@@ -1,0 +1,16 @@
+{
+  "name": "ste-gestion",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Gestion Scierie — monorepo (web + api + shared)",
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:web": "pnpm --filter @ste/web dev",
+    "dev:api": "pnpm --filter @ste/api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @ste/shared test",
+    "test:e2e": "node apps/api/scripts/smoke-summary.mjs"
+  }
+}

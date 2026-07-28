@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  // Les tests tournent sous vitest (APIs Node, import.meta) — hors build/typecheck
+  // du paquet, qui ne dépend pas de @types/node.
+  "exclude": ["src/**/*.test.ts"]
+}

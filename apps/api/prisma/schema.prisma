@@ -1,0 +1,395 @@
+// Prisma schema — Contrats.
+// DB en anglais, snake_case. Decimal pour argent/volume (jamais float).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ContractStatus {
+  OPEN
+  CLOSED
+}
+
+enum UserRole {
+  ADMIN
+  BUREAU
+  PARC
+  SCIERIE
+  EXPORT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(BUREAU)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("user")
+}
+
+model Contract {
+  id     String         @id @default(cuid())
+  code   String         @unique
+  year   Int?
+  status ContractStatus @default(OPEN)
+  note   String?
+
+  // ── Termes du contrat (saisis) ──────────────────────────────────────
+  quotaM3       Decimal @map("quota_m3") @db.Decimal(12, 6)
+  trucksPlanned Int     @default(0) @map("trucks_planned")
+
+  // Administratif (bordereau SODEFOR — saisie progressive, tout optionnel)
+  signedAt            DateTime? @map("signed_at")
+  durationMonths      Int?      @map("duration_months")
+  exploitationStartAt DateTime? @map("exploitation_start_at")
+  forest              String?
+  managementCenter    String?   @map("management_center")
+
+  // Paramètres de prix (F7/F9)
+  sodeforPrice    Decimal @default(0) @map("sodefor_price") @db.Decimal(18, 2)
+  ibrahimPrice    Decimal @default(0) @map("ibrahim_price") @db.Decimal(18, 2)
+  transportPrice  Decimal @default(0) @map("transport_price") @db.Decimal(18, 2)
+  cubagePrice     Decimal @default(0) @map("cubage_price") @db.Decimal(18, 2)
+  companyPrice    Decimal @default(0) @map("company_price") @db.Decimal(18, 2)
+  exportPrice     Decimal @default(0) @map("export_price") @db.Decimal(18, 2)
+  sellingPriceUsd Decimal @default(0) @map("selling_price_usd") @db.Decimal(18, 2)
+  usdCfaRate      Decimal @default(0) @map("usd_cfa_rate") @db.Decimal(10, 4)
+  oneInchPrice    Decimal @default(0) @map("one_inch_price") @db.Decimal(18, 2)
+
+  // Frais SODEFOR fixes du contrat (FCFA)
+  feeSodeforR      Decimal @default(0) @map("fee_sodefor_r") @db.Decimal(18, 2)
+  feeSodeforPlus   Decimal @default(0) @map("fee_sodefor_plus") @db.Decimal(18, 2)
+  feeReforestation Decimal @default(0) @map("fee_reforestation") @db.Decimal(18, 2)
+
+  // Budgets (FCFA) — F8 formule inconnue, saisis
+  woodBudget     Decimal  @default(0) @map("wood_budget") @db.Decimal(18, 2)
+  companyBudget  Decimal  @default(0) @map("company_budget") @db.Decimal(18, 2)
+  exportBudget   Decimal  @default(0) @map("export_budget") @db.Decimal(18, 2)
+  expectedProfit Decimal? @map("expected_profit") @db.Decimal(18, 2)
+
+  // Tiers assignés → activent les suggestions de dûs
+  sodeforPartyId   String? @map("sodefor_party_id")
+  cubagePartyId    String? @map("cubage_party_id")
+  transportPartyId String? @map("transport_party_id")
+  sodeforParty     Party?  @relation("SodeforParty", fields: [sodeforPartyId], references: [id])
+  cubageParty      Party?  @relation("CubageParty", fields: [cubagePartyId], references: [id])
+  transportParty   Party?  @relation("TransportParty", fields: [transportPartyId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  trucks         Truck[]
+  productionRuns ProductionRun[]
+  accountEntries AccountEntry[]
+  sales          Sale[]
+  containers     Container[]
+
+  @@map("contract")
+}
+
+enum PartyType {
+  SUPPLIER
+  TRANSPORTER
+  CLIENT
+  INTERNAL
+  TAX_AUTHORITY
+  OTHER
+}
+
+enum EntryKind {
+  DUE
+  PAID
+}
+
+model Party {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  type      PartyType @default(OTHER)
+  note      String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  entries          AccountEntry[]
+  sales            Sale[]
+  containers       Container[]
+  sodeforContracts Contract[]     @relation("SodeforParty")
+  cubageContracts  Contract[]     @relation("CubageParty")
+  transportContracts Contract[]   @relation("TransportParty")
+
+  @@map("party")
+}
+
+model AccountEntry {
+  id          String    @id @default(cuid())
+  contractId  String    @map("contract_id")
+  contract    Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  partyId     String    @map("party_id")
+  party       Party     @relation(fields: [partyId], references: [id], onDelete: Restrict)
+  kind        EntryKind
+  amount      Decimal   @db.Decimal(18, 2)
+  description String?
+  entryDate   DateTime  @default(now()) @map("entry_date")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("account_entry")
+}
+
+enum MeasurementContext {
+  FIELD
+  YARD_GIRTH
+  YARD_DIAMETER
+}
+
+model Truck {
+  id           String   @id @default(cuid())
+  contractId   String   @map("contract_id")
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  registration String
+  deliveryNote String?  @map("delivery_note") // B/L — clé pivot du suivi par camion
+  parcel       String?
+  origin       String?
+
+  // Bordereau SODEFOR « circulation des bois » (saisie progressive, tout optionnel)
+  transporter   String? // société de transport (ex JAMAL)
+  driver        String? // chauffeur (ex KONATE MADOU)
+  trailer       String? // remorque (ex 7794 F3 01)
+  bookletNo     String?   @map("booklet_no") // n° carnet de circulation (ex 6455)
+  bonNo         String?   @map("bon_no") // n° BON (ex 225640693814)
+  smsCode       String?   @map("sms_code") // code vérification SMS (ex 47734027)
+  followupAgent String?   @map("followup_agent") // agent de suivi (ex Sgt Koffi Joel)
+  destination   String? // parc usine / destination (ex TOUMODI)
+  loadedAt      DateTime? @map("loaded_at") // date/heure de chargement
+
+  // Déclaré à l'arrivée (documents B/L), avant étalage
+  declaredFieldM3  Decimal? @map("declared_field_m3") @db.Decimal(12, 6)
+  declaredLogCount Int?     @map("declared_log_count")
+  // Écart comptage bordereau vs parc confirmé « normal » par l'opérateur (assumé, non bloquant)
+  countGapConfirmed Boolean @default(false) @map("count_gap_confirmed")
+  arrivedAt        DateTime @default(now()) @map("arrived_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  measurements   LogMeasurement[]
+  packingLogs    PackingLog[]
+  productionRuns ProductionRunTruck[]
+  containers     ContainerTruck[]
+
+  @@map("truck")
+}
+
+// Packing list grumes = « Spécification de transport » SODEFOR (1 ligne par bille).
+// Détail optionnel : le total obligatoire reste declaredFieldM3 / declaredLogCount.
+// Volume = valeur déclarée du document (pas recalculée par nos formules).
+model PackingLog {
+  id       String @id @default(cuid())
+  truckId  String @map("truck_id")
+  truck    Truck  @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  position Int
+  billNo   String? @map("bill_no") // N° bille (ex 1509)
+
+  diaTopCm    Decimal? @map("dia_top_cm") @db.Decimal(8, 2) // Ø gros bout (cm)
+  diaBottomCm Decimal? @map("dia_bottom_cm") @db.Decimal(8, 2) // Ø petit bout (cm)
+  diaMeanCm   Decimal? @map("dia_mean_cm") @db.Decimal(8, 2) // Ø moyen (cm)
+  lengthM     Decimal? @map("length_m") @db.Decimal(8, 3) // longueur (m)
+  volumeM3    Decimal  @map("volume_m3") @db.Decimal(12, 6) // volume déclaré (m³)
+
+  @@map("packing_log")
+}
+
+model LogMeasurement {
+  id         String             @id @default(cuid())
+  truckId    String             @map("truck_id")
+  truck      Truck              @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  context    MeasurementContext
+  measuredAt DateTime           @default(now()) @map("measured_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  logs Log[]
+
+  @@map("log_measurement")
+}
+
+model Log {
+  id            String         @id @default(cuid())
+  measurementId String         @map("measurement_id")
+  measurement   LogMeasurement @relation(fields: [measurementId], references: [id], onDelete: Cascade)
+  position      Int
+  externalId    String?        @map("external_id")
+
+  // Unités selon contexte : FIELD/YARD_GIRTH = m + cm (F2) ; YARD_DIAMETER = ft + in (F1)
+  lengthM         Decimal? @map("length_m") @db.Decimal(8, 3)
+  lengthFt        Decimal? @map("length_ft") @db.Decimal(8, 3)
+  diameterIn      Decimal? @map("diameter_in") @db.Decimal(8, 3)
+  circumferenceCm Decimal? @map("circumference_cm") @db.Decimal(8, 2)
+
+  volumeM3 Decimal  @map("volume_m3") @db.Decimal(12, 6)
+  cft      Decimal? @db.Decimal(12, 4)
+
+  productionRuns ProductionRunLog[]
+
+  @@map("log")
+}
+
+enum SizeGroup {
+  MAIN
+  SIDE
+  ONE_INCH
+  OTHER
+}
+
+model ProductionRun {
+  id         String   @id @default(cuid())
+  contractId String   @map("contract_id")
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  producedAt DateTime @default(now()) @map("produced_at")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  lines  SawnLine[]
+  trucks ProductionRunTruck[]
+  logs   ProductionRunLog[]
+
+  @@map("production_run")
+}
+
+// Lien N-N : billes (billons girth) sciées dans une session — granularité fine.
+// Session sans billes liées = camion entier (comportement historique).
+model ProductionRunLog {
+  runId String        @map("run_id")
+  logId String        @map("log_id")
+  run   ProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  log   Log           @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@id([runId, logId])
+  @@map("production_run_log")
+}
+
+// Lien N-N : camions sciés dans une session.
+model ProductionRunTruck {
+  runId   String        @map("run_id")
+  truckId String        @map("truck_id")
+  run     ProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  truck   Truck         @relation(fields: [truckId], references: [id], onDelete: Cascade)
+
+  @@id([runId, truckId])
+  @@map("production_run_truck")
+}
+
+model Sale {
+  id           String   @id @default(cuid())
+  contractId   String   @map("contract_id")
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  clientId     String?  @map("client_id")
+  client       Party?   @relation(fields: [clientId], references: [id])
+  saleDate     DateTime @default(now()) @map("sale_date")
+  deliveryNote String?  @map("delivery_note")
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  lines SaleLine[]
+
+  @@map("sale")
+}
+
+model SaleLine {
+  id       String @id @default(cuid())
+  saleId   String @map("sale_id")
+  sale     Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  position Int
+
+  sizeCode     String   @map("size_code")
+  volumeM3     Decimal  @map("volume_m3") @db.Decimal(12, 6)
+  unitPriceUsd Decimal? @map("unit_price_usd") @db.Decimal(18, 2)
+  usdCfaRate   Decimal? @map("usd_cfa_rate") @db.Decimal(10, 4)
+  unitPriceCfa Decimal? @map("unit_price_cfa") @db.Decimal(18, 2)
+  amountCfa    Decimal  @map("amount_cfa") @db.Decimal(18, 2)
+
+  @@map("sale_line")
+}
+
+enum ContainerStatus {
+  PLANNED
+  LOADING
+  LOADED
+  SHIPPED
+}
+
+model Container {
+  id          String          @id @default(cuid())
+  contractId  String          @map("contract_id")
+  contract    Contract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  clientId    String?         @map("client_id")
+  client      Party?          @relation(fields: [clientId], references: [id])
+  containerNo String          @map("container_no")
+  sealNo      String?         @map("seal_no")
+  fauxSealNo  String?         @map("faux_seal_no")
+  bookingNo   String?         @map("booking_no")
+  grade       String?
+  destination String?
+  status      ContainerStatus @default(PLANNED)
+  loadedAt    DateTime?       @map("loaded_at")
+  shippedAt   DateTime?       @map("shipped_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  items  ContainerItem[]
+  trucks ContainerTruck[]
+
+  @@map("container")
+}
+
+// Lien N-N : camions d'origine des débités empotés dans un conteneur (traçabilité).
+model ContainerTruck {
+  containerId String    @map("container_id")
+  truckId     String    @map("truck_id")
+  container   Container @relation(fields: [containerId], references: [id], onDelete: Cascade)
+  truck       Truck     @relation(fields: [truckId], references: [id], onDelete: Cascade)
+
+  @@id([containerId, truckId])
+  @@map("container_truck")
+}
+
+// Ligne d'empotage — même calcul que débité (F3).
+model ContainerItem {
+  id          String    @id @default(cuid())
+  containerId String    @map("container_id")
+  container   Container @relation(fields: [containerId], references: [id], onDelete: Cascade)
+  position    Int
+
+  lengthFt    Decimal @map("length_ft") @db.Decimal(8, 3)
+  widthIn     Decimal @map("width_in") @db.Decimal(8, 3)
+  thicknessIn Decimal @map("thickness_in") @db.Decimal(8, 3)
+  count       Int
+
+  sizeCode  String    @map("size_code")
+  sizeGroup SizeGroup @map("size_group")
+  volumeM3  Decimal   @map("volume_m3") @db.Decimal(12, 6)
+
+  @@map("container_item")
+}
+
+model SawnLine {
+  id       String        @id @default(cuid())
+  runId    String        @map("run_id")
+  run      ProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  position Int
+
+  lengthFt    Decimal @map("length_ft") @db.Decimal(8, 3)
+  widthIn     Decimal @map("width_in") @db.Decimal(8, 3)
+  thicknessIn Decimal @map("thickness_in") @db.Decimal(8, 3)
+  count       Int
+
+  sizeCode  String    @map("size_code")
+  sizeGroup SizeGroup @map("size_group")
+  volumeM3  Decimal   @map("volume_m3") @db.Decimal(12, 6)
+
+  @@map("sawn_line")
+}
