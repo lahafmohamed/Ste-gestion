@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { USER_ROLE_LABELS } from "@ste/shared";
 import { clearSession, getUser } from "../lib/auth";
+import { buttonCls } from "./ui/Button";
 import {
   IconBox,
   IconContainer,
@@ -120,18 +121,12 @@ export default function Layout() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            to="/contracts"
-            className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-slate-900"
-          >
+          <Link to="/contracts" className={buttonCls("secondary", "sm")}>
             <IconContract width={16} height={16} />
             <span className="hidden sm:inline">Contrats</span>
           </Link>
           {!onContracts && (
-            <Link
-              to="/contracts?nouveau=1"
-              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
-            >
+            <Link to="/contracts?nouveau=1" className={buttonCls("primary", "sm")}>
               + Contrat
             </Link>
           )}

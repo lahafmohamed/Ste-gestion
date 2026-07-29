@@ -11,7 +11,10 @@ import {
   type SizeGroup,
   type TruckDTO,
 } from "@ste/shared";
-import { fmtNum, fmtPct } from "../lib/format";
+import { fmtNum, fmtPct, normalizeDecimal, todayISO } from "../lib/format";
+import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
+import Button from "./ui/Button";
+import Chip from "./ui/Chip";
 
 // Cubage des billons (girth) d'un camion — dénominateur du rendement.
 function truckGirthM3(t: TruckDTO): number {
@@ -53,13 +56,6 @@ function rowInfo(r: RowState) {
   if (!(L > 0) || !(w > 0) || !(t > 0) || !Number.isInteger(n) || n < 1) return null;
   return { volume: sawnVolumeM3(L, w, t, n), size: classifySize(w, t), count: n };
 }
-
-const GROUP_BADGE: Record<SizeGroup, string> = {
-  MAIN: "bg-sky-50 text-sky-700",
-  SIDE: "bg-amber-50 text-amber-700",
-  ONE_INCH: "bg-violet-50 text-violet-700",
-  OTHER: "bg-slate-100 text-slate-500",
-};
 
 type Props = {
   onSave: (data: Omit<ProductionRunCreateInput, "contractId">) => void;
@@ -139,7 +135,8 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
     if (lines.length === 0) return;
     onSave({
       lines,
-      producedAt: date ? new Date(date) : undefined,
+      // Midi local : la date seule ne doit pas glisser d'un jour en UTC.
+      producedAt: date ? new Date(`${date}T12:00:00`) : undefined,
       note: note.trim() || undefined,
       truckIds: truckIds.length > 0 ? truckIds : undefined,
       logIds: logIds.length > 0 ? logIds : undefined,
@@ -154,6 +151,8 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
           <input
             type="date"
             value={date}
+            // Une session de sciage n'a pas lieu dans le futur — évite le 2026 → 2062.
+            max={todayISO()}
             onChange={(e) => setDate(e.target.value)}
             className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
           />
@@ -176,19 +175,10 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
           </div>
           <div className="flex flex-wrap gap-2">
             {trucks.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => toggleTruck(t.id)}
-                className={`rounded-full border px-2.5 py-1 text-xs ${
-                  truckIds.includes(t.id)
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 text-slate-600"
-                }`}
-              >
+              <Chip key={t.id} selected={truckIds.includes(t.id)} onClick={() => toggleTruck(t.id)}>
                 {t.registration}
                 {t.sawn ? " ✓" : ""}
-              </button>
+              </Chip>
             ))}
           </div>
 
@@ -240,7 +230,7 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
                                 : [...new Set([...p, ...ids])]
                             )
                           }
-                          className={`w-14 shrink-0 rounded px-1.5 py-0.5 text-left text-[11px] font-medium tabular-nums ${
+                          className={`w-14 shrink-0 rounded px-1.5 py-0.5 text-left text-xs font-medium tabular-nums ${
                             selOfBill > 0 ? "text-emerald-700" : "text-slate-500"
                           }`}
                         >
@@ -248,20 +238,15 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
                           <span className="ml-0.5 text-slate-400">·{ids.length}</span>
                         </button>
                         {g.billons.map((l) => (
-                          <button
+                          <Chip
                             key={l.id}
-                            type="button"
+                            selected={logIds.includes(l.id)}
                             onClick={() => toggleLog(l.id)}
                             title={`${l.externalId ?? `#${l.position}`} — ${Number(l.volumeM3).toFixed(4)} m³`}
-                            className={`rounded-full px-2 py-0.5 text-[11px] ${
-                              logIds.includes(l.id)
-                                ? "bg-emerald-600 text-white"
-                                : "bg-white text-slate-600 ring-1 ring-slate-200"
-                            }`}
                           >
                             {/* Suffixe seul (A, B, C…) : la bille est déjà en tête de ligne. */}
                             {l.externalId?.slice(g.bill.length) || l.externalId || `#${l.position}`}
-                          </button>
+                          </Chip>
                         ))}
                       </div>
                     );
@@ -274,8 +259,8 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
       )}
 
       <div className="overflow-x-auto">
-      <div className="min-w-[620px]">
-      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2rem] items-center gap-1 text-xs text-slate-500">
+      <div className="min-w-[640px]">
+      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1 text-xs text-slate-500">
         <span>#</span>
         <span>L (ft)</span>
         <span>l (in)</span>
@@ -291,7 +276,7 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
         return (
           <div
             key={i}
-            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2rem] items-center gap-1"
+            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1"
           >
             <span className="text-xs text-slate-400">{i + 1}</span>
             {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
@@ -299,7 +284,8 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
                 key={k}
                 inputMode="decimal"
                 value={r[k]}
-                onChange={(e) => setRow(i, { [k]: e.target.value })}
+                // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
+                onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
                 onKeyDown={
                   k === "count"
                     ? (e) => {
@@ -310,23 +296,23 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
                       }
                     : undefined
                 }
-                className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+                className="w-full min-w-0 rounded-lg border border-slate-200 px-2.5 py-2.5 text-base outline-none focus:border-slate-900"
               />
             ))}
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-center text-xs ${
-                info ? GROUP_BADGE[info.size.group] : "text-slate-300"
-              }`}
-            >
-              {info ? info.size.code : "—"}
-            </span>
+            {info ? (
+              <Badge tone={SIZE_GROUP_TONE[info.size.group]} className="justify-self-center">
+                {info.size.code}
+              </Badge>
+            ) : (
+              <span className="text-center text-xs text-slate-300">—</span>
+            )}
             <span className="text-right text-sm tabular-nums text-slate-700">
               {info ? info.volume.toFixed(3) : "—"}
             </span>
             <button
               type="button"
               onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-              className="text-slate-300 hover:text-red-500"
+              className="flex h-11 w-full items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
               aria-label="Supprimer la ligne"
             >
               ×
@@ -338,13 +324,9 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
       </div>
 
       <div className="mt-2 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setRows((p) => [...p, emptyRow()])}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button size="xs" onClick={() => setRows((p) => [...p, emptyRow()])}>
           + Ligne
-        </button>
+        </Button>
         <div className="text-sm">
           <span className="text-slate-500">
             {fmtNum(pieces)} pièces ·{" "}
@@ -359,22 +341,22 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
             {(Object.keys(groups) as SizeGroup[])
               .filter((g) => groups[g] > 0)
               .map((g) => (
-                <span key={g} className={`rounded-full px-2 py-0.5 text-xs ${GROUP_BADGE[g]}`}>
+                <Badge key={g} tone={SIZE_GROUP_TONE[g]}>
                   {SIZE_GROUP_LABELS[g]} {fmtNum(groups[g].toFixed(3))} m³
-                </span>
+                </Badge>
               ))}
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone="sky">
               Long ≥6,5ft {fmtNum(longM3.toFixed(3))} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
               {fmtNum(shortM3.toFixed(3))}
-            </span>
+            </Badge>
             {bands
               .filter((b) => b.m3 > 0)
               .map((b) => (
-                <span key={b.key} className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                <Badge key={b.key}>
                   {b.label} {fmtNum(b.m3.toFixed(3))}
-                </span>
+                </Badge>
               ))}
           </div>
           {rendement !== null && (
@@ -391,14 +373,15 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
         </div>
       )}
 
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        size="lg"
+        className="mt-3 w-full"
         onClick={save}
         disabled={saving || valid.length === 0}
-        className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
       >
         {saving ? "Enregistrement…" : `Valider la session (${valid.length} lignes)`}
-      </button>
+      </Button>
     </div>
   );
 }

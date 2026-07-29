@@ -11,6 +11,10 @@ import {
   type MeasurementContext,
 } from "@ste/shared";
 import { fmtNum, normalizeDecimal } from "../lib/format";
+import Badge from "./ui/Badge";
+import Button from "./ui/Button";
+import Chip from "./ui/Chip";
+import { FormError } from "./ui/Feedback";
 
 // `id` : clé React stable. Avec l'index, supprimer la ligne 3 décalait toutes
 // les suivantes — React réutilisait les <input> et le focus atterrissait sur la
@@ -388,13 +392,14 @@ export default function TallyEntry({
           {/* Le parc se dépile dans l'ordre : la bille suivante à tronçonner
               mérite un bouton pleine largeur, pas d'être cherchée dans 60 pastilles. */}
           {nextBill && (
-            <button
-              type="button"
+            <Button
+              variant="emerald"
+              size="lg"
+              className="mb-2 w-full tabular-nums"
               onClick={() => addBillon(nextBill)}
-              className="mb-2 w-full rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-medium text-white tabular-nums hover:bg-slate-700"
             >
               Bille suivante · {nextBill}
-            </button>
+            </Button>
           )}
           {!nextBill && !allBills && (
             <p className="mb-2 text-xs text-slate-500">Toutes les billes sont entamées.</p>
@@ -404,19 +409,16 @@ export default function TallyEntry({
             {visibleBills.map((b) => {
               const n = billonsPerBill.get(billParent(b) ?? b) ?? 0;
               return (
-                <button
+                <Chip
                   key={b}
-                  type="button"
+                  size="lg"
+                  selected={n > 0}
+                  className="tabular-nums"
                   onClick={() => addBillon(b)}
-                  className={`rounded-lg px-2.5 py-2 text-sm tabular-nums ring-1 ${
-                    n > 0
-                      ? "bg-slate-900 text-white ring-slate-900"
-                      : "bg-white text-slate-700 ring-slate-200 hover:ring-slate-900"
-                  }`}
                 >
                   {b}
                   {n > 0 && <span className="ml-1 text-xs opacity-70">×{n}</span>}
-                </button>
+                </Chip>
               );
             })}
           </div>
@@ -567,17 +569,14 @@ export default function TallyEntry({
                 <span className="text-slate-500">
                   Billes : {billValidCount} / {declared.count} annoncées
                 </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 font-medium tabular-nums ${
-                    billValidCount === declared.count
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-amber-100 text-amber-700"
-                  }`}
+                <Badge
+                  tone={billValidCount === declared.count ? "emerald" : "amber"}
+                  className="tabular-nums"
                 >
                   {billValidCount === declared.count
                     ? "compte bon ✓"
                     : `écart ${billValidCount - declared.count > 0 ? "+" : ""}${billValidCount - declared.count}`}
-                </span>
+                </Badge>
               </div>
             )}
             {declared.m3 != null && declared.m3 > 0 && (
@@ -585,16 +584,13 @@ export default function TallyEntry({
                 <span className="text-slate-500">
                   Volume : {fmtNum(total.toFixed(3))} / {fmtNum(declared.m3.toFixed(3))} m³ brousse
                 </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 font-medium tabular-nums ${
-                    Math.abs(total - declared.m3) / declared.m3 <= 0.05
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-amber-100 text-amber-700"
-                  }`}
+                <Badge
+                  tone={Math.abs(total - declared.m3) / declared.m3 <= 0.05 ? "emerald" : "amber"}
+                  className="tabular-nums"
                 >
                   {total - declared.m3 >= 0 ? "+" : ""}
                   {fmtNum((total - declared.m3).toFixed(3))} m³
-                </span>
+                </Badge>
               </div>
             )}
           </div>
@@ -625,27 +621,27 @@ export default function TallyEntry({
       {/* Enregistrement échoué (réseau du parc, contrat clôturé…) : la saisie
           reste à l'écran et le brouillon est conservé — retaper Valider suffit. */}
       {error && (
-        <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          Enregistrement échoué : {error}
-          <div className="mt-0.5 text-xs text-red-600">
-            Rien n'est perdu — la saisie est conservée. Retaper « Valider » pour réessayer.
-          </div>
+        <div className="mt-3">
+          <FormError hint="Rien n'est perdu — la saisie est conservée. Retaper « Valider » pour réessayer.">
+            Enregistrement échoué : {error}
+          </FormError>
         </div>
       )}
 
       {!embedded && (
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          size="lg"
+          className="mt-3 w-full"
           onClick={save}
           disabled={saving || validCount === 0}
-          className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-3 text-base font-medium text-white disabled:opacity-40"
         >
           {saving
             ? "Enregistrement…"
             : error
               ? `Réessayer (${validCount})`
               : `Valider ${isGirth ? "le billonnage" : "l'étalage"} (${validCount})`}
-        </button>
+        </Button>
       )}
       </div>
     </div>

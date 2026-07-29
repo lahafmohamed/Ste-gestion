@@ -32,6 +32,15 @@ export function normalizeDecimal(v: string): string {
   return v.replace(/,/g, ".");
 }
 
+/**
+ * Date locale du jour en YYYY-MM-DD (input type=date, borne max des dates
+ * saisies — un camion ou une session de sciage n'arrive pas dans le futur).
+ */
+export function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** % utilisé du quota, borné [0,100+], -1 si quota 0. */
 export function usedPct(used: string | number, quota: string | number): number {
   const q = Number(quota);

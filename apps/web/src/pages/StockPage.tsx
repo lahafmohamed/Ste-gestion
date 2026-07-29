@@ -1,15 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { SIZE_GROUP_LABELS, type SizeGroup } from "@ste/shared";
+import { SIZE_GROUP_LABELS } from "@ste/shared";
 import StepLayout from "../components/StepLayout";
+import Badge, { SIZE_GROUP_TONE } from "../components/ui/Badge";
 import { contractsApi } from "../lib/api";
 import { fmtM3, fmtNum } from "../lib/format";
-
-const GROUP_BADGE: Record<SizeGroup, string> = {
-  MAIN: "bg-sky-50 text-sky-700",
-  SIDE: "bg-amber-50 text-amber-700",
-  ONE_INCH: "bg-violet-50 text-violet-700",
-  OTHER: "bg-slate-100 text-slate-500",
-};
 
 export default function StockPage() {
   return (
@@ -131,9 +125,7 @@ function StockInner({ contractId }: { contractId: string }) {
                 <tr key={r.code} className="border-t border-slate-100">
                   <td className="py-1 pr-4 font-medium">{r.code}</td>
                   <td className="py-1 pr-4">
-                    <span className={`rounded-full px-1.5 py-0.5 text-xs ${GROUP_BADGE[r.group]}`}>
-                      {SIZE_GROUP_LABELS[r.group]}
-                    </span>
+                    <Badge tone={SIZE_GROUP_TONE[r.group]}>{SIZE_GROUP_LABELS[r.group]}</Badge>
                   </td>
                   <td className="py-1 pr-4 text-right tabular-nums">{fmtNum(r.producedM3)}</td>
                   <td className="py-1 pr-4 text-right tabular-nums">{fmtNum(r.soldM3)}</td>

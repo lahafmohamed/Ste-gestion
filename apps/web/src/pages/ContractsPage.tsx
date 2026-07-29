@@ -7,6 +7,10 @@ import { fmtInt } from "../lib/format";
 import { PageHeader } from "../components/Layout";
 import { ContractQuickCreate } from "../components/ContractSections";
 import { QuotaBar } from "../components/QuotaGauge";
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
+import Chip from "../components/ui/Chip";
+import { EmptyState, QueryError } from "../components/ui/Feedback";
 
 function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
   return (
@@ -26,13 +30,9 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
             {c.forest ? ` · ${c.forest}` : ""}
           </div>
         </div>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs ${
-            c.status === "OPEN" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-          }`}
-        >
+        <Badge tone={c.status === "OPEN" ? "emerald" : "slate"}>
           {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
-        </span>
+        </Badge>
       </div>
       <div className="mt-3">
         {o ? (
@@ -122,23 +122,15 @@ export default function ContractsPage() {
 
   const filtering = q.trim() !== "" || year !== "ALL";
 
-  const chipCls = (on: boolean) =>
-    `rounded-full px-2.5 py-1 text-xs ${
-      on ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:ring-slate-400"
-    }`;
-
   return (
     <>
       <PageHeader
         title="Contrats"
         subtitle={`${openCount} ouvert(s)${closedCount > 0 ? ` · ${closedCount} clôturé(s)` : ""} — l'état opérationnel est calculé à partir des opérations.`}
         right={
-          <button
-            onClick={() => setShowForm((s) => !s)}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
+          <Button variant="primary" onClick={() => setShowForm((s) => !s)}>
             {showForm ? "Fermer" : "+ Nouveau contrat"}
-          </button>
+          </Button>
         }
       />
 
@@ -178,24 +170,20 @@ export default function ContractsPage() {
               <div className="flex flex-wrap gap-1.5">
                 {years.length > 1 && (
                   <>
-                    <button type="button" onClick={() => setYear("ALL")} className={chipCls(year === "ALL")}>
+                    <Chip selected={year === "ALL"} onClick={() => setYear("ALL")}>
                       Toutes années
-                    </button>
+                    </Chip>
                     {years.map((y) => (
-                      <button key={y} type="button" onClick={() => setYear(y)} className={chipCls(year === y)}>
+                      <Chip key={y} selected={year === y} onClick={() => setYear(y)}>
                         {y}
-                      </button>
+                      </Chip>
                     ))}
                   </>
                 )}
                 {closedCount > 0 && openCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowClosed((s) => !s)}
-                    className={chipCls(withClosed)}
-                  >
+                  <Chip selected={withClosed} onClick={() => setShowClosed((s) => !s)}>
                     {withClosed ? "Masquer les clôturés" : `Clôturés (${closedCount})`}
-                  </button>
+                  </Chip>
                 )}
               </div>
             )}
@@ -205,32 +193,21 @@ export default function ContractsPage() {
         <div className="space-y-3">
           {contracts.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
           {contracts.isError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="text-sm text-red-700">
-                Impossible de charger les contrats
-                {contracts.error instanceof Error ? ` : ${contracts.error.message}` : "."}
-              </p>
-              <button
-                type="button"
-                onClick={() => contracts.refetch()}
-                className="mt-2 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
-              >
-                Réessayer
-              </button>
-            </div>
+            <QueryError error={contracts.error} onRetry={() => contracts.refetch()}>
+              Impossible de charger les contrats
+            </QueryError>
           )}
 
-          {!contracts.isLoading && all.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
-              <p className="text-sm text-slate-500">Aucun contrat pour l'instant.</p>
-              <button
-                type="button"
-                onClick={() => setShowForm(true)}
-                className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-              >
-                + Créer le premier contrat
-              </button>
-            </div>
+          {!contracts.isLoading && !contracts.isError && all.length === 0 && (
+            <EmptyState
+              action={
+                <Button variant="primary" onClick={() => setShowForm(true)}>
+                  + Créer le premier contrat
+                </Button>
+              }
+            >
+              Aucun contrat pour l'instant.
+            </EmptyState>
           )}
 
           {all.length > 0 && shown.length === 0 && (

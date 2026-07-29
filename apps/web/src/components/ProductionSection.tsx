@@ -10,8 +10,11 @@ import {
   type SizeGroup,
 } from "@ste/shared";
 import { productionApi, trucksApi } from "../lib/api";
-import { fmtInt, fmtM3 } from "../lib/format";
+import { fmtInt, fmtM3, fmtNum } from "../lib/format";
 import SawnEntry from "./SawnEntry";
+import Badge from "./ui/Badge";
+import Button from "./ui/Button";
+import { EmptyState, QueryError } from "./ui/Feedback";
 
 export default function ProductionSection({ contractId }: { contractId: string }) {
   const qc = useQueryClient();
@@ -45,12 +48,9 @@ export default function ProductionSection({ contractId }: { contractId: string }
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           Débitage ({runs.data?.length ?? 0} sessions)
         </h2>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Fermer" : "+ Session"}
-        </button>
+        </Button>
       </div>
 
       {showForm && (
@@ -66,8 +66,14 @@ export default function ProductionSection({ contractId }: { contractId: string }
       )}
 
       <div className="space-y-2">
+        {runs.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {runs.isError && (
+          <QueryError error={runs.error} onRetry={() => runs.refetch()}>
+            Impossible de charger les sessions de débitage
+          </QueryError>
+        )}
         {runs.data?.length === 0 && !showForm && (
-          <p className="text-sm text-slate-500">Aucune session de débitage.</p>
+          <EmptyState>Aucune session de débitage.</EmptyState>
         )}
         {runs.data?.map((r) => {
           const groups = runGroupTotals(r);
@@ -92,19 +98,14 @@ export default function ProductionSection({ contractId }: { contractId: string }
                 {(Object.keys(groups) as SizeGroup[])
                   .filter((g) => groups[g] > 0)
                   .map(
-                    (g) => ` · ${SIZE_GROUP_LABELS[g]} ${groups[g].toFixed(3)}`
+                    (g) => ` · ${SIZE_GROUP_LABELS[g]} ${fmtNum(groups[g].toFixed(3))}`
                   )
                   .join("")}
               </div>
               {r.truckIds.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {linked.map((t) => (
-                    <span
-                      key={t.id}
-                      className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600"
-                    >
-                      {t.registration}
-                    </span>
+                    <Badge key={t.id}>{t.registration}</Badge>
                   ))}
                 </div>
               )}

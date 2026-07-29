@@ -13,6 +13,8 @@ import CuttingSection from "../components/CuttingSection";
 import SalesSection from "../components/SalesSection";
 import ContainersSection from "../components/ContainersSection";
 import AccountsSection from "../components/AccountsSection";
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
@@ -160,12 +162,12 @@ export default function ContractDetailPage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button
+          <Button
+            size="sm"
             onClick={() => downloadFile(`/contracts/${c.id}/export.xlsx`, `contrat-${c.code}.xlsx`)}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-900"
           >
             Exporter Excel
-          </button>
+          </Button>
           <button
             onClick={() => {
               setDelText("");
@@ -213,21 +215,14 @@ export default function ContractDetailPage() {
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
+            <Button
+              variant="danger"
               onClick={() => del.mutate()}
               disabled={delText.trim() !== c.code || del.isPending}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
             >
               {del.isPending ? "Suppression…" : "Supprimer définitivement"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDelOpen(false)}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700"
-            >
-              Annuler
-            </button>
+            </Button>
+            <Button onClick={() => setDelOpen(false)}>Annuler</Button>
           </div>
         </div>
       )}
@@ -342,32 +337,26 @@ export default function ContractDetailPage() {
                   {/* Perte au parc : brousse (brut forêt) vs billes étalées — écorce,
                       nettoyage, sur-déclaration. Anomalie forte = à creuser. */}
                   {Number(s.brousseM3) > 0 && Number(s.diaM3) > 0 && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 ${
-                        1 - Number(s.diaM3) / Number(s.brousseM3) > 0.25
-                          ? "bg-amber-50 text-amber-700"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
+                    <Badge
+                      tone={1 - Number(s.diaM3) / Number(s.brousseM3) > 0.25 ? "amber" : "slate"}
                       title="Écart entre le cubage brousse déclaré et les billes mesurées à l'étalage"
                     >
                       Perte brousse → parc :{" "}
                       {fmtPct((1 - Number(s.diaM3) / Number(s.brousseM3)) * 100, 1)}
-                    </span>
+                    </Badge>
                   )}
                   {Number(s.girthM3) > 0 && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                    <Badge tone="emerald">
                       Billons ≥85 cm : {fmtM3(s.girthGte85M3)} · &lt;85 : {fmtM3(s.girthLt85M3)}
-                    </span>
+                    </Badge>
                   )}
                   {Number(s.debitedM3) > 0 && (
                     <>
-                      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">
+                      <Badge tone="sky">
                         Long 6,5ft+ : {fmtM3(s.longM3)} ({fmtPct(Number(s.longPct), 0)}) · court :{" "}
                         {fmtM3(s.shortM3)}
-                      </span>
-                      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-700">
-                        1" : {fmtPct(Number(s.oneInchPct))}
-                      </span>
+                      </Badge>
+                      <Badge tone="violet">1" : {fmtPct(Number(s.oneInchPct))}</Badge>
                     </>
                   )}
                 </div>

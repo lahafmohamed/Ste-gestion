@@ -4,8 +4,12 @@ import { Link } from "react-router-dom";
 import type { MeasurementCreateInput, TruckDTO } from "@ste/shared";
 import { measurementTotalM3, truckBillCount, truckBillNos } from "@ste/shared";
 import { trucksApi } from "../lib/api";
-import { fmtM3, fmtNum, fmtPct, normalizeDecimal } from "../lib/format";
+import { fmtM3, fmtNum, fmtPct, normalizeDecimal, todayISO } from "../lib/format";
 import TallyEntry, { clearTallyDraft } from "./TallyEntry";
+import Badge from "./ui/Badge";
+import Button from "./ui/Button";
+import Chip from "./ui/Chip";
+import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 
 // Flux en 3 étapes (chronologie réelle du parc) :
 // 1. Réception — le camion arrive : immat, B/L, parcelle, origine, vol brousse
@@ -30,12 +34,6 @@ function declaredOf(t: TruckDTO) {
     count: t.declaredLogCount ?? null,
     m3: t.declaredFieldM3 != null ? Number(t.declaredFieldM3) : null,
   };
-}
-
-// Date locale YYYY-MM-DD (input type=date).
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 type ParcFilter = "ALL" | "A_ETALER" | "A_BILLONNER" | "TERMINES";
@@ -202,15 +200,15 @@ export default function TrucksSection({
           Camions ({trucks.data?.length ?? 0})
         </h2>
         {!closed && (
-          <button
+          <Button
+            size="xs"
             onClick={() => {
               setJustReceived(null);
               setShowForm((s) => !s);
             }}
-            className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:border-slate-900"
           >
             {showForm ? "Fermer" : "+ Camion arrivé"}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -293,29 +291,34 @@ export default function TrucksSection({
           )}
 
           <div className="mt-3 border-t border-slate-100 pt-3">
-            {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+            {error && (
+              <div className="mb-2">
+                <FormError>{error}</FormError>
+              </div>
+            )}
             {/* Les deux boutons sont des submit : la validation native du champ
                 Immatriculation joue dans les deux cas, et le clic pose chainRef
                 avant que le submit ne parte. Le principal est premier dans le DOM
                 (Entrée au clavier déclenche le premier submit) et replacé à
                 droite via `order`. */}
             <div className="flex flex-wrap justify-end gap-2">
-              <button
+              <Button
                 type="submit"
+                variant="primary"
                 onClick={() => (chainRef.current = false)}
                 disabled={create.isPending}
-                className="order-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                className="order-2"
               >
                 {create.isPending ? "Enregistrement…" : "Réceptionner → étaler les billes"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 onClick={() => (chainRef.current = true)}
                 disabled={create.isPending}
-                className="order-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm text-slate-700 hover:border-slate-900 disabled:opacity-50"
+                className="order-1"
               >
                 Enregistrer et camion suivant
-              </button>
+              </Button>
             </div>
           </div>
         </form>
@@ -489,19 +492,13 @@ export default function TrucksSection({
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {parcStep === "ETALAGE" && parcDia && !parcGirth && (
-              <button
-                onClick={() => setParcStep("BILLONNAGE")}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-              >
+              <Button variant="emerald" onClick={() => setParcStep("BILLONNAGE")}>
                 Billonner (266 → 266A, 266B…) →
-              </button>
+              </Button>
             )}
-            <button
-              onClick={() => setParcTruck(null)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-900"
-            >
+            <Button size="xs" onClick={() => setParcTruck(null)}>
               {parcDone ? "Terminer" : "Plus tard"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -528,7 +525,7 @@ export default function TrucksSection({
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-1.5 text-xs">
+        <div className="flex flex-wrap gap-1.5">
           {(
             [
               ["ALL", "Tous", (t: TruckDTO) => true],
@@ -539,18 +536,9 @@ export default function TrucksSection({
           ).map(([key, label, pred]) => {
             const n = (trucks.data ?? []).filter(pred).length;
             return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFilter(key)}
-                className={`rounded-full px-2.5 py-1 ${
-                  filter === key
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:ring-slate-400"
-                }`}
-              >
+              <Chip key={key} selected={filter === key} onClick={() => setFilter(key)}>
                 {label} ({n})
-              </button>
+              </Chip>
             );
           })}
         </div>
@@ -559,11 +547,17 @@ export default function TrucksSection({
 
       {/* ── Cartes camions : annoncé vs étalé/billonné en un coup d'œil ── */}
       <div className="space-y-2">
+        {trucks.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {trucks.isError && (
+          <QueryError error={trucks.error} onRetry={() => trucks.refetch()}>
+            Impossible de charger les camions
+          </QueryError>
+        )}
         {trucks.data?.length === 0 && !showForm && !parcTruck && (
-          <p className="text-sm text-slate-500">Aucun camion.</p>
+          <EmptyState>Aucun camion.</EmptyState>
         )}
         {(trucks.data?.length ?? 0) > 0 && shownTrucks.length === 0 && (
-          <p className="text-sm text-slate-500">Aucun camion ne correspond.</p>
+          <EmptyState>Aucun camion ne correspond.</EmptyState>
         )}
         {shownTrucks.map((t) => {
           const dia = diaOf(t);
@@ -582,16 +576,8 @@ export default function TrucksSection({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-900">{t.registration}</span>
-                    {!dia && !girth && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                        À étaler
-                      </span>
-                    )}
-                    {dia && !girth && (
-                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700">
-                        À billonner
-                      </span>
-                    )}
+                    {!dia && !girth && <Badge tone="amber">À étaler</Badge>}
+                    {dia && !girth && <Badge tone="sky">À billonner</Badge>}
                   </div>
                   <div className="shrink-0 text-xs text-slate-500">
                     {t.deliveryNote ? `B/L ${t.deliveryNote}` : ""}
@@ -611,27 +597,18 @@ export default function TrucksSection({
                         {girth && ` → ${girth.logs.length} billons`}
                       </span>
                       {countGap != null && (
-                        <span
-                          className={`rounded-full px-2 py-0.5 font-medium ${
-                            countGap === 0
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
+                        <Badge tone={countGap === 0 ? "emerald" : "amber"}>
                           {countGap === 0 ? "compte bon ✓" : `billes ${countGap > 0 ? "+" : ""}${countGap}`}
-                        </span>
+                        </Badge>
                       )}
                       {volGap != null && (
-                        <span
-                          className={`rounded-full px-2 py-0.5 font-medium tabular-nums ${
-                            Math.abs(volGap) / d.m3! <= 0.05
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
+                        <Badge
+                          tone={Math.abs(volGap) / d.m3! <= 0.05 ? "emerald" : "amber"}
+                          className="tabular-nums"
                         >
                           vol {volGap >= 0 ? "+" : ""}
                           {fmtNum(volGap.toFixed(3))} m³
-                        </span>
+                        </Badge>
                       )}
                     </div>
                   )}
@@ -639,17 +616,18 @@ export default function TrucksSection({
               </Link>
 
               {!girth && !closed && (
-                <button
-                  type="button"
+                <Button
+                  variant="emerald"
+                  size="lg"
+                  className="mt-3 w-full"
                   onClick={() => {
                     setShowForm(false);
                     setParcTruck(t);
                     setParcStep(dia ? "BILLONNAGE" : "ETALAGE");
                   }}
-                  className="mt-3 w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
                 >
                   {dia ? "Billonner (266 → 266A, 266B…) →" : "Étaler les billes →"}
-                </button>
+                </Button>
               )}
             </div>
           );

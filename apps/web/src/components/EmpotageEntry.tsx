@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { classifySize, sawnVolumeM3, type SizeGroup } from "@ste/shared";
+import { classifySize, sawnVolumeM3 } from "@ste/shared";
 import { fmtNum } from "../lib/format";
+import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 
 type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
 const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
@@ -14,13 +15,6 @@ function rowInfo(r: RowState) {
   if (!(L > 0) || !(w > 0) || !(t > 0) || !Number.isInteger(n) || n < 1) return null;
   return { volume: sawnVolumeM3(L, w, t, n), size: classifySize(w, t), count: n };
 }
-
-const GROUP_BADGE: Record<SizeGroup, string> = {
-  MAIN: "bg-sky-50 text-sky-700",
-  SIDE: "bg-amber-50 text-amber-700",
-  ONE_INCH: "bg-violet-50 text-violet-700",
-  OTHER: "bg-slate-100 text-slate-500",
-};
 
 type Item = { lengthFt: string; widthIn: string; thicknessIn: string; count: number };
 
@@ -95,13 +89,13 @@ export default function EmpotageEntry({
                 className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
               />
             ))}
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-center text-xs ${
-                info ? GROUP_BADGE[info.size.group] : "text-slate-300"
-              }`}
-            >
-              {info ? info.size.code : "—"}
-            </span>
+            {info ? (
+              <Badge tone={SIZE_GROUP_TONE[info.size.group]} className="justify-self-center">
+                {info.size.code}
+              </Badge>
+            ) : (
+              <span className="text-center text-xs text-slate-300">—</span>
+            )}
             <span className="text-right text-sm tabular-nums text-slate-700">
               {info ? info.volume.toFixed(3) : "—"}
             </span>

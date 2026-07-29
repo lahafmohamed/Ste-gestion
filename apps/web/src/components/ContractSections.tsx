@@ -3,6 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ContractDTO, ContractUpdateInput } from "@ste/shared";
 import { accountsApi, contractsApi } from "../lib/api";
 import { fmtInt, fmtNum, normalizeDecimal } from "../lib/format";
+import Badge from "./ui/Badge";
+import Button from "./ui/Button";
+import { FormError } from "./ui/Feedback";
 
 // ── Saisie progressive : la fiche contrat est découpée en cartes
 // indépendantes ; chaque carte s'édite et s'enregistre séparément (PATCH
@@ -202,17 +205,9 @@ function SectionCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-slate-900">{section.title}</h3>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              filled === total
-                ? "bg-emerald-50 text-emerald-700"
-                : filled === 0
-                  ? "bg-slate-100 text-slate-400"
-                  : "bg-amber-50 text-amber-700"
-            }`}
-          >
+          <Badge tone={filled === total ? "emerald" : filled === 0 ? "slate" : "amber"}>
             {filled}/{total}
-          </span>
+          </Badge>
         </div>
         <button
           onClick={() => (editing ? closeEdit() : openEdit())}
@@ -285,15 +280,15 @@ function SectionCard({
               </label>
             ))}
           </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            {error && <span className="text-sm text-red-600">{error}</span>}
-            <button
-              type="submit"
-              disabled={save.isPending}
-              className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
+          {error && (
+            <div className="mt-3">
+              <FormError>{error}</FormError>
+            </div>
+          )}
+          <div className="mt-3 flex justify-end">
+            <Button type="submit" variant="primary" disabled={save.isPending}>
               {save.isPending ? "Enregistrement…" : "Enregistrer"}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -393,26 +388,16 @@ export function ContractQuickCreate({
           />
         </label>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-3">
-        {error && <span className="text-sm text-red-600">{error}</span>}
-        <div className="ml-auto flex gap-2">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600"
-            >
-              Annuler
-            </button>
-          )}
-          <button
-            type="submit"
-            disabled={create.isPending}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {create.isPending ? "Création…" : "Créer le contrat"}
-          </button>
+      {error && (
+        <div className="mt-3">
+          <FormError>{error}</FormError>
         </div>
+      )}
+      <div className="mt-3 flex justify-end gap-2">
+        {onCancel && <Button onClick={onCancel}>Annuler</Button>}
+        <Button type="submit" variant="primary" disabled={create.isPending}>
+          {create.isPending ? "Création…" : "Créer le contrat"}
+        </Button>
       </div>
     </form>
   );
