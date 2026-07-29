@@ -10,6 +10,8 @@ import {
 } from "@ste/shared";
 import { accountsApi, salesApi } from "../lib/api";
 import { fmtFcfa, fmtNum } from "../lib/format";
+import Button from "./ui/Button";
+import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 
 type Mode = "USD" | "CFA";
 type RowState = { sizeCode: string; volumeM3: string; mode: Mode; priceUsd: string; rate: string; priceCfa: string };
@@ -238,13 +240,9 @@ function SaleForm({
       </datalist>
 
       <div className="mt-2 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setRows((p) => [...p, emptyRow(contract)])}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button size="xs" onClick={() => setRows((p) => [...p, emptyRow(contract)])}>
           + Ligne
-        </button>
+        </Button>
         <div className="text-sm">
           <span className="text-slate-500">Total : </span>
           <span className="font-semibold text-slate-900">{fmtFcfa(total)}</span>
@@ -264,15 +262,21 @@ function SaleForm({
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-        {error && <span className="text-sm text-red-600">{error}</span>}
-        <button
-          type="submit"
-          disabled={create.isPending || (oversold.length > 0 && !override)}
-          className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          Valider la vente
-        </button>
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        {error && (
+          <div className="mb-2">
+            <FormError>{error}</FormError>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={create.isPending || (oversold.length > 0 && !override)}
+          >
+            Valider la vente
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -310,20 +314,21 @@ export default function SalesSection({
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           Ventes ({sales.data?.length ?? 0})
         </h2>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Fermer" : "+ Vente"}
-        </button>
+        </Button>
       </div>
 
       {showForm && <SaleForm contract={contract} stock={stock} onDone={() => setShowForm(false)} />}
 
       <div className="space-y-2">
-        {sales.data?.length === 0 && !showForm && (
-          <p className="text-sm text-slate-500">Aucune vente.</p>
+        {sales.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {sales.isError && (
+          <QueryError error={sales.error} onRetry={() => sales.refetch()}>
+            Impossible de charger les ventes
+          </QueryError>
         )}
+        {sales.data?.length === 0 && !showForm && <EmptyState>Aucune vente.</EmptyState>}
         {sales.data?.map((s) => (
           <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-3">
             <div className="flex items-center justify-between">

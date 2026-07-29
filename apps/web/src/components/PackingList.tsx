@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PackingLogDTO, TruckDTO } from "@ste/shared";
 import { trucksApi } from "../lib/api";
 import { fmtM3, fmtNum } from "../lib/format";
+import Button from "./ui/Button";
+import { EmptyState, FormError } from "./ui/Feedback";
 
 // Packing list grumes = « Spécification de transport » SODEFOR (1 ligne/bille).
 // Détail optionnel ; le total de référence reste le brousse déclaré du camion.
@@ -165,13 +167,9 @@ function PackingEntry({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={addRow}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button size="xs" onClick={addRow}>
           + Ligne
-        </button>
+        </Button>
         <div className="text-sm">
           <span className="text-slate-500">Total ({valid.length} billes) : </span>
           <span className="font-semibold text-slate-900">{fmtM3(total.toFixed(6))}</span>
@@ -185,23 +183,16 @@ function PackingEntry({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        {error && <span className="text-sm text-red-600">{error}</span>}
+        {error && <FormError>{error}</FormError>}
         <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onDone}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600"
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
+          <Button onClick={onDone}>Annuler</Button>
+          <Button
+            variant="primary"
             onClick={() => save.mutate()}
             disabled={save.isPending || valid.length === 0}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
             {save.isPending ? "Enregistrement…" : `Valider (${valid.length})`}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -222,12 +213,9 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
           Packing list grumes ({rows.length})
         </h2>
         {!editing && (
-          <button
-            onClick={() => setEditing(true)}
-            className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:border-slate-900"
-          >
+          <Button size="xs" onClick={() => setEditing(true)}>
             {rows.length ? "Modifier" : "+ Saisir"}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -240,10 +228,10 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
             onDone={() => setEditing(false)}
           />
         ) : rows.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <EmptyState>
             Détail bille par bille du bordereau (optionnel). Le total de référence est le
             cubage brousse déclaré du camion.
-          </p>
+          </EmptyState>
         ) : (
           <>
             <div className="-mx-4 overflow-x-auto px-4">

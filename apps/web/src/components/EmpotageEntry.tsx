@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { classifySize, sawnVolumeM3 } from "@ste/shared";
-import { fmtNum } from "../lib/format";
+import { fmtNum, normalizeDecimal } from "../lib/format";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
+import Button from "./ui/Button";
 
 type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
 const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
@@ -51,7 +52,7 @@ export default function EmpotageEntry({
     <div>
       <div className="overflow-x-auto">
       <div className="min-w-[620px]">
-      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2rem] items-center gap-1 text-xs text-slate-500">
+      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1 text-xs text-slate-500">
         <span>#</span>
         <span>L (ft)</span>
         <span>l (in)</span>
@@ -67,7 +68,7 @@ export default function EmpotageEntry({
         return (
           <div
             key={i}
-            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2rem] items-center gap-1"
+            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1"
           >
             <span className="text-xs text-slate-400">{i + 1}</span>
             {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
@@ -75,7 +76,8 @@ export default function EmpotageEntry({
                 key={k}
                 inputMode="decimal"
                 value={r[k]}
-                onChange={(e) => setRow(i, { [k]: e.target.value })}
+                // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
+                onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
                 onKeyDown={
                   k === "count"
                     ? (e) => {
@@ -86,7 +88,7 @@ export default function EmpotageEntry({
                       }
                     : undefined
                 }
-                className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+                className="w-full min-w-0 rounded-lg border border-slate-200 px-2.5 py-2.5 text-base outline-none focus:border-slate-900"
               />
             ))}
             {info ? (
@@ -102,7 +104,7 @@ export default function EmpotageEntry({
             <button
               type="button"
               onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-              className="text-slate-300 hover:text-red-500"
+              className="flex h-11 w-full items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
               aria-label="Supprimer la ligne"
             >
               ×
@@ -114,27 +116,24 @@ export default function EmpotageEntry({
       </div>
 
       <div className="mt-2 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setRows((p) => [...p, emptyRow()])}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button variant="secondary" size="xs" onClick={() => setRows((p) => [...p, emptyRow()])}>
           + Ligne
-        </button>
+        </Button>
         <div className="text-sm">
           <span className="text-slate-500">{fmtNum(pieces)} pièces · </span>
           <span className="font-semibold text-slate-900">{fmtNum(total.toFixed(6))} m³</span>
         </div>
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        size="lg"
         onClick={save}
         disabled={saving || valid.length === 0}
-        className="mt-3 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+        className="mt-3 w-full"
       >
         {saving ? "Enregistrement…" : `Ajouter ${valid.length} ligne(s)`}
-      </button>
+      </Button>
     </div>
   );
 }

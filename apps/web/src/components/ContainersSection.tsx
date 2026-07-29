@@ -12,6 +12,10 @@ import { containersApi, contractsApi, trucksApi } from "../lib/api";
 import { fmtM3, fmtNum } from "../lib/format";
 import { printContainerPackingList } from "../lib/printPacking";
 import EmpotageEntry from "./EmpotageEntry";
+import Badge, { type BadgeTone } from "./ui/Badge";
+import Button from "./ui/Button";
+import Chip from "./ui/Chip";
+import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 
 // Puces de sélection multi-camions (origine des débités empotés).
 function TruckChips({
@@ -27,28 +31,19 @@ function TruckChips({
   return (
     <div className="flex flex-wrap gap-1.5">
       {trucks.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          onClick={() => onToggle(t.id)}
-          className={`rounded-full border px-2.5 py-1 text-xs ${
-            selected.includes(t.id)
-              ? "border-slate-900 bg-slate-900 text-white"
-              : "border-slate-300 text-slate-600"
-          }`}
-        >
+        <Chip key={t.id} selected={selected.includes(t.id)} onClick={() => onToggle(t.id)}>
           {t.registration}
-        </button>
+        </Chip>
       ))}
     </div>
   );
 }
 
-const STATUS_BADGE: Record<ContainerStatus, string> = {
-  PLANNED: "bg-slate-100 text-slate-500",
-  LOADING: "bg-amber-50 text-amber-700",
-  LOADED: "bg-sky-50 text-sky-700",
-  SHIPPED: "bg-emerald-50 text-emerald-700",
+const STATUS_TONE: Record<ContainerStatus, BadgeTone> = {
+  PLANNED: "slate",
+  LOADING: "amber",
+  LOADED: "sky",
+  SHIPPED: "emerald",
 };
 
 const STATUSES: ContainerStatus[] = ["PLANNED", "LOADING", "LOADED", "SHIPPED"];
@@ -135,15 +130,17 @@ function CreateForm({
           />
         </div>
       )}
-      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-        {error && <span className="text-sm text-red-600">{error}</span>}
-        <button
-          type="submit"
-          disabled={create.isPending}
-          className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          Créer le conteneur
-        </button>
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        {error && (
+          <div className="mb-2">
+            <FormError>{error}</FormError>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button type="submit" variant="primary" disabled={create.isPending}>
+            Créer le conteneur
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -219,9 +216,7 @@ function ContainerCard({
           <span className="text-sm font-semibold text-slate-900">
             {fmtM3(containerTotalM3(c))}
           </span>
-          <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_BADGE[c.status]}`}>
-            {CONTAINER_STATUS_LABELS[c.status]}
-          </span>
+          <Badge tone={STATUS_TONE[c.status]}>{CONTAINER_STATUS_LABELS[c.status]}</Badge>
         </div>
       </button>
 
@@ -230,19 +225,12 @@ function ContainerCard({
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">Statut :</span>
             {STATUSES.map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatus.mutate(st)}
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  c.status === st
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-200 text-slate-500"
-                }`}
-              >
+              <Chip key={st} selected={c.status === st} onClick={() => setStatus.mutate(st)}>
                 {CONTAINER_STATUS_LABELS[st]}
-              </button>
+              </Chip>
             ))}
-            <button
+            <Button
+              size="xs"
               onClick={() =>
                 printContainerPackingList(c, {
                   contractCode,
@@ -250,10 +238,9 @@ function ContainerCard({
                 })
               }
               disabled={c.items.length === 0}
-              className="rounded-full border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:border-slate-900 disabled:opacity-40"
             >
               Imprimer packing list
-            </button>
+            </Button>
             <button
               onClick={() => {
                 if (
@@ -294,11 +281,7 @@ function ContainerCard({
             ) : (
               <>
                 {linkedRegs.length ? (
-                  linkedRegs.map((r) => (
-                    <span key={r} className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-                      {r}
-                    </span>
-                  ))
+                  linkedRegs.map((r) => <Badge key={r}>{r}</Badge>)
                 ) : (
                   <span className="text-slate-400">aucun</span>
                 )}
@@ -368,12 +351,9 @@ function ContainerCard({
             {adding ? (
               <EmpotageEntry saving={addItems.isPending} onSave={(items) => addItems.mutate(items)} />
             ) : (
-              <button
-                onClick={() => setAdding(true)}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:border-slate-900"
-              >
+              <Button size="xs" onClick={() => setAdding(true)}>
                 + Lignes d'empotage
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -405,12 +385,9 @@ export default function ContainersSection({ contractId }: { contractId: string }
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           Conteneurs / Empotage ({containers.data?.length ?? 0})
         </h2>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Fermer" : "+ Conteneur"}
-        </button>
+        </Button>
       </div>
 
       {showForm && (
@@ -418,9 +395,13 @@ export default function ContainersSection({ contractId }: { contractId: string }
       )}
 
       <div className="space-y-2">
-        {containers.data?.length === 0 && !showForm && (
-          <p className="text-sm text-slate-500">Aucun conteneur.</p>
+        {containers.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {containers.isError && (
+          <QueryError error={containers.error} onRetry={() => containers.refetch()}>
+            Impossible de charger les conteneurs
+          </QueryError>
         )}
+        {containers.data?.length === 0 && !showForm && <EmptyState>Aucun conteneur.</EmptyState>}
         {containers.data?.map((c) => (
           <ContainerCard
             key={c.id}

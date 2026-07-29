@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { contractsApi } from "../lib/api";
 import { fmtInt, fmtNum, fmtPct } from "../lib/format";
+import Badge from "./ui/Badge";
+import { QueryError } from "./ui/Feedback";
 
 const num = (v: string | number) => fmtNum(Number(Number(v).toFixed(3)));
 
@@ -9,6 +11,20 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
     queryKey: ["truck-stats", contractId],
     queryFn: () => contractsApi.truckStats(contractId),
   });
+
+  // Échec du chargement : le dire, au lieu d'escamoter le tableau comme s'il
+  // n'y avait rien à analyser.
+  if (q.isError)
+    return (
+      <section className="mt-5">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Analyse par camion
+        </h2>
+        <QueryError error={q.error} onRetry={() => q.refetch()}>
+          Impossible de charger l'analyse par camion
+        </QueryError>
+      </section>
+    );
 
   if (!q.data || q.data.length === 0) return null;
 
@@ -98,9 +114,9 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
                       <span className="ml-1.5 text-xs text-slate-400">{t.deliveryNote}</span>
                     )}
                     {t.sawn && (
-                      <span className="ml-1.5 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700">
+                      <Badge tone="sky" className="ml-1.5">
                         scié
-                      </span>
+                      </Badge>
                     )}
                   </td>
                   <td className="py-1 pr-3 text-right tabular-nums">{t.billeCount || "—"}</td>
@@ -191,7 +207,7 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
             </tr>
           </tfoot>
         </table>
-        <p className="mt-2 text-[11px] text-slate-400">
+        <p className="mt-2 text-xs text-slate-400">
           Miroir du Daily Truck Log Excel. A/B/C = billes par relevé d'étalage (camion étalé en
           plusieurs fois). BDR = cubage brousse (bordereau) · Ø = étalage diamètre · Circ =
           billons girth. Main size = ép ≥ 3″ · 1,5″ = ép 1,5 – 3″ · MS = main

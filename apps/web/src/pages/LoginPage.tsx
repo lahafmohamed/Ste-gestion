@@ -2,6 +2,8 @@ import { useState } from "react";
 import { APP_NAME } from "@ste/shared";
 import { authApi } from "../lib/api";
 import { setSession } from "../lib/auth";
+import Button from "../components/ui/Button";
+import { FormError } from "../components/ui/Feedback";
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("");
@@ -58,15 +60,15 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
           />
         </label>
 
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && (
+          <div className="mt-3">
+            <FormError>{error}</FormError>
+          </div>
+        )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-5 w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" size="lg" disabled={loading} className="mt-5 w-full">
           {loading ? "Connexion…" : "Se connecter"}
-        </button>
+        </Button>
       </form>
     </div>
   );

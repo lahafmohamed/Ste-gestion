@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EntryKind } from "@ste/shared";
 import { accountsApi } from "../lib/api";
 import { fmtFcfa } from "../lib/format";
+import Button from "./ui/Button";
+import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 
 function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => void }) {
   const qc = useQueryClient();
@@ -114,14 +116,10 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
       </label>
 
       <div className="col-span-2 flex items-end justify-between sm:col-span-1">
-        {error && <span className="text-sm text-red-600">{error}</span>}
-        <button
-          type="submit"
-          disabled={saving}
-          className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
+        {error && <FormError>{error}</FormError>}
+        <Button type="submit" variant="primary" disabled={saving} className="ml-auto">
           Ajouter
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -171,12 +169,9 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           Comptes tiers ({accounts.data?.length ?? 0})
         </h2>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:border-slate-900"
-        >
+        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
           {showForm ? "Fermer" : "+ Écriture"}
-        </button>
+        </Button>
       </div>
 
       {showForm && <EntryForm contractId={contractId} onDone={() => setShowForm(false)} />}
@@ -208,8 +203,14 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
       )}
 
       <div className="space-y-2">
+        {accounts.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {accounts.isError && (
+          <QueryError error={accounts.error} onRetry={() => accounts.refetch()}>
+            Impossible de charger les comptes
+          </QueryError>
+        )}
         {accounts.data?.length === 0 && !showForm && (
-          <p className="text-sm text-slate-500">Aucune écriture.</p>
+          <EmptyState>Aucune écriture.</EmptyState>
         )}
         {accounts.data?.map((a) => {
           const balance = Number(a.balance);

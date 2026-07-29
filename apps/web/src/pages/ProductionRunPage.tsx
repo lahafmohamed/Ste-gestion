@@ -11,6 +11,8 @@ import {
 } from "@ste/shared";
 import { downloadFile, productionApi, trucksApi } from "../lib/api";
 import { fmtInt, fmtNum, fmtPct } from "../lib/format";
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
 
 export default function ProductionRunPage() {
   const { id = "" } = useParams();
@@ -91,17 +93,17 @@ export default function ProductionRunPage() {
           <div className="text-sm text-slate-500">{r.note ?? ""}</div>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            size="sm"
             onClick={() =>
               downloadFile(
                 `/production-runs/${r.id}/export.xlsx`,
                 `debite-${new Date(r.producedAt).toISOString().slice(0, 10)}.xlsx`
               )
             }
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-900"
           >
             Exporter Excel
-          </button>
+          </Button>
           <button
             onClick={() => {
               if (
@@ -154,10 +156,10 @@ export default function ProductionRunPage() {
           ))
         )}
         {rendement !== null && (
-          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+          <Badge tone="emerald">
             Rendement {fmtPct(rendement)} ({fmtNum(girthLinked.toFixed(3))} m³ de billons
             {sawnBillons.length > 0 ? ` · ${sawnBillons.length} billons` : ""})
-          </span>
+          </Badge>
         )}
       </div>
 
@@ -166,29 +168,25 @@ export default function ProductionRunPage() {
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="uppercase tracking-wide text-slate-400">Billons sciés :</span>
           {sawnBillons.map((l) => (
-            <span
-              key={l.id}
-              title={`${Number(l.volumeM3).toFixed(4)} m³`}
-              className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700"
-            >
+            <Badge key={l.id} tone="emerald" title={`${Number(l.volumeM3).toFixed(4)} m³`}>
               {l.externalId ?? `#${l.position}`}
-            </span>
+            </Badge>
           ))}
         </div>
       )}
 
       {/* Splits longueur & épaisseur (rapport d'activité) */}
-      <div className="mt-2 flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Badge tone="sky">
           Long ≥6,5ft {fmtNum(longM3.toFixed(3))} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
           {fmtNum(shortM3.toFixed(3))} ({fmtPct((shortM3 / total) * 100, 0)})
-        </span>
+        </Badge>
         {bands
           .filter((b) => b.m3 > 0)
           .map((b) => (
-            <span key={b.key} className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+            <Badge key={b.key}>
               {b.label} {fmtNum(b.m3.toFixed(3))} ({fmtPct((b.m3 / total) * 100, 0)})
-            </span>
+            </Badge>
           ))}
       </div>
 

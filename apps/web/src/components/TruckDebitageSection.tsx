@@ -4,6 +4,8 @@ import type { TruckDTO } from "@ste/shared";
 import { runPieceCount, runTotalM3 } from "@ste/shared";
 import { contractsApi, productionApi } from "../lib/api";
 import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
+import Badge from "./ui/Badge";
+import { QueryError } from "./ui/Feedback";
 
 // Miroir de la feuille « DEBITE TECK DU … » (docs/pdf5) : elle est tenue PAR
 // CAMION et porte, à côté du tableau de stock, un encadré B/L · cubage brousse ·
@@ -72,7 +74,17 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        {stats.isLoading || runs.isLoading ? (
+        {stats.isError || runs.isError ? (
+          <QueryError
+            error={stats.error ?? runs.error}
+            onRetry={() => {
+              stats.refetch();
+              runs.refetch();
+            }}
+          >
+            Impossible de charger le débitage du camion
+          </QueryError>
+        ) : stats.isLoading || runs.isLoading ? (
           <p className="text-sm text-slate-500">Chargement…</p>
         ) : debited === 0 ? (
           <div className="text-sm text-slate-500">
@@ -121,28 +133,28 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
             )}
 
             {/* Splits Daily Truck Log — ce que le débité a donné, par produit. */}
-            <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
-              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <Badge tone="sky">
                 MS {fmtNum(Number(s!.msM3).toFixed(3))} m³
                 <span className="opacity-70">
                   {" "}
                   (main {fmtNum(Number(s!.mainM3).toFixed(3))} · 1,5″{" "}
                   {fmtNum(Number(s!.band15M3).toFixed(3))})
                 </span>
-              </span>
-              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-700">
+              </Badge>
+              <Badge tone="violet">
                 1″ {fmtNum(Number(s!.oneInchM3).toFixed(3))} m³ ({fmtPct(Number(s!.oneInchPct), 0)}
                 )
-              </span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+              </Badge>
+              <Badge>
                 Long ≥ 6,5 ft {fmtNum(Number(s!.longM3).toFixed(3))} · court{" "}
                 {fmtNum(Number(s!.shortM3).toFixed(3))} m³
-              </span>
+              </Badge>
               {s!.costPerM3 && (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                <Badge>
                   Coût {fmtInt(s!.costPerM3)} FCFA/m³ débité
                   {s!.costMsPerM3 ? ` · ${fmtInt(s!.costMsPerM3)} /m³ MS` : ""}
-                </span>
+                </Badge>
               )}
             </div>
 

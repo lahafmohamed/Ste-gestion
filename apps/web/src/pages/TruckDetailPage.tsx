@@ -16,6 +16,9 @@ import TallyEntry, { clearTallyDraft } from "../components/TallyEntry";
 import TruckBordereau from "../components/TruckBordereau";
 import PackingList from "../components/PackingList";
 import TruckDebitageSection from "../components/TruckDebitageSection";
+import Badge, { type BadgeTone } from "../components/ui/Badge";
+import Button from "../components/ui/Button";
+import { FormError } from "../components/ui/Feedback";
 
 const CONTEXTS: MeasurementContext[] = ["FIELD", "YARD_GIRTH", "YARD_DIAMETER"];
 
@@ -139,13 +142,9 @@ function MeasurementTable({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {bills.map((b) => (
-              <span
-                key={b.bill}
-                className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200"
-                title={`${fmtNum(b.m3.toFixed(4))} m³`}
-              >
+              <Badge key={b.bill} title={`${fmtNum(b.m3.toFixed(4))} m³`}>
                 {b.bill} · {b.billons}
-              </span>
+              </Badge>
             ))}
           </div>
         </div>
@@ -153,13 +152,9 @@ function MeasurementTable({
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {onAppend && !adding && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
+          <Button variant="primary" onClick={() => setAdding(true)}>
             + Continuer l'étalage
-          </button>
+          </Button>
         )}
         <button onClick={onDelete} className="text-xs text-slate-400 hover:text-red-600">
           Supprimer cet étalage
@@ -316,13 +311,13 @@ export default function TruckDetailPage() {
     declaredCount != null && billesOnParc != null ? billesOnParc - declaredCount : null;
 
   // Étape atteinte dans la chaîne réception → étalage → billonnage → débitage.
-  const stage = t.sawn
-    ? { label: "Scié", cls: "bg-sky-50 text-sky-700" }
+  const stage: { label: string; tone: BadgeTone } = t.sawn
+    ? { label: "Scié", tone: "sky" }
     : billonCount != null
-      ? { label: "Billonné · sur parc", cls: "bg-emerald-50 text-emerald-700" }
+      ? { label: "Billonné · sur parc", tone: "emerald" }
       : t.measurements.some((m) => m.context === "YARD_DIAMETER")
-        ? { label: "Étalé · à billonner", cls: "bg-sky-50 text-sky-700" }
-        : { label: "À étaler", cls: "bg-amber-50 text-amber-700" };
+        ? { label: "Étalé · à billonner", tone: "sky" }
+        : { label: "À étaler", tone: "amber" };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
@@ -335,10 +330,7 @@ export default function TruckDetailPage() {
           <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold text-slate-900">
             {t.registration}
             {/* Où en est le camion dans la chaîne — visible sans dérouler la page. */}
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${stage.cls}`}>
-              {stage.label}
-            </span>
+            <Badge tone={stage.tone}>{stage.label}</Badge>
           </h1>
           <div className="text-sm text-slate-500">
             {[
@@ -351,17 +343,17 @@ export default function TruckDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            size="sm"
             onClick={() =>
               downloadFile(
                 `/trucks/${t.id}/export.xlsx`,
                 `etalage-${t.registration.replace(/\s+/g, "-")}.xlsx`
               )
             }
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-900"
           >
             Exporter Excel
-          </button>
+          </Button>
           <button onClick={confirmDelTruck} className="text-sm text-slate-400 hover:text-red-600">
             Supprimer
           </button>
@@ -370,33 +362,25 @@ export default function TruckDetailPage() {
 
       {/* Suppression / confirmation d'écart en échec — sinon le clic reste sans effet visible. */}
       {opError && (
-        <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          Opération échouée : {opError}
+        <div className="mt-3">
+          <FormError>Opération échouée : {opError}</FormError>
         </div>
       )}
 
       {/* Écart de comptage billes — bordereau vs parc (assumé, non bloquant) */}
       {(declaredCount != null || billesOnParc != null) && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-            Bordereau : {declaredCount ?? "—"} billes
-          </span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-            Parc : {billesOnParc ?? "—"} billes
-          </span>
-          {billonCount != null && (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-              Tronçonnées en {billonCount} billons
-            </span>
-          )}
+          <Badge>Bordereau : {declaredCount ?? "—"} billes</Badge>
+          <Badge>Parc : {billesOnParc ?? "—"} billes</Badge>
+          {billonCount != null && <Badge>Tronçonnées en {billonCount} billons</Badge>}
           {countGap != null &&
             countGap !== 0 &&
             (t.countGapConfirmed ? (
               <>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                <Badge tone="emerald">
                   écart {countGap > 0 ? "+" : ""}
                   {countGap} · confirmé ✓
-                </span>
+                </Badge>
                 <button
                   type="button"
                   onClick={() => confirmGap.mutate(false)}
@@ -408,11 +392,11 @@ export default function TruckDetailPage() {
               </>
             ) : (
               <>
-                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                <Badge tone="amber">
                   écart {countGap > 0 ? "+" : ""}
                   {countGap}
                   {countGap < 0 ? " · à compléter ?" : ""}
-                </span>
+                </Badge>
                 <button
                   type="button"
                   onClick={() => confirmGap.mutate(true)}

@@ -5,6 +5,8 @@ import { MEASUREMENT_CONTEXT_LABELS } from "@ste/shared";
 import StepLayout from "../components/StepLayout";
 import { contractsApi } from "../lib/api";
 import { fmtNum, fmtPct } from "../lib/format";
+import Button from "../components/ui/Button";
+import { QueryError } from "../components/ui/Feedback";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -163,25 +165,21 @@ function RapportInner({
           />
         </label>
         <div className="flex gap-2">
-          <button
-            onClick={printReport}
-            disabled={!text}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-900 disabled:opacity-40"
-          >
+          <Button onClick={printReport} disabled={!text}>
             Imprimer / PDF
-          </button>
-          <button
-            onClick={copy}
-            disabled={!text}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-          >
+          </Button>
+          <Button variant="primary" onClick={copy} disabled={!text}>
             {copied ? "Copié ✓" : "Copier le rapport"}
-          </button>
+          </Button>
         </div>
       </div>
 
       {q.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
-      {q.isError && <p className="text-sm text-red-600">Erreur de chargement.</p>}
+      {q.isError && (
+        <QueryError error={q.error} onRetry={() => q.refetch()}>
+          Erreur de chargement
+        </QueryError>
+      )}
 
       {q.data && (
         <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 font-mono text-sm leading-6 text-slate-800">

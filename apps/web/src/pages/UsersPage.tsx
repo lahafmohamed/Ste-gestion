@@ -4,6 +4,8 @@ import { USER_ROLE_LABELS, UserRole, type UserCreateInput } from "@ste/shared";
 import { usersApi } from "../lib/api";
 import { PageHeader } from "../components/Layout";
 import { getUser } from "../lib/auth";
+import Button from "../components/ui/Button";
+import { FormError, QueryError } from "../components/ui/Feedback";
 
 const ROLES = UserRole.options;
 
@@ -39,12 +41,9 @@ export default function UsersPage() {
         title="Utilisateurs"
         subtitle="Comptes & rôles (réservé admin)."
         right={
-          <button
-            onClick={() => setShowForm((s) => !s)}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
+          <Button variant="primary" onClick={() => setShowForm((s) => !s)}>
             {showForm ? "Fermer" : "Nouveau"}
-          </button>
+          </Button>
         }
       />
 
@@ -107,19 +106,21 @@ export default function UsersPage() {
               </select>
             </label>
             <div className="col-span-2 flex items-center justify-between sm:col-span-4">
-              {error && <span className="text-sm text-red-600">{error}</span>}
-              <button
-                type="submit"
-                disabled={create.isPending}
-                className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
+              {error && <FormError>{error}</FormError>}
+              <Button type="submit" variant="primary" disabled={create.isPending} className="ml-auto">
                 Créer
-              </button>
+              </Button>
             </div>
           </form>
         )}
 
         <div className="space-y-2">
+          {users.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+          {users.isError && (
+            <QueryError error={users.error} onRetry={() => users.refetch()}>
+              Impossible de charger les utilisateurs
+            </QueryError>
+          )}
           {users.data?.map((u) => (
             <div
               key={u.id}
@@ -149,13 +150,13 @@ export default function UsersPage() {
                     </option>
                   ))}
                 </select>
-                <button
+                <Button
+                  size="xs"
                   disabled={me?.id === u.id}
                   onClick={() => update.mutate({ id: u.id, active: !u.active })}
-                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:border-slate-900 disabled:opacity-40"
                 >
                   {u.active ? "Désactiver" : "Activer"}
-                </button>
+                </Button>
               </div>
             </div>
           ))}

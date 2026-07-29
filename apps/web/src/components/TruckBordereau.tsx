@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TruckDTO, TruckUpdateInput } from "@ste/shared";
 import { trucksApi } from "../lib/api";
+import Badge from "./ui/Badge";
+import Button from "./ui/Button";
+import { FormError } from "./ui/Feedback";
 
 // Champs du bordereau SODEFOR « circulation des bois » — saisie progressive.
 // Chaque donnée arrive à son moment ; tout est optionnel et éditable après coup.
@@ -102,17 +105,9 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             Bordereau SODEFOR
           </h2>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              filled === FIELDS.length
-                ? "bg-emerald-50 text-emerald-700"
-                : filled <= 2
-                  ? "bg-slate-100 text-slate-400"
-                  : "bg-amber-50 text-amber-700"
-            }`}
-          >
+          <Badge tone={filled === FIELDS.length ? "emerald" : filled <= 2 ? "slate" : "amber"}>
             {filled}/{FIELDS.length}
-          </span>
+          </Badge>
         </div>
         <button
           onClick={() => (editing ? setEditing(false) : openEdit())}
@@ -142,14 +137,15 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
               ))}
             </div>
             <div className="mt-3 flex items-center justify-between gap-3">
-              {error && <span className="text-sm text-red-600">{error}</span>}
-              <button
+              {error && <FormError>{error}</FormError>}
+              <Button
                 type="submit"
+                variant="primary"
                 disabled={save.isPending}
-                className="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="ml-auto"
               >
                 {save.isPending ? "Enregistrement…" : "Enregistrer"}
-              </button>
+              </Button>
             </div>
           </form>
         ) : (
