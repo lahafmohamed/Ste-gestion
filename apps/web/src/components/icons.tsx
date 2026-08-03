@@ -48,6 +48,18 @@ export const IconTruck = (p: IconProps) => (
   </Base>
 );
 
+// Billes étalées au parc, vues en bout (cœur + écorce).
+export const IconLogs = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="7.5" cy="8" r="3.5" />
+    <circle cx="16.5" cy="8" r="3.5" />
+    <circle cx="12" cy="15.5" r="3.5" />
+    <circle cx="7.5" cy="8" r="1" />
+    <circle cx="16.5" cy="8" r="1" />
+    <circle cx="12" cy="15.5" r="1" />
+  </Base>
+);
+
 export const IconSaw = (p: IconProps) => (
   <Base {...p}>
     <path d="M3 7l6 6" />

@@ -9,6 +9,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ContractsPage from "./pages/ContractsPage";
 import ContractDetailPage from "./pages/ContractDetailPage";
 import ReceptionPage from "./pages/ReceptionPage";
+import EtalagePage from "./pages/EtalagePage";
 import DebitagePage from "./pages/DebitagePage";
 import StockPage from "./pages/StockPage";
 // Masqué pour la première version en ligne — réactiver quand prêt
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/contracts/:id" element={<ContractDetailPage />} />
             <Route path="/reception" element={<ReceptionPage />} />
+            <Route path="/etalage" element={<EtalagePage />} />
             <Route path="/debitage" element={<DebitagePage />} />
             <Route path="/stock" element={<StockPage />} />
             {/* Masqué pour la première version en ligne — réactiver quand prêt */}

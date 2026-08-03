@@ -81,7 +81,11 @@ export default function ProductionRunPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <Link to={`/contracts/${r.contractId}`} className="text-sm text-slate-500">
+      {/* Zone de tap élargie : le lien retour se vise au pouce en haut d'écran. */}
+      <Link
+        to={`/contracts/${r.contractId}`}
+        className="-mx-2 inline-flex min-h-9 items-center rounded-lg px-2 text-sm text-slate-500 hover:text-slate-900 active:bg-slate-100"
+      >
         ← Contrat
       </Link>
 
@@ -113,7 +117,7 @@ export default function ProductionRunPage() {
               )
                 del.mutate();
             }}
-            className="text-sm text-slate-400 hover:text-red-600"
+            className="min-h-9 rounded-lg px-2 text-sm text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
           >
             Supprimer
           </button>
@@ -149,7 +153,7 @@ export default function ProductionRunPage() {
             <Link
               key={t.id}
               to={`/trucks/${t.id}`}
-              className="rounded-full border border-slate-300 px-2.5 py-0.5 text-xs text-slate-700 hover:border-slate-900"
+              className="inline-flex min-h-9 items-center rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 transition-colors hover:border-slate-900 active:bg-slate-100"
             >
               {t.registration}
             </Link>

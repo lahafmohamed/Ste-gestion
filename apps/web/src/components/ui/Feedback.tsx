@@ -30,7 +30,7 @@ export function QueryError({
       <button
         type="button"
         onClick={onRetry}
-        className="mt-2 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
+        className="mt-2 min-h-9 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 active:bg-red-200"
       >
         Réessayer
       </button>

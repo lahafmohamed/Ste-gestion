@@ -56,8 +56,9 @@ function StockInner({ contractId }: { contractId: string }) {
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
             Parc — billons par camion (non sciés)
           </h2>
+          {/* min-w : sur téléphone les 6 colonnes s'écrasaient au lieu de défiler. */}
           <div className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white p-4">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-slate-500">
                   <th className="py-1 pr-4 font-normal">Camion</th>
@@ -110,7 +111,7 @@ function StockInner({ contractId }: { contractId: string }) {
         {s.stockBySize.length === 0 ? (
           <p className="text-sm text-slate-500">Aucun produit débité.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[440px] text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-500">
                 <th className="py-1 pr-4 font-normal">Taille</th>

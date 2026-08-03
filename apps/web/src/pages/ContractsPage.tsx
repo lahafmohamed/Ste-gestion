@@ -16,7 +16,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
   return (
     <Link
       to={`/contracts/${c.id}`}
-      className="block rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+      className="block rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -160,7 +160,7 @@ export default function ContractsPage() {
                   type="button"
                   onClick={() => setQ("")}
                   aria-label="Effacer la recherche"
-                  className="absolute inset-y-0 right-0 px-3 text-slate-400 hover:text-slate-900"
+                  className="absolute inset-y-0 right-0 px-3 text-lg text-slate-400 hover:text-slate-900 active:text-slate-900"
                 >
                   ×
                 </button>

@@ -251,6 +251,20 @@ export default function TallyEntry({
   const nextBill = untouchedBills[0] ?? null;
   const visibleBills = allBills ? (bills ?? []) : untouchedBills.slice(0, BILL_CHIPS);
 
+  // Bille en cours (dernière ligne avec un n°) : une bille tronçonnée donne
+  // souvent 2-3 billons — le suivant de la même bille doit être à un tap, sans
+  // rouvrir « Toutes » (sa pastille disparaît dès qu'elle est entamée).
+  let currentBill: string | null = null;
+  if (isGirth && bills?.length) {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const p = billParent(rows[i].externalId);
+      if (p) {
+        currentBill = p;
+        break;
+      }
+    }
+  }
+
   // Split girth ≥85 / <85 cm live (miroir GIRTH_SPLIT_CM du backend) — recoupe
   // le « VOL G ≥85 / <85 » du slip terrain pendant la saisie.
   let ge85 = 0;
@@ -362,7 +376,7 @@ export default function TallyEntry({
               if (draftKey) clearTallyDraft(draftKey);
               setRows([emptyRow()]);
             }}
-            className="font-medium text-amber-700 underline hover:text-amber-900"
+            className="-my-2 min-h-9 shrink-0 rounded-lg px-2 font-medium text-amber-700 underline hover:text-amber-900 active:bg-amber-100"
           >
             Repartir à zéro
           </button>
@@ -382,7 +396,7 @@ export default function TallyEntry({
               <button
                 type="button"
                 onClick={() => setAllBills((s) => !s)}
-                className="shrink-0 underline hover:text-slate-900"
+                className="-my-2 min-h-9 shrink-0 rounded-lg px-2 underline hover:text-slate-900 active:bg-slate-200"
               >
                 {allBills ? "Réduire" : `Toutes (${bills.length})`}
               </button>
@@ -390,16 +404,31 @@ export default function TallyEntry({
           </div>
 
           {/* Le parc se dépile dans l'ordre : la bille suivante à tronçonner
-              mérite un bouton pleine largeur, pas d'être cherchée dans 60 pastilles. */}
-          {nextBill && (
-            <Button
-              variant="emerald"
-              size="lg"
-              className="mb-2 w-full tabular-nums"
-              onClick={() => addBillon(nextBill)}
-            >
-              Bille suivante · {nextBill}
-            </Button>
+              mérite un bouton pleine largeur, pas d'être cherchée dans 60
+              pastilles. Une bille donne souvent plusieurs billons → « Même
+              bille » enchaîne 266A → 266B sans rouvrir le sélecteur. */}
+          {(nextBill || currentBill) && (
+            <div className={`mb-2 grid gap-2 ${nextBill && currentBill ? "grid-cols-2" : ""}`}>
+              {currentBill && (
+                <Button
+                  size="lg"
+                  className="w-full tabular-nums"
+                  onClick={() => addBillon(currentBill)}
+                >
+                  Même bille · {nextBillonId(currentBill, knownIds)}
+                </Button>
+              )}
+              {nextBill && (
+                <Button
+                  variant="emerald"
+                  size="lg"
+                  className="w-full tabular-nums"
+                  onClick={() => addBillon(nextBill)}
+                >
+                  Bille suivante · {nextBill}
+                </Button>
+              )}
+            </div>
           )}
           {!nextBill && !allBills && (
             <p className="mb-2 text-xs text-slate-500">Toutes les billes sont entamées.</p>
@@ -493,7 +522,7 @@ export default function TallyEntry({
       <button
         type="button"
         onClick={() => addRow()}
-        className="mt-2 w-full rounded-lg border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:border-slate-900 hover:text-slate-900"
+        className="mt-2 min-h-11 w-full rounded-lg border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:border-slate-900 hover:text-slate-900 active:bg-slate-100"
       >
         + {isGirth ? "Billon" : "Bille"}
       </button>
@@ -515,15 +544,19 @@ export default function TallyEntry({
             Ligne {undo.index + 1} supprimée
             {undo.row.externalId.trim() ? ` (n° ${undo.row.externalId.trim()})` : ""}
           </span>
-          <div className="flex shrink-0 gap-3">
-            <button type="button" onClick={restoreRow} className="font-medium underline">
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={restoreRow}
+              className="-my-2 min-h-9 rounded-lg px-2 font-medium underline active:bg-white/20"
+            >
               Annuler
             </button>
             <button
               type="button"
               onClick={() => setUndo(null)}
               aria-label="Masquer"
-              className="text-slate-400 hover:text-white"
+              className="-my-2 min-h-9 rounded-lg px-2 text-base text-slate-400 hover:text-white active:bg-white/20"
             >
               ×
             </button>

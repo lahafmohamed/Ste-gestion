@@ -35,7 +35,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
 
           {/* Table par taille */}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[400px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-slate-500">
                   <th className="py-1 pr-4 font-normal">Taille</th>

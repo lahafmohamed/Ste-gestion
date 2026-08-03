@@ -111,7 +111,7 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
         </div>
         <button
           onClick={() => (editing ? setEditing(false) : openEdit())}
-          className="text-xs text-slate-500 hover:text-slate-900"
+          className="-my-2 min-h-9 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
         >
           {editing ? "Annuler" : "Modifier"}
         </button>

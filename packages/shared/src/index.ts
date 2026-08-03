@@ -488,6 +488,42 @@ export function truckBillNos(t: {
     .filter((v): v is string => !!v);
 }
 
+// ── Avancement du débitage d'un camion ────────────────────────────────
+// Croise billons girth × sessions : logIds vides = camion entier (tous ses
+// billons comptent sciés — comportement historique).
+
+export type TruckSawnProgress = {
+  total: number; // billons girth du camion
+  sawn: number; // billons passés à la scie
+  started: boolean; // ≥1 session liée au camion
+  complete: boolean; // tout est scié
+  remaining: LogDTO[]; // billons pas encore sciés
+};
+
+export function truckSawnProgress(
+  t: { id: string; measurements: MeasurementDTO[] },
+  runs: Pick<ProductionRunDTO, "truckIds" | "logIds">[]
+): TruckSawnProgress {
+  const billons = t.measurements
+    .filter((m) => m.context === "YARD_GIRTH")
+    .flatMap((m) => m.logs);
+  const myRuns = runs.filter((r) => r.truckIds.includes(t.id));
+  const wholeTruck = myRuns.some((r) => r.logIds.length === 0);
+  // logIds de TOUTES les sessions : un billon du camion peut être lié à une
+  // session sans que le camion le soit (données saisies à la main / API).
+  const sawnIds = new Set(runs.flatMap((r) => r.logIds));
+  const remaining = wholeTruck ? [] : billons.filter((l) => !sawnIds.has(l.id));
+  const sawn = billons.length - remaining.length;
+  const started = myRuns.length > 0 || sawn > 0;
+  return {
+    total: billons.length,
+    sawn,
+    started,
+    complete: started && (billons.length === 0 ? wholeTruck : sawn === billons.length),
+    remaining,
+  };
+}
+
 // ── Comptes tiers ──────────────────────────────────────────────────────
 
 export const PartyType = z.enum([

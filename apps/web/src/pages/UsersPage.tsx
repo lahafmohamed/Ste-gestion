@@ -142,7 +142,8 @@ export default function UsersPage() {
                   onChange={(e) =>
                     update.mutate({ id: u.id, role: e.target.value as UserRole })
                   }
-                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs outline-none focus:border-slate-900 disabled:opacity-50"
+                  // 16px : sous ce seuil, iOS zoome la page au focus du select.
+                  className="min-h-11 rounded-lg border border-slate-300 px-2 py-1 text-base outline-none focus:border-slate-900 disabled:opacity-50"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>

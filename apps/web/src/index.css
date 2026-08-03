@@ -1,3 +1,25 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    /* Tablette au parc : le flash gris iOS au tap est remplacé par les états
+       :active explicites des composants (Button, Chip, cartes). */
+    -webkit-tap-highlight-color: transparent;
+    /* iOS paysage : ne pas gonfler les tailles de texte automatiquement. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Saisie en rafale (étalage : + Bille, bille suivante…) : sans ça, deux taps
+     rapprochés déclenchent le double-tap zoom iOS au lieu du deuxième clic. */
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label {
+    touch-action: manipulation;
+  }
+}

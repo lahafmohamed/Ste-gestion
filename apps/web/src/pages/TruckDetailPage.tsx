@@ -156,13 +156,16 @@ function MeasurementTable({
             + Continuer l'étalage
           </Button>
         )}
-        <button onClick={onDelete} className="text-xs text-slate-400 hover:text-red-600">
+        <button
+          onClick={onDelete}
+          className="min-h-9 rounded-lg px-2 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+        >
           Supprimer cet étalage
         </button>
         {hasBillons && (
           <button
             onClick={() => setByBill((s) => !s)}
-            className="text-xs text-slate-500 hover:text-slate-900"
+            className="min-h-9 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
           >
             {byBill ? "Masquer la vue par bille" : "Vue par bille"}
           </button>
@@ -187,7 +190,7 @@ function MeasurementTable({
           <button
             type="button"
             onClick={() => setAdding(false)}
-            className="mt-2 text-xs text-slate-400 hover:text-slate-700"
+            className="mt-2 min-h-9 rounded-lg px-2 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200"
           >
             Annuler
           </button>
@@ -321,7 +324,11 @@ export default function TruckDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <Link to={`/contracts/${t.contractId}`} className="text-sm text-slate-500">
+      {/* Zone de tap élargie : le lien retour se vise au pouce en haut d'écran. */}
+      <Link
+        to={`/contracts/${t.contractId}`}
+        className="-mx-2 inline-flex min-h-9 items-center rounded-lg px-2 text-sm text-slate-500 hover:text-slate-900 active:bg-slate-100"
+      >
         ← Contrat
       </Link>
 
@@ -354,7 +361,10 @@ export default function TruckDetailPage() {
           >
             Exporter Excel
           </Button>
-          <button onClick={confirmDelTruck} className="text-sm text-slate-400 hover:text-red-600">
+          <button
+            onClick={confirmDelTruck}
+            className="min-h-9 rounded-lg px-2 text-sm text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+          >
             Supprimer
           </button>
         </div>
@@ -385,7 +395,7 @@ export default function TruckDetailPage() {
                   type="button"
                   onClick={() => confirmGap.mutate(false)}
                   disabled={confirmGap.isPending}
-                  className="text-slate-400 hover:text-slate-700 disabled:opacity-50"
+                  className="min-h-9 rounded-lg px-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 disabled:opacity-50"
                 >
                   annuler
                 </button>
@@ -401,7 +411,7 @@ export default function TruckDetailPage() {
                   type="button"
                   onClick={() => confirmGap.mutate(true)}
                   disabled={confirmGap.isPending}
-                  className="rounded-full border border-amber-300 px-2 py-0.5 font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                  className="min-h-9 rounded-full border border-amber-300 px-3 py-1 font-medium text-amber-700 hover:bg-amber-100 active:bg-amber-200 disabled:opacity-50"
                 >
                   Confirmer l'écart
                 </button>
@@ -463,7 +473,7 @@ export default function TruckDetailPage() {
                             clearTallyDraft(`${t.id}:${ctx}`);
                             setDiaPrefill(ids);
                           }}
-                          className="mb-3 w-full rounded-lg border border-dashed border-slate-300 py-2 text-xs text-slate-600 hover:border-slate-900 hover:text-slate-900"
+                          className="mb-3 min-h-11 w-full rounded-lg border border-dashed border-slate-300 py-2 text-xs text-slate-600 hover:border-slate-900 hover:text-slate-900 active:bg-slate-100"
                         >
                           Préremplir les n° depuis la packing list ({ids.length} billes)
                         </button>

@@ -14,7 +14,8 @@ export default function ContractPicker({ contracts, value, onChange }: Props) {
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-slate-900"
+        // 16px : sous ce seuil, iOS zoome la page au focus du select.
+        className="min-h-11 rounded-lg border border-slate-300 px-3 py-1.5 text-base outline-none focus:border-slate-900"
       >
         {contracts.map((c) => (
           <option key={c.id} value={c.id}>

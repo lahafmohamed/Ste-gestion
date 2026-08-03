@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { USER_ROLE_LABELS } from "@ste/shared";
 import { clearSession, getUser } from "../lib/auth";
@@ -10,6 +10,7 @@ import {
   IconDashboard,
   IconLedger,
   IconLogout,
+  IconLogs,
   IconReport,
   IconSales,
   IconSaw,
@@ -24,6 +25,7 @@ const NAV: NavItem[] = [
   { to: "/", label: "Tableau de bord", Icon: IconDashboard, end: true },
   { to: "/contracts", label: "Contrats", Icon: IconContract, end: false },
   { to: "/reception", label: "Réception", Icon: IconTruck, end: false },
+  { to: "/etalage", label: "Étalage", Icon: IconLogs, end: false },
   { to: "/debitage", label: "Débitage", Icon: IconSaw, end: false },
   { to: "/stock", label: "Stock", Icon: IconBox, end: false },
   // Masqué pour la première version en ligne — réactiver quand prêt
@@ -61,8 +63,11 @@ function NavList({
             end={n.end}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
-                isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+              // min-h-11 : cible tactile 44px (le drawer se navigue au pouce).
+              `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                isActive
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-100 active:bg-slate-200"
               }`
             }
           >
@@ -77,7 +82,7 @@ function NavList({
           <div className="px-2 text-xs text-slate-400">{USER_ROLE_LABELS[user.role]}</div>
           <button
             onClick={logout}
-            className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-500 hover:bg-slate-100"
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-500 hover:bg-slate-100 active:bg-slate-200"
           >
             <IconLogout width={16} height={16} />
             Déconnexion
@@ -95,6 +100,20 @@ export default function Layout() {
   // Sur /contracts, la page a déjà son propre bouton de création : deux boutons
   // pour la même action à quelques centimètres l'un de l'autre.
   const onContracts = useLocation().pathname === "/contracts";
+  // Drawer ouvert : fond figé (sinon la page défile derrière le voile) + Échap.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900">
       {/* Header STE — permanent, toutes tailles d'écran */}
@@ -105,7 +124,7 @@ export default function Layout() {
             onClick={() => setMenuOpen(true)}
             aria-label="Ouvrir le menu"
             aria-expanded={menuOpen}
-            className="-ml-1.5 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 md:hidden"
+            className="-ml-2.5 rounded-lg p-2.5 text-slate-600 hover:bg-slate-100 active:bg-slate-200 md:hidden"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="4" y1="7" x2="20" y2="7" />
@@ -121,7 +140,8 @@ export default function Layout() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/contracts" className={buttonCls("secondary", "sm")}>
+          {/* Icône seule sur mobile → le nom doit rester lisible au lecteur d'écran. */}
+          <Link to="/contracts" aria-label="Contrats" className={buttonCls("secondary", "sm")}>
             <IconContract width={16} height={16} />
             <span className="hidden sm:inline">Contrats</span>
           </Link>
@@ -170,7 +190,7 @@ export default function Layout() {
               type="button"
               onClick={() => setMenuOpen(false)}
               aria-label="Fermer le menu"
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+              className="rounded-lg p-2.5 text-slate-500 hover:bg-slate-100 active:bg-slate-200"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="6" y1="6" x2="18" y2="18" />

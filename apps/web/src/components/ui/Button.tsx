@@ -3,20 +3,25 @@ import type { ButtonHTMLAttributes } from "react";
 export type ButtonVariant = "primary" | "secondary" | "emerald" | "danger";
 export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
+// :active : retour d'appui tactile — le hover n'existe pas au doigt (le
+// tap-highlight iOS est désactivé globalement, voir index.css).
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-slate-900 text-white hover:bg-slate-700",
-  secondary: "border border-slate-300 bg-white text-slate-700 hover:border-slate-900",
+  primary: "bg-slate-900 text-white hover:bg-slate-700 active:bg-slate-600",
+  secondary:
+    "border border-slate-300 bg-white text-slate-700 hover:border-slate-900 active:bg-slate-100",
   // Réservé aux actions de la chaîne parc (étaler, billonner, bille suivante).
-  emerald: "bg-emerald-600 text-white hover:bg-emerald-700",
-  danger: "bg-red-600 text-white hover:bg-red-700",
+  emerald: "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800",
+  danger: "bg-red-600 text-white hover:bg-red-700 active:bg-red-800",
 };
 
 // lg : saisie tablette — 16px (pas de zoom auto iOS) et grande cible tactile.
+// min-h : cible tactile plancher (36px xs/sm, 44px md, 48px lg) même quand le
+// libellé tient sur une ligne basse.
 const SIZE: Record<ButtonSize, string> = {
-  xs: "px-3 py-1.5 text-xs",
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-sm",
-  lg: "px-4 py-3 text-base",
+  xs: "min-h-9 px-3 py-1.5 text-xs",
+  sm: "min-h-9 px-3 py-1.5 text-sm",
+  md: "min-h-11 px-4 py-2 text-sm",
+  lg: "min-h-12 px-4 py-3 text-base",
 };
 
 const BASE =

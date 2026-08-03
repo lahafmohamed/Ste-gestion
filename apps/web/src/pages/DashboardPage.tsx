@@ -16,7 +16,7 @@ function ContractCard({ c }: { c: ContractDTO }) {
   return (
     <Link
       to={`/contracts/${c.id}`}
-      className="block rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-400"
+      className="block rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50"
     >
       <div className="flex items-center justify-between">
         <div className="font-medium text-slate-900">{c.code}</div>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { TruckDTO } from "@ste/shared";
-import { runPieceCount, runTotalM3 } from "@ste/shared";
+import { runPieceCount, runTotalM3, truckSawnProgress } from "@ste/shared";
 import { contractsApi, productionApi } from "../lib/api";
 import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
 import Badge from "./ui/Badge";
@@ -60,6 +60,9 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
   // Session couvrant plusieurs camions : le débité du camion est une quote-part,
   // pas une mesure. À dire, sinon le chiffre se lit comme exact.
   const shared = myRuns.some((r) => r.truckIds.length > 1);
+
+  // Avancement billon par billon — quel bois du camion reste à scier.
+  const progress = truckSawnProgress(truck, runs.data ?? []);
 
   const debited = Number(s?.debitedM3 ?? 0);
   const girth = Number(s?.girthM3 ?? 0);
@@ -124,6 +127,34 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
               />
             </div>
 
+            {/* Où en est le camion — l'info que la feuille papier ne donne pas. */}
+            {progress.total > 0 && (
+              <div
+                className={`mt-2 rounded-lg px-3 py-2 text-sm ${
+                  progress.complete
+                    ? "bg-emerald-50 text-emerald-800"
+                    : "bg-amber-50 text-amber-800"
+                }`}
+              >
+                {progress.complete ? (
+                  <>✓ Camion entièrement scié ({progress.total} billons)</>
+                ) : (
+                  <>
+                    <strong className="tabular-nums">
+                      {progress.sawn}/{progress.total}
+                    </strong>{" "}
+                    billons sciés — restent :{" "}
+                    {progress.remaining
+                      .slice(0, 24)
+                      .map((l) => l.externalId ?? `#${l.position}`)
+                      .join(", ")}
+                    {progress.remaining.length > 24 &&
+                      ` … +${progress.remaining.length - 24}`}
+                  </>
+                )}
+              </div>
+            )}
+
             {shared && (
               <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 ⚠ Une session porte sur plusieurs camions : le débité ci-dessus est une
@@ -171,7 +202,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
                     <Link
                       key={r.id}
                       to={`/production-runs/${r.id}`}
-                      className="block rounded-lg border border-slate-200 p-2.5 hover:border-slate-400"
+                      className="block rounded-lg border border-slate-200 p-2.5 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm text-slate-900">

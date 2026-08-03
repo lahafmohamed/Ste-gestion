@@ -6,8 +6,10 @@ import {
   sawnThicknessBands,
   sawnVolumeM3,
   SIZE_GROUP_LABELS,
+  truckSawnProgress,
   type LogDTO,
   type ProductionRunCreateInput,
+  type ProductionRunDTO,
   type SizeGroup,
   type TruckDTO,
 } from "@ste/shared";
@@ -61,14 +63,32 @@ type Props = {
   onSave: (data: Omit<ProductionRunCreateInput, "contractId">) => void;
   saving: boolean;
   trucks?: TruckDTO[]; // camions du contrat (pour lier les camions sciés)
+  runs?: ProductionRunDTO[]; // sessions existantes → billons déjà sciés
 };
 
-export default function SawnEntry({ onSave, saving, trucks }: Props) {
+export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
   const [rows, setRows] = useState<RowState[]>([emptyRow()]);
   const [date, setDate] = useState("");
   const [note, setNote] = useState("");
   const [truckIds, setTruckIds] = useState<string[]>([]);
   const [logIds, setLogIds] = useState<string[]>([]); // billons sciés (girth)
+
+  // Avancement existant par camion (sessions déjà enregistrées) : sert à
+  // marquer les billons déjà sciés et l'état des camions dans les chips.
+  const progressByTruck = new Map(
+    (trucks ?? []).map((t) => [t.id, truckSawnProgress(t, runs ?? [])])
+  );
+  // Billon déjà passé à la scie = pas dans « remaining » de son camion.
+  const alreadySawnIds = new Set(
+    (trucks ?? []).flatMap((t) => {
+      const p = progressByTruck.get(t.id)!;
+      if (p.sawn === 0) return [];
+      const rem = new Set(p.remaining.map((l) => l.id));
+      return truckBillons(t)
+        .map((l) => l.id)
+        .filter((id) => !rem.has(id));
+    })
+  );
 
   function toggleTruck(id: string) {
     setTruckIds((p) => {
@@ -174,12 +194,35 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
             Camions sciés (optionnel — définit « sur parc non sciés »)
           </div>
           <div className="flex flex-wrap gap-2">
-            {trucks.map((t) => (
-              <Chip key={t.id} selected={truckIds.includes(t.id)} onClick={() => toggleTruck(t.id)}>
-                {t.registration}
-                {t.sawn ? " ✓" : ""}
-              </Chip>
-            ))}
+            {trucks.map((t) => {
+              const p = progressByTruck.get(t.id)!;
+              const sel = truckIds.includes(t.id);
+              return (
+                <Chip
+                  key={t.id}
+                  selected={sel}
+                  onClick={() => toggleTruck(t.id)}
+                  title={
+                    p.total > 0
+                      ? `${p.sawn}/${p.total} billons sciés`
+                      : "Pas d'étalage billons (girth)"
+                  }
+                >
+                  {t.registration}
+                  {p.complete ? (
+                    <span className={`ml-1 ${sel ? "text-emerald-300" : "text-emerald-600"}`}>
+                      ✓ fini
+                    </span>
+                  ) : p.sawn > 0 ? (
+                    <span
+                      className={`ml-1 tabular-nums ${sel ? "text-amber-300" : "text-amber-600"}`}
+                    >
+                      {p.sawn}/{p.total}
+                    </span>
+                  ) : null}
+                </Chip>
+              );
+            })}
           </div>
 
           {/* Billons sciés du/des camion(s) coché(s) — vide = camion entier.
@@ -190,6 +233,7 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
             const selCount = billons.filter((l) => logIds.includes(l.id)).length;
             const allSelected = selCount === billons.length;
             const groups = billonsByBill(billons);
+            const p = progressByTruck.get(t.id)!;
             return (
               <div key={t.id} className="mt-2 rounded-lg bg-slate-50 p-2">
                 <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
@@ -197,6 +241,11 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
                     Billons sciés de {t.registration} — {selCount === 0
                       ? "aucun coché = camion entier"
                       : `${selCount}/${billons.length}`}
+                    {p.sawn > 0 && (
+                      <span className="ml-1.5 text-emerald-700">
+                        · {p.complete ? "tout déjà scié" : `${p.sawn} déjà scié${p.sawn > 1 ? "s" : ""} ✓`}
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"
@@ -208,7 +257,7 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
                           : [...new Set([...p, ...ids])];
                       })
                     }
-                    className="text-slate-500 underline hover:text-slate-900"
+                    className="-my-2 min-h-9 rounded-lg px-2 text-slate-500 underline hover:text-slate-900 active:bg-slate-200"
                   >
                     {allSelected ? "Tout décocher" : "Tout cocher"}
                   </button>
@@ -230,24 +279,32 @@ export default function SawnEntry({ onSave, saving, trucks }: Props) {
                                 : [...new Set([...p, ...ids])]
                             )
                           }
-                          className={`w-14 shrink-0 rounded px-1.5 py-0.5 text-left text-xs font-medium tabular-nums ${
+                          className={`min-h-9 w-14 shrink-0 rounded px-1.5 py-0.5 text-left text-xs font-medium tabular-nums active:bg-slate-200 ${
                             selOfBill > 0 ? "text-emerald-700" : "text-slate-500"
                           }`}
                         >
                           {g.bill}
                           <span className="ml-0.5 text-slate-400">·{ids.length}</span>
                         </button>
-                        {g.billons.map((l) => (
-                          <Chip
-                            key={l.id}
-                            selected={logIds.includes(l.id)}
-                            onClick={() => toggleLog(l.id)}
-                            title={`${l.externalId ?? `#${l.position}`} — ${Number(l.volumeM3).toFixed(4)} m³`}
-                          >
-                            {/* Suffixe seul (A, B, C…) : la bille est déjà en tête de ligne. */}
-                            {l.externalId?.slice(g.bill.length) || l.externalId || `#${l.position}`}
-                          </Chip>
-                        ))}
+                        {g.billons.map((l) => {
+                          const done = alreadySawnIds.has(l.id);
+                          const sel = logIds.includes(l.id);
+                          return (
+                            <Chip
+                              key={l.id}
+                              selected={sel}
+                              onClick={() => toggleLog(l.id)}
+                              // Déjà scié : chip verte + ✓ — recochable (resciage),
+                              // mais impossible de le prendre pour du bois restant.
+                              className={done && !sel ? "!bg-emerald-50 !text-emerald-700 !ring-emerald-200" : ""}
+                              title={`${l.externalId ?? `#${l.position}`} — ${Number(l.volumeM3).toFixed(4)} m³${done ? " — déjà scié" : ""}`}
+                            >
+                              {/* Suffixe seul (A, B, C…) : la bille est déjà en tête de ligne. */}
+                              {l.externalId?.slice(g.bill.length) || l.externalId || `#${l.position}`}
+                              {done ? " ✓" : ""}
+                            </Chip>
+                          );
+                        })}
                       </div>
                     );
                   })}

@@ -6,8 +6,10 @@ import {
   runPieceCount,
   runTotalM3,
   SIZE_GROUP_LABELS,
+  truckSawnProgress,
   type ProductionRunCreateInput,
   type SizeGroup,
+  type TruckSawnProgress,
 } from "@ste/shared";
 import { productionApi, trucksApi } from "../lib/api";
 import { fmtInt, fmtM3, fmtNum } from "../lib/format";
@@ -29,6 +31,17 @@ export default function ProductionSection({ contractId }: { contractId: string }
     queryKey: ["trucks", contractId],
     queryFn: () => trucksApi.listByContract(contractId),
   });
+
+  // État débitage par camion — répond à « quel camion reste à scier ? ».
+  // Ordre de lecture parc : en cours, puis pas commencés, puis à billonner,
+  // les finis en dernier.
+  const truckProgress = (trucks.data ?? []).map((t) => ({
+    truck: t,
+    p: truckSawnProgress(t, runs.data ?? []),
+  }));
+  const progressRank = ({ p }: { p: TruckSawnProgress }) =>
+    p.complete ? 3 : p.sawn > 0 ? 0 : p.total > 0 ? 1 : 2;
+  const sortedProgress = [...truckProgress].sort((a, b) => progressRank(a) - progressRank(b));
 
   const create = useMutation({
     mutationFn: productionApi.create,
@@ -58,10 +71,69 @@ export default function ProductionSection({ contractId }: { contractId: string }
           <SawnEntry
             saving={create.isPending}
             trucks={trucks.data}
+            runs={runs.data}
             onSave={(data) =>
               create.mutate({ ...data, contractId } as ProductionRunCreateInput)
             }
           />
+        </div>
+      )}
+
+      {/* Avancement par camion — la question du parc est « qu'est-ce qui reste
+          à scier ? », pas « quelles sessions ont eu lieu ? ». */}
+      {sortedProgress.length > 0 && (
+        <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Camions — avancement sciage
+          </div>
+          <div className="divide-y divide-slate-50">
+            {sortedProgress.map(({ truck: t, p }) => (
+              <Link
+                key={t.id}
+                to={`/trucks/${t.id}`}
+                className="flex min-h-11 items-center gap-3 rounded-lg px-1 py-1.5 hover:bg-slate-50 active:bg-slate-100"
+              >
+                <span className="w-28 shrink-0 truncate text-sm font-medium text-slate-900">
+                  {t.registration}
+                  {t.deliveryNote && (
+                    <span className="ml-1 text-xs font-normal text-slate-400">
+                      B/L {t.deliveryNote}
+                    </span>
+                  )}
+                </span>
+                {p.total > 0 ? (
+                  <>
+                    <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={`h-full rounded-full ${p.complete ? "bg-emerald-500" : "bg-amber-400"}`}
+                        style={{ width: `${Math.round((p.sawn / p.total) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="w-24 shrink-0 text-right text-xs tabular-nums text-slate-500">
+                      {p.sawn}/{p.total} billons
+                    </span>
+                    <Badge
+                      tone={p.complete ? "emerald" : p.sawn > 0 ? "amber" : "slate"}
+                      className="w-20 shrink-0 justify-center"
+                    >
+                      {p.complete ? "✓ Fini" : p.sawn > 0 ? "En cours" : "À scier"}
+                    </Badge>
+                  </>
+                ) : (
+                  <>
+                    <div className="min-w-0 flex-1" />
+                    {/* Scié « camion entier » sans étalage girth : fini quand même. */}
+                    <Badge
+                      tone={p.complete ? "emerald" : "slate"}
+                      className="w-20 shrink-0 justify-center"
+                    >
+                      {p.complete ? "✓ Fini" : "À billonner"}
+                    </Badge>
+                  </>
+                )}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
@@ -82,7 +154,7 @@ export default function ProductionSection({ contractId }: { contractId: string }
             <Link
               key={r.id}
               to={`/production-runs/${r.id}`}
-              className="block rounded-xl border border-slate-200 bg-white p-3 hover:border-slate-400"
+              className="block rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50"
             >
               <div className="flex items-center justify-between">
                 <div className="font-medium text-slate-900">
