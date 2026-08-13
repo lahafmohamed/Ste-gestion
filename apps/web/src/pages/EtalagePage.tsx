@@ -10,6 +10,7 @@ export default function EtalagePage() {
     <StepLayout
       title="Étalage"
       subtitle="Billes étalées et mesurées une par une, puis billonnage (266 → 266A, 266B…)."
+      step="etalage"
     >
       {(c) => (
         <EtalageSection

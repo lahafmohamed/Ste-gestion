@@ -5,7 +5,9 @@ import { accountsApi, contractsApi } from "../lib/api";
 import { fmtInt, fmtNum, normalizeDecimal } from "../lib/format";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
+import Card from "./ui/Card";
 import { FormError } from "./ui/Feedback";
+import Input, { Field, Select } from "./ui/Input";
 
 // ── Saisie progressive : la fiche contrat est découpée en cartes
 // indépendantes ; chaque carte s'édite et s'enregistre séparément (PATCH
@@ -201,7 +203,7 @@ function SectionCard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <Card>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-slate-900">{section.title}</h3>
@@ -209,9 +211,10 @@ function SectionCard({
             {filled}/{total}
           </Badge>
         </div>
+        {/* min-h-9 : « Modifier » se tape au pouce sur la fiche. */}
         <button
           onClick={() => (editing ? closeEdit() : openEdit())}
-          className="text-sm text-slate-500 hover:text-slate-900"
+          className="-my-1 min-h-9 rounded-lg px-2 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
         >
           {editing ? "Annuler" : "Modifier"}
         </button>
@@ -233,22 +236,19 @@ function SectionCard({
         <form onSubmit={submit} className="mt-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {section.fields.map((f) => (
-              <label key={f.key} className="flex flex-col gap-1 text-sm">
-                <span className="text-slate-600">{f.label}</span>
+              <Field key={f.key} label={f.label}>
                 {f.kind === "status" ? (
-                  <select
+                  <Select
                     value={v[f.key]}
                     onChange={(e) => setV((p) => ({ ...p, [f.key]: e.target.value }))}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
                   >
                     <option value="OPEN">Ouvert</option>
                     <option value="CLOSED">Clôturé</option>
-                  </select>
+                  </Select>
                 ) : f.kind === "party" ? (
-                  <select
+                  <Select
                     value={v[f.key]}
                     onChange={(e) => setV((p) => ({ ...p, [f.key]: e.target.value }))}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
                   >
                     <option value="">— aucun —</option>
                     {parties.data?.map((p) => (
@@ -256,9 +256,9 @@ function SectionCard({
                         {p.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
-                  <input
+                  <Input
                     type={f.kind === "date" ? "date" : "text"}
                     inputMode={f.kind === "int" || f.kind === "decimal" ? "decimal" : undefined}
                     value={v[f.key]}
@@ -274,10 +274,9 @@ function SectionCard({
                       }))
                     }
                     placeholder={f.ph}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
                   />
                 )}
-              </label>
+              </Field>
             ))}
           </div>
           {error && (
@@ -292,7 +291,7 @@ function SectionCard({
           </div>
         </form>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -356,37 +355,27 @@ export function ContractQuickCreate({
         fiche, au fil du contrat.
       </p>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">N° de contrat</span>
-          <input
+        <Field label="N° de contrat">
+          <Input
             required
             autoFocus
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="A3-2026-014"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Quota (m³)</span>
-          <input
+        </Field>
+        <Field label="Quota (m³)">
+          <Input
             required
             inputMode="decimal"
             value={quota}
             onChange={(e) => setQuota(normalizeDecimal(e.target.value))}
             placeholder="1000"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Année</span>
-          <input
-            inputMode="numeric"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
-          />
-        </label>
+        </Field>
+        <Field label="Année">
+          <Input inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value)} />
+        </Field>
       </div>
       {error && (
         <div className="mt-3">

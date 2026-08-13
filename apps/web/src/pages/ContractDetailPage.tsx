@@ -16,15 +16,7 @@ import ContainersSection from "../components/ContainersSection";
 import AccountsSection from "../components/AccountsSection";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
-
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-slate-900">{value}</div>
-    </div>
-  );
-}
+import Card, { BackLink, Kpi, SectionHeading } from "../components/ui/Card";
 
 // Chaîne de mesure du bois : chaque étape a son unité (billes puis billons) et
 // son cubage. Même vocabulaire que la réception (étalage → billonnage → débitage).
@@ -56,7 +48,7 @@ function FlowStep({
       >
         {value}
       </div>
-      <div className="text-[11px] text-slate-400">{sub ?? "—"}</div>
+      <div className="text-xs text-slate-400">{sub ?? "—"}</div>
     </div>
   );
 }
@@ -147,11 +139,8 @@ export default function ContractDetailPage() {
   const s: ContractSummaryDTO | undefined = summaryQ.data;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      {/* Zone de tap élargie : le lien retour se vise au pouce en haut d'écran. */}
-      <Link to="/contracts" className="-mx-2 inline-flex min-h-9 items-center rounded-lg px-2 text-sm text-slate-500 hover:text-slate-900 active:bg-slate-100">
-        ← Contrats
-      </Link>
+    <div className="mx-auto max-w-page px-4 py-6">
+      <BackLink to="/contracts">Contrats</BackLink>
 
       <div className="mt-2 flex items-start justify-between gap-3">
         <div>
@@ -174,15 +163,16 @@ export default function ContractDetailPage() {
           >
             Exporter Excel
           </Button>
-          <button
+          <Button
+            variant="ghost-danger"
+            size="sm"
             onClick={() => {
               setDelText("");
               setDelOpen((s) => !s);
             }}
-            className="min-h-9 rounded-lg px-2 text-sm text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
           >
             Supprimer
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -212,7 +202,7 @@ export default function ContractDetailPage() {
               autoCorrect="off"
               spellCheck={false}
               placeholder={c.code}
-              className="rounded-lg border border-red-300 bg-white px-3 py-2 text-base outline-none focus:border-red-600 sm:max-w-xs"
+              className="min-h-touch rounded-lg border border-red-300 bg-white px-3 py-2 text-base outline-none focus:border-red-600 sm:max-w-xs"
             />
           </label>
           {del.isError && (
@@ -250,7 +240,10 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      <div className="-mx-4 mt-4 overflow-x-auto border-b border-slate-200 px-4">
+      {/* overflow-x-auto force aussi overflow-y en auto (règle CSS) : le -mb-px des
+          onglets déborde d'1px et Chrome affiche une barre de défilement verticale
+          fantôme à droite. Barres masquées, le glissement tactile reste possible. */}
+      <div className="-mx-4 mt-4 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none">
         <div className="flex min-w-max gap-1">
           {TABS.map((t) => (
             <button
@@ -258,7 +251,7 @@ export default function ContractDetailPage() {
               type="button"
               onClick={() => setTab(t.key)}
               aria-current={tab === t.key ? "page" : undefined}
-              className={`-mb-px min-h-11 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-900 ${
+              className={`-mb-px min-h-touch whitespace-nowrap border-b-2 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-900 ${
                 tab === t.key
                   ? "border-slate-900 font-medium text-slate-900"
                   : "border-transparent text-slate-500 hover:text-slate-900 active:bg-slate-100"
@@ -292,10 +285,8 @@ export default function ContractDetailPage() {
         {/* Pipeline — tout dérivé des opérations */}
         {s && (
           <section className="mt-5">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Pipeline
-            </h2>
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+            <SectionHeading>Pipeline</SectionHeading>
+            <Card className="space-y-3">
               {/* Chaîne de mesure — mêmes étapes et mêmes mots que la réception. */}
               <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                 <FlowStep
@@ -377,7 +368,7 @@ export default function ContractDetailPage() {
                 <Kpi label="Solde" value={fmtFcfa(s.balance)} />
                 <Kpi label="Profit estimé" value={fmtFcfa(s.profitEstimate)} />
               </div>
-            </div>
+            </Card>
           </section>
         )}
 
@@ -426,9 +417,7 @@ export default function ContractDetailPage() {
       {/* Termes — saisie progressive, chaque carte s'édite et s'enregistre seule */}
       {tab === "termes" && (
         <section className="mt-5">
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Termes du contrat
-          </h2>
+          <SectionHeading>Termes du contrat</SectionHeading>
           <ContractSections
             contract={c}
             onSaved={() => {

@@ -4,7 +4,10 @@ import type { EntryKind } from "@ste/shared";
 import { accountsApi } from "../lib/api";
 import { fmtFcfa } from "../lib/format";
 import Button from "./ui/Button";
+import { SectionHeading } from "./ui/Card";
+import ConfirmDialog from "./ui/ConfirmDialog";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
+import Input, { Field, Select } from "./ui/Input";
 
 function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => void }) {
   const qc = useQueryClient();
@@ -54,66 +57,49 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
       onSubmit={submit}
       className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3"
     >
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-600">Tiers</span>
-        <input
+      <Field label="Tiers">
+        <Input
           required
           list="parties-list"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ibrahim"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
         />
         <datalist id="parties-list">
           {parties.data?.map((p) => (
             <option key={p.id} value={p.name} />
           ))}
         </datalist>
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-600">Type</span>
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value as EntryKind)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
-        >
+      <Field label="Type">
+        <Select value={kind} onChange={(e) => setKind(e.target.value as EntryKind)}>
           <option value="DUE">Devoir (dû)</option>
           <option value="PAID">Payé</option>
-        </select>
-      </label>
+        </Select>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-600">Montant (FCFA)</span>
-        <input
+      <Field label="Montant (FCFA)">
+        <Input
           required
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="7317672"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-600">Description</span>
-        <input
+      <Field label="Description">
+        <Input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Sous cubage, 20m cash…"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-slate-600">Date</span>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
-        />
-      </label>
+      <Field label="Date">
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </Field>
 
       <div className="col-span-2 flex items-end justify-between sm:col-span-1">
         {error && <FormError>{error}</FormError>}
@@ -129,6 +115,10 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  // Confirmation lisible sur tablette (remplace window.confirm).
+  const [delEntry, setDelEntry] = useState<{ id: string; kind: string; amount: string } | null>(
+    null
+  );
 
   const accounts = useQuery({
     queryKey: ["accounts", contractId],
@@ -165,14 +155,15 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
 
   return (
     <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Comptes tiers ({accounts.data?.length ?? 0})
-        </h2>
-        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? "Fermer" : "+ Écriture"}
-        </Button>
-      </div>
+      <SectionHeading
+        right={
+          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+            {showForm ? "Fermer" : "+ Écriture"}
+          </Button>
+        }
+      >
+        Comptes tiers ({accounts.data?.length ?? 0})
+      </SectionHeading>
 
       {showForm && <EntryForm contractId={contractId} onDone={() => setShowForm(false)} />}
 
@@ -192,7 +183,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                   <button
                     onClick={() => applySuggestion.mutate(s)}
                     disabled={applySuggestion.isPending}
-                    className="shrink-0 rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                    className="min-h-9 shrink-0 rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50"
                   >
                     + {fmtFcfa(s.delta)}
                   </button>
@@ -219,7 +210,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
             <div key={a.party.id} className="rounded-xl border border-slate-200 bg-white">
               <button
                 onClick={() => setOpen(isOpen ? null : a.party.id)}
-                className="flex w-full items-center justify-between p-3 text-left"
+                className="flex min-h-touch w-full items-center justify-between gap-3 p-3 text-left hover:bg-slate-50 active:bg-slate-100"
               >
                 <span className="font-medium text-slate-900">{a.party.name}</span>
                 <span className="text-right text-sm">
@@ -264,15 +255,10 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                           </td>
                           <td className="py-1 text-right">
                             <button
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    `Supprimer cette écriture (${e.kind === "DUE" ? "dû" : "payé"} ${fmtFcfa(e.amount)}) ? Action irréversible.`
-                                  )
-                                )
-                                  removeEntry.mutate(e.id);
-                              }}
-                              className="text-slate-300 hover:text-red-500"
+                              onClick={() =>
+                                setDelEntry({ id: e.id, kind: e.kind, amount: e.amount })
+                              }
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
                               aria-label="Supprimer l'écriture"
                             >
                               ×
@@ -288,6 +274,21 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
           );
         })}
       </div>
+
+      <ConfirmDialog
+        open={delEntry !== null}
+        title="Supprimer cette écriture ?"
+        confirmLabel="Supprimer l'écriture"
+        onConfirm={() => {
+          if (delEntry) removeEntry.mutate(delEntry.id);
+          setDelEntry(null);
+        }}
+        onCancel={() => setDelEntry(null)}
+      >
+        {delEntry
+          ? `${delEntry.kind === "DUE" ? "Dû" : "Payé"} de ${fmtFcfa(delEntry.amount)}. Action irréversible.`
+          : null}
+      </ConfirmDialog>
     </section>
   );
 }

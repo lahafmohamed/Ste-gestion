@@ -66,8 +66,16 @@ export async function summaryRoutes(app: FastifyInstance) {
     const contract = await prisma.contract.findUnique({ where: { id: contractId } });
     if (!contract) return reply.code(404).send({ error: "Contrat introuvable" });
 
-    const [trucks, logs, sawnLines, saleLines, entries, runTruckLinks, runLogLinks] =
-      await Promise.all([
+    const [
+      trucks,
+      logs,
+      sawnLines,
+      saleLines,
+      entries,
+      runTruckLinks,
+      runLogLinks,
+      resawLines,
+    ] = await Promise.all([
       prisma.truck.findMany({
         where: { contractId },
         select: {
@@ -111,6 +119,10 @@ export async function summaryRoutes(app: FastifyInstance) {
           logId: true,
           log: { select: { measurement: { select: { truckId: true } } } },
         },
+      }),
+      prisma.resawLine.findMany({
+        where: { op: { contractId } },
+        select: { kind: true, sizeCode: true, sizeGroup: true, volumeM3: true },
       }),
     ]);
 
@@ -244,23 +256,53 @@ export async function summaryRoutes(app: FastifyInstance) {
       soldBySize.set(l.sizeCode, (soldBySize.get(l.sizeCode) ?? 0) + v);
     }
 
-    // ── Stock produits par taille = produit − vendu ──
-    const codes = new Set([...producedBySize.keys(), ...soldBySize.keys()]);
+    // ── Resciage par taille (entrant = produit plus petit, sortant = consommé) ──
+    // Ne touche ni debitedM3 ni le rendement : le resciage ne crée pas de
+    // matière depuis les billons, il redistribue le stock entre tailles.
+    const resawInBySize = new Map<string, { group: SizeGroup; m3: number }>();
+    const resawOutBySize = new Map<string, number>();
+    let resawInM3 = 0;
+    let resawOutM3 = 0;
+    for (const l of resawLines) {
+      const v = Number(l.volumeM3);
+      if (l.kind === "PRODUCED") {
+        resawInM3 += v;
+        const acc = resawInBySize.get(l.sizeCode);
+        if (acc) acc.m3 += v;
+        else resawInBySize.set(l.sizeCode, { group: l.sizeGroup as SizeGroup, m3: v });
+      } else {
+        resawOutM3 += v;
+        resawOutBySize.set(l.sizeCode, (resawOutBySize.get(l.sizeCode) ?? 0) + v);
+      }
+    }
+
+    // ── Stock produits par taille = produit + rescié entrant − vendu − rescié sortant ──
+    const codes = new Set([
+      ...producedBySize.keys(),
+      ...soldBySize.keys(),
+      ...resawInBySize.keys(),
+      ...resawOutBySize.keys(),
+    ]);
     const stockBySize = [...codes]
       .map((code) => {
         const prod = producedBySize.get(code);
         const producedM3 = prod?.m3 ?? 0;
         const sold = soldBySize.get(code) ?? 0;
+        const resawIn = resawInBySize.get(code);
+        const rIn = resawIn?.m3 ?? 0;
+        const rOut = resawOutBySize.get(code) ?? 0;
         return {
           code,
-          group: prod?.group ?? ("OTHER" as SizeGroup),
+          group: prod?.group ?? resawIn?.group ?? ("OTHER" as SizeGroup),
           producedM3: producedM3.toFixed(6),
           soldM3: sold.toFixed(6),
-          stockM3: (producedM3 - sold).toFixed(6),
+          resawnInM3: rIn.toFixed(6),
+          resawnOutM3: rOut.toFixed(6),
+          stockM3: (producedM3 + rIn - sold - rOut).toFixed(6),
         };
       })
       .sort((a, b) => sizeSortIndex(a.code) - sizeSortIndex(b.code));
-    const stockProductsM3 = debitedM3 - soldM3;
+    const stockProductsM3 = debitedM3 + resawInM3 - soldM3 - resawOutM3;
 
     // ── Compta ──
     let fullCost = 0;

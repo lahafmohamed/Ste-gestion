@@ -6,7 +6,10 @@ import { normalizeDecimal, todayISO } from "../lib/format";
 import { invalidateTrucks, parcStage, truckMatches } from "../lib/trucks";
 import TruckCard from "./TruckCard";
 import Button from "./ui/Button";
+import { SectionHeading } from "./ui/Card";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
+import Input, { Field, SearchInput } from "./ui/Input";
+import { SkeletonList } from "./ui/Skeleton";
 
 /**
  * Étape 1 · Réception au portail : uniquement l'en-tête recopié du bordereau
@@ -114,22 +117,23 @@ export default function ReceptionSection({
 
   return (
     <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Camions reçus ({trucks.data?.length ?? 0})
-        </h2>
-        {!closed && (
-          <Button
-            size="xs"
-            onClick={() => {
-              setJustReceived(null);
-              setShowForm((s) => !s);
-            }}
-          >
-            {showForm ? "Fermer" : "+ Camion arrivé"}
-          </Button>
-        )}
-      </div>
+      <SectionHeading
+        right={
+          !closed && (
+            <Button
+              size="xs"
+              onClick={() => {
+                setJustReceived(null);
+                setShowForm((s) => !s);
+              }}
+            >
+              {showForm ? "Fermer" : "+ Camion arrivé"}
+            </Button>
+          )
+        }
+      >
+        Camions reçus ({trucks.data?.length ?? 0})
+      </SectionHeading>
 
       {/* ── Réception : uniquement l'en-tête recopié du bordereau ── */}
       {showForm && (
@@ -177,9 +181,8 @@ export default function ReceptionSection({
               // sinon « 33,171 » part tel quel et l'API refuse la ligne.
               const isNum = key === "declaredFieldM3" || key === "declaredLogCount";
               return (
-                <label key={key} className="flex flex-col gap-1 text-sm">
-                  <span className="text-slate-600">{label}</span>
-                  <input
+                <Field key={key} label={label}>
+                  <Input
                     ref={key === "registration" ? regRef : undefined}
                     required={required}
                     type={key === "arrivedAt" ? "date" : "text"}
@@ -194,9 +197,8 @@ export default function ReceptionSection({
                       }))
                     }
                     placeholder={ph}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
                   />
-                </label>
+                </Field>
               );
             })}
           </div>
@@ -265,30 +267,18 @@ export default function ReceptionSection({
 
       {/* ── Recherche — dès que la liste des bordereaux s'allonge ── */}
       {(trucks.data?.length ?? 0) > 3 && (
-        <div className="relative mb-2">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Immatriculation, B/L, parcelle…"
-            aria-label="Chercher un camion"
-            className="w-full rounded-lg border border-slate-300 py-2 pl-3 pr-9 text-base outline-none focus:border-slate-900"
-          />
-          {q && (
-            <button
-              type="button"
-              onClick={() => setQ("")}
-              aria-label="Effacer la recherche"
-              className="absolute inset-y-0 right-0 px-3 text-lg text-slate-400 hover:text-slate-900 active:text-slate-900"
-            >
-              ×
-            </button>
-          )}
-        </div>
+        <SearchInput
+          value={q}
+          onChange={setQ}
+          placeholder="Immatriculation, B/L, parcelle…"
+          aria-label="Chercher un camion"
+          className="mb-2"
+        />
       )}
 
       {/* ── Cartes camions : annoncé vs étalé/billonné en un coup d'œil ── */}
       <div className="space-y-2">
-        {trucks.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {trucks.isLoading && <SkeletonList count={3} lines={1} />}
         {trucks.isError && (
           <QueryError error={trucks.error} onRetry={() => trucks.refetch()}>
             Impossible de charger les camions

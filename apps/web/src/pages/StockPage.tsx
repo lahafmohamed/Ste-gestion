@@ -1,13 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { SIZE_GROUP_LABELS } from "@ste/shared";
+import ResawSection from "../components/ResawSection";
 import StepLayout from "../components/StepLayout";
 import Badge, { SIZE_GROUP_TONE } from "../components/ui/Badge";
+import Card, { Kpi, SectionHeading } from "../components/ui/Card";
+import { SkeletonList } from "../components/ui/Skeleton";
+import { TableWrap } from "../components/ui/Table";
 import { contractsApi } from "../lib/api";
 import { fmtM3, fmtNum } from "../lib/format";
 
 export default function StockPage() {
   return (
-    <StepLayout title="Stock" subtitle="Parc (billons non sciés) & produits par taille.">
+    <StepLayout
+      title="Stock"
+      subtitle="Parc (billons non sciés) & produits par taille."
+      step="stock"
+    >
       {(c) => <StockInner contractId={c.id} />}
     </StepLayout>
   );
@@ -23,7 +31,7 @@ function StockInner({ contractId }: { contractId: string }) {
     queryFn: () => contractsApi.truckStats(contractId),
   });
   const s = summary.data;
-  if (!s) return <p className="text-sm text-slate-500">Chargement…</p>;
+  if (!s) return <SkeletonList count={2} />;
 
   // Alerte : tailles en stock négatif (plus vendu que produit).
   const negatives = s.stockBySize.filter((r) => Number(r.stockM3) < 0);
@@ -41,24 +49,18 @@ function StockInner({ contractId }: { contractId: string }) {
       )}
 
       <div className="mb-4 grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="text-xs text-slate-500">Stock parc (billons non sciés)</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">{fmtM3(s.stockParcM3)}</div>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="text-xs text-slate-500">Stock produits</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">{fmtM3(s.stockProductsM3)}</div>
-        </div>
+        <Kpi label="Stock parc (billons non sciés)" value={fmtM3(s.stockParcM3)} />
+        <Kpi label="Stock produits" value={fmtM3(s.stockProductsM3)} />
       </div>
 
       {parcTrucks.length > 0 && (
         <>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Parc — billons par camion (non sciés)
-          </h2>
-          {/* min-w : sur téléphone les 6 colonnes s'écrasaient au lieu de défiler. */}
-          <div className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white p-4">
-            <table className="w-full min-w-[560px] text-sm">
+          <SectionHeading>Parc — billons par camion (non sciés)</SectionHeading>
+          {/* min-w : sur téléphone les 6 colonnes s'écrasaient au lieu de défiler.
+              1re colonne figée : on garde l'immat sous les yeux en défilant. */}
+          <Card className="mb-4">
+            <TableWrap stickyFirstCol>
+              <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-slate-500">
                   <th className="py-1 pr-4 font-normal">Camion</th>
@@ -99,36 +101,54 @@ function StockInner({ contractId }: { contractId: string }) {
                   <td colSpan={2} />
                 </tr>
               </tfoot>
-            </table>
-          </div>
+              </table>
+            </TableWrap>
+          </Card>
         </>
       )}
 
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Produits par taille (produit − vendu)
-      </h2>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4">
+      <SectionHeading>Produits par taille (produit ± rescié − vendu)</SectionHeading>
+      <Card>
         {s.stockBySize.length === 0 ? (
           <p className="text-sm text-slate-500">Aucun produit débité.</p>
         ) : (
-          <table className="w-full min-w-[440px] text-sm">
+          <TableWrap>
+            <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-500">
                 <th className="py-1 pr-4 font-normal">Taille</th>
                 <th className="py-1 pr-4 font-normal">Groupe</th>
                 <th className="py-1 pr-4 text-right font-normal">Produit</th>
+                <th className="py-1 pr-4 text-right font-normal">Rescié</th>
                 <th className="py-1 pr-4 text-right font-normal">Vendu</th>
                 <th className="py-1 text-right font-normal">Stock</th>
               </tr>
             </thead>
             <tbody>
-              {s.stockBySize.map((r) => (
+              {s.stockBySize.map((r) => {
+                // Effet net du resciage sur la taille : + = reçoit du bois
+                // rescié plus petit, − = part à la scie pour être rescié.
+                const resawNet = Number(r.resawnInM3) - Number(r.resawnOutM3);
+                return (
                 <tr key={r.code} className="border-t border-slate-100">
                   <td className="py-1 pr-4 font-medium">{r.code}</td>
                   <td className="py-1 pr-4">
                     <Badge tone={SIZE_GROUP_TONE[r.group]}>{SIZE_GROUP_LABELS[r.group]}</Badge>
                   </td>
                   <td className="py-1 pr-4 text-right tabular-nums">{fmtNum(r.producedM3)}</td>
+                  <td
+                    className={`py-1 pr-4 text-right tabular-nums ${
+                      resawNet > 0
+                        ? "text-emerald-700"
+                        : resawNet < 0
+                          ? "text-amber-700"
+                          : "text-slate-400"
+                    }`}
+                  >
+                    {resawNet === 0
+                      ? "—"
+                      : `${resawNet > 0 ? "+" : "−"}${fmtNum(Math.abs(resawNet).toFixed(3))}`}
+                  </td>
                   <td className="py-1 pr-4 text-right tabular-nums">{fmtNum(r.soldM3)}</td>
                   <td
                     className={`py-1 text-right font-medium tabular-nums ${
@@ -138,11 +158,15 @@ function StockInner({ contractId }: { contractId: string }) {
                     {fmtNum(r.stockM3)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
-          </table>
+            </table>
+          </TableWrap>
         )}
-      </div>
+      </Card>
+
+      <ResawSection contractId={contractId} summary={s} />
     </>
   );
 }

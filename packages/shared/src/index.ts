@@ -218,6 +218,29 @@ export function runGroupTotals(r: ProductionRunDTO): Record<SizeGroup, number> {
   return t;
 }
 
+// ── Resciage ──────────────────────────────────────────────────────────
+// Bois déjà scié en stock repassé à la scie en sections plus petites.
+// Les deux sens (consommé / produit) partagent la forme d'une ligne débitée.
+
+export const resawOpCreateSchema = z.object({
+  contractId: z.string().min(1),
+  resawnAt: z.coerce.date().optional(),
+  note: z.string().trim().max(500).optional(),
+  consumed: z.array(sawnLineInput).min(1), // pris dans le stock
+  produced: z.array(sawnLineInput).min(1), // remis au stock (plus petit)
+});
+export type ResawOpCreateInput = z.infer<typeof resawOpCreateSchema>;
+
+export type ResawOpDTO = {
+  id: string;
+  contractId: string;
+  resawnAt: string;
+  note: string | null;
+  createdAt: string;
+  consumed: SawnLineDTO[];
+  produced: SawnLineDTO[];
+};
+
 // Agrégat débité par taille sur tout le contrat (bloc CONTRACTS CUTTING).
 export type CuttingSizeDTO = {
   code: string;
@@ -631,7 +654,16 @@ export type ContractSummaryDTO = {
   girthLt85M3: string;
 
   // Stock
-  stockBySize: { code: string; group: SizeGroup; producedM3: string; soldM3: string; stockM3: string }[];
+  // stock = produit + rescié entrant − vendu − rescié sortant
+  stockBySize: {
+    code: string;
+    group: SizeGroup;
+    producedM3: string;
+    soldM3: string;
+    resawnInM3: string; // produit par resciage
+    resawnOutM3: string; // consommé par resciage
+    stockM3: string;
+  }[];
   stockProductsM3: string;
   stockParcM3: string; // girth des camions non sciés
 

@@ -92,6 +92,7 @@ model Contract {
   accountEntries AccountEntry[]
   sales          Sale[]
   containers     Container[]
+  resawOps       ResawOp[]
 
   @@map("contract")
 }
@@ -374,6 +375,50 @@ model ContainerItem {
   volumeM3  Decimal   @map("volume_m3") @db.Decimal(12, 6)
 
   @@map("container_item")
+}
+
+// ── Resciage ──────────────────────────────────────────────────────────
+// Du bois déjà scié en stock repasse à la scie pour donner des sections
+// plus petites. Le stock d'une taille = produit + rescié entrant − vendu
+// − rescié sortant. Le rendement du débitage n'est pas affecté (le
+// resciage ne crée pas de matière depuis les billons).
+
+enum ResawLineKind {
+  CONSUMED // pris dans le stock (taille source)
+  PRODUCED // remis au stock (nouvelles tailles plus petites)
+}
+
+model ResawOp {
+  id         String   @id @default(cuid())
+  contractId String   @map("contract_id")
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  resawnAt   DateTime @default(now()) @map("resawn_at")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  lines ResawLine[]
+
+  @@map("resaw_op")
+}
+
+// Même calcul F3/F4 qu'une ligne de débitage — les deux sens partagent la forme.
+model ResawLine {
+  id       String        @id @default(cuid())
+  opId     String        @map("op_id")
+  op       ResawOp       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  kind     ResawLineKind
+  position Int
+
+  lengthFt    Decimal @map("length_ft") @db.Decimal(8, 3)
+  widthIn     Decimal @map("width_in") @db.Decimal(8, 3)
+  thicknessIn Decimal @map("thickness_in") @db.Decimal(8, 3)
+  count       Int
+
+  sizeCode  String    @map("size_code")
+  sizeGroup SizeGroup @map("size_group")
+  volumeM3  Decimal   @map("volume_m3") @db.Decimal(12, 6)
+
+  @@map("resaw_line")
 }
 
 model SawnLine {

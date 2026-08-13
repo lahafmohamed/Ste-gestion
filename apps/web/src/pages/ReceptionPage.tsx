@@ -9,6 +9,7 @@ export default function ReceptionPage() {
     <StepLayout
       title="Réception"
       subtitle="Le camion arrive : bordereau SODEFOR (immat, B/L, parcelle, vol brousse, billes annoncées)."
+      step="reception"
     >
       {(c) => (
         <ReceptionSection

@@ -5,6 +5,10 @@ import { contractsApi } from "../lib/api";
 import { fmtFcfa, fmtM3, fmtPct } from "../lib/format";
 import { PageHeader } from "../components/Layout";
 import { QuotaBar } from "../components/QuotaGauge";
+import Badge from "../components/ui/Badge";
+import { EmptyState, QueryError } from "../components/ui/Feedback";
+import { buttonCls } from "../components/ui/Button";
+import { SkeletonLine, SkeletonList } from "../components/ui/Skeleton";
 
 function ContractCard({ c }: { c: ContractDTO }) {
   const summary = useQuery({
@@ -16,17 +20,13 @@ function ContractCard({ c }: { c: ContractDTO }) {
   return (
     <Link
       to={`/contracts/${c.id}`}
-      className="block rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50"
+      className="block rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="font-medium text-slate-900">{c.code}</div>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs ${
-            c.status === "OPEN" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-          }`}
-        >
+        <Badge tone={c.status === "OPEN" ? "emerald" : "slate"}>
           {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
-        </span>
+        </Badge>
       </div>
 
       {s ? (
@@ -52,7 +52,11 @@ function ContractCard({ c }: { c: ContractDTO }) {
           </div>
         </div>
       ) : (
-        <div className="mt-3 text-xs text-slate-400">Chargement…</div>
+        <div className="mt-3 space-y-2" aria-hidden>
+          <SkeletonLine className="w-2/3" />
+          <SkeletonLine className="w-full" />
+          <SkeletonLine className="w-1/2" />
+        </div>
       )}
     </Link>
   );
@@ -64,16 +68,23 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble par contrat." />
-      <div className="mx-auto max-w-3xl px-4 py-6">
-        {contracts.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+      <div className="mx-auto max-w-page px-4 py-6">
+        {contracts.isLoading && <SkeletonList count={2} lines={3} />}
+        {contracts.isError && (
+          <QueryError error={contracts.error} onRetry={() => contracts.refetch()}>
+            Impossible de charger les contrats
+          </QueryError>
+        )}
         {contracts.data?.length === 0 && (
-          <p className="text-sm text-slate-500">
-            Aucun contrat.{" "}
-            <Link to="/contracts" className="underline">
-              Créer un contrat
-            </Link>
-            .
-          </p>
+          <EmptyState
+            action={
+              <Link to="/contracts?nouveau=1" className={buttonCls("primary", "md")}>
+                + Créer un contrat
+              </Link>
+            }
+          >
+            Aucun contrat pour l'instant.
+          </EmptyState>
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {contracts.data?.map((c) => (

@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { contractsApi } from "../lib/api";
 import { fmtInt, fmtNum, fmtPct } from "../lib/format";
 import Badge from "./ui/Badge";
+import Card, { SectionHeading } from "./ui/Card";
 import { QueryError } from "./ui/Feedback";
+import { TableWrap } from "./ui/Table";
 
 const num = (v: string | number) => fmtNum(Number(Number(v).toFixed(3)));
 
@@ -17,9 +19,7 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
   if (q.isError)
     return (
       <section className="mt-5">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Analyse par camion
-        </h2>
+        <SectionHeading>Analyse par camion</SectionHeading>
         <QueryError error={q.error} onRetry={() => q.refetch()}>
           Impossible de charger l'analyse par camion
         </QueryError>
@@ -72,11 +72,12 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
 
   return (
     <section className="mt-5">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Analyse par camion
-      </h2>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4">
-        <table className="w-full min-w-[1280px] text-sm">
+      <SectionHeading>Analyse par camion</SectionHeading>
+      <Card>
+        {/* 18 colonnes : défilement obligatoire — la colonne Camion reste figée,
+            sinon on compare des chiffres sans savoir de quel camion ils sont. */}
+        <TableWrap stickyFirstCol>
+          <table className="w-full min-w-[1280px] text-sm">
           <thead>
             <tr className="text-left text-xs text-slate-500">
               <th className="py-1 pr-3 font-normal">Camion</th>
@@ -206,7 +207,8 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
               </td>
             </tr>
           </tfoot>
-        </table>
+          </table>
+        </TableWrap>
         <p className="mt-2 text-xs text-slate-400">
           Miroir du Daily Truck Log Excel. A/B/C = billes par relevé d'étalage (camion étalé en
           plusieurs fois). BDR = cubage brousse (bordereau) · Ø = étalage diamètre · Circ =
@@ -216,7 +218,7 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
           FCFA/m³. Débité attribué : volume de session ÷ nb de camions liés (approximation si
           session multi-camions).
         </p>
-      </div>
+      </Card>
     </section>
   );
 }

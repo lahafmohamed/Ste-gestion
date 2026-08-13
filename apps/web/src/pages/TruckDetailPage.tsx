@@ -18,7 +18,11 @@ import PackingList from "../components/PackingList";
 import TruckDebitageSection from "../components/TruckDebitageSection";
 import Badge, { type BadgeTone } from "../components/ui/Badge";
 import Button from "../components/ui/Button";
+import { BackLink } from "../components/ui/Card";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { FormError } from "../components/ui/Feedback";
+import { SkeletonList } from "../components/ui/Skeleton";
+import { TableWrap } from "../components/ui/Table";
 
 const CONTEXTS: MeasurementContext[] = ["FIELD", "YARD_GIRTH", "YARD_DIAMETER"];
 
@@ -75,7 +79,7 @@ function MeasurementTable({
 
   return (
     <div>
-      <div className="-mx-4 overflow-x-auto px-4">
+      <TableWrap className="-mx-4 px-4">
       <table className="w-full min-w-[480px] text-sm">
         <thead>
           <tr className="text-left text-xs text-slate-500">
@@ -133,7 +137,7 @@ function MeasurementTable({
             })()}
         </tfoot>
       </table>
-      </div>
+      </TableWrap>
 
       {byBill && (
         <div className="mt-3 rounded-lg bg-slate-50 p-3">
@@ -273,24 +277,22 @@ export default function TruckDetailPage() {
       refresh();
       nav(-1);
     },
-    onError: (e: Error) => setOpError(e.message),
+    onError: (e: Error) => {
+      setDelTruckOpen(false);
+      setOpError(e.message);
+    },
   });
 
-  function confirmDelTruck() {
-    const t = q.data;
-    if (!t) return;
-    const n = t.measurements.reduce((s, m) => s + m.logs.length, 0);
-    if (
-      window.confirm(
-        `Supprimer le camion ${t.registration} ?\n` +
-          `${n} mesure${n > 1 ? "s" : ""} et sa packing list seront effacées. Action irréversible.`
-      )
-    ) {
-      delTruck.mutate();
-    }
-  }
+  // Confirmations lisibles sur tablette (remplacent window.confirm).
+  const [delTruckOpen, setDelTruckOpen] = useState(false);
+  const [delMeas, setDelMeas] = useState<MeasurementDTO | null>(null);
 
-  if (q.isLoading) return <p className="p-6 text-sm text-slate-500">Chargement…</p>;
+  if (q.isLoading)
+    return (
+      <div className="mx-auto max-w-page px-4 py-6">
+        <SkeletonList count={3} />
+      </div>
+    );
   if (q.isError || !q.data)
     return (
       <div className="p-6">
@@ -323,14 +325,8 @@ export default function TruckDetailPage() {
         : { label: "À étaler", tone: "amber" };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      {/* Zone de tap élargie : le lien retour se vise au pouce en haut d'écran. */}
-      <Link
-        to={`/contracts/${t.contractId}`}
-        className="-mx-2 inline-flex min-h-9 items-center rounded-lg px-2 text-sm text-slate-500 hover:text-slate-900 active:bg-slate-100"
-      >
-        ← Contrat
-      </Link>
+    <div className="mx-auto max-w-page px-4 py-6">
+      <BackLink to={`/contracts/${t.contractId}`}>Contrat</BackLink>
 
       <div className="mt-2 flex items-start justify-between gap-3">
         <div>
@@ -361,12 +357,9 @@ export default function TruckDetailPage() {
           >
             Exporter Excel
           </Button>
-          <button
-            onClick={confirmDelTruck}
-            className="min-h-9 rounded-lg px-2 text-sm text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
-          >
+          <Button variant="ghost-danger" size="sm" onClick={() => setDelTruckOpen(true)}>
             Supprimer
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -425,6 +418,10 @@ export default function TruckDetailPage() {
 
       {CONTEXTS.map((ctx) => {
         const measurement = t.measurements.find((m) => m.context === ctx);
+        // Le cubage brousse vient du ticket SODEFOR (champ « Brousse déclaré » du
+        // bordereau) — pas de saisie bille par bille. On n'affiche la section FIELD
+        // que si un ancien camion en a déjà une enregistrée.
+        if (ctx === "FIELD" && !measurement) return null;
         return (
           <section key={ctx} className="mt-5">
             <div className="mb-2 flex items-center justify-between">
@@ -441,14 +438,7 @@ export default function TruckDetailPage() {
               {measurement ? (
                 <MeasurementTable
                   m={measurement}
-                  onDelete={() => {
-                    if (
-                      window.confirm(
-                        `Supprimer ce relevé (${measurement.logs.length} ligne${measurement.logs.length > 1 ? "s" : ""}) ? Action irréversible.`
-                      )
-                    )
-                      delMeasurement.mutate(measurement.id);
-                  }}
+                  onDelete={() => setDelMeas(measurement)}
                   onAppend={(data) =>
                     appendMeasurement.mutate({ measurementId: measurement.id, data })
                   }
@@ -499,6 +489,35 @@ export default function TruckDetailPage() {
 
       {/* Étape suivante de la chaîne : ce que ce camion a donné à la scie. */}
       <TruckDebitageSection truck={t} />
+
+      <ConfirmDialog
+        open={delTruckOpen}
+        title={`Supprimer le camion ${t.registration} ?`}
+        confirmLabel="Supprimer définitivement"
+        pending={delTruck.isPending}
+        onConfirm={() => delTruck.mutate()}
+        onCancel={() => setDelTruckOpen(false)}
+      >
+        {(() => {
+          const n = t.measurements.reduce((s, m) => s + m.logs.length, 0);
+          return `${n} mesure${n > 1 ? "s" : ""} et sa packing list seront effacées. Action irréversible.`;
+        })()}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={delMeas !== null}
+        title="Supprimer ce relevé ?"
+        confirmLabel="Supprimer le relevé"
+        onConfirm={() => {
+          if (delMeas) delMeasurement.mutate(delMeas.id);
+          setDelMeas(null);
+        }}
+        onCancel={() => setDelMeas(null)}
+      >
+        {delMeas
+          ? `${delMeas.logs.length} ligne${delMeas.logs.length > 1 ? "s" : ""} seront effacées. Action irréversible.`
+          : null}
+      </ConfirmDialog>
     </div>
   );
 }

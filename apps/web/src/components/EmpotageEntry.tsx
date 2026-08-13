@@ -3,6 +3,7 @@ import { classifySize, sawnVolumeM3 } from "@ste/shared";
 import { fmtNum, normalizeDecimal } from "../lib/format";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
+import { inputQuietCls } from "./ui/Input";
 
 type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
 const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
@@ -88,7 +89,7 @@ export default function EmpotageEntry({
                       }
                     : undefined
                 }
-                className="w-full min-w-0 rounded-lg border border-slate-200 px-2.5 py-2.5 text-base outline-none focus:border-slate-900"
+                className={inputQuietCls}
               />
             ))}
             {info ? (

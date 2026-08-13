@@ -63,8 +63,8 @@ function NavList({
             end={n.end}
             onClick={onNavigate}
             className={({ isActive }) =>
-              // min-h-11 : cible tactile 44px (le drawer se navigue au pouce).
-              `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+              // min-h-touch : cible tactile 44px (le drawer se navigue au pouce).
+              `flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                 isActive
                   ? "bg-slate-900 text-white"
                   : "text-slate-600 hover:bg-slate-100 active:bg-slate-200"
@@ -82,7 +82,7 @@ function NavList({
           <div className="px-2 text-xs text-slate-400">{USER_ROLE_LABELS[user.role]}</div>
           <button
             onClick={logout}
-            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-500 hover:bg-slate-100 active:bg-slate-200"
+            className="mt-2 flex min-h-touch w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-500 hover:bg-slate-100 active:bg-slate-200"
           >
             <IconLogout width={16} height={16} />
             Déconnexion
@@ -117,7 +117,7 @@ export default function Layout() {
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900">
       {/* Header STE — permanent, toutes tailles d'écran */}
-      <header className="fixed inset-x-0 top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
+      <header className="fixed inset-x-0 top-0 z-header flex h-header items-center justify-between border-b border-slate-200 bg-white px-4">
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -132,10 +132,8 @@ export default function Layout() {
               <line x1="4" y1="17" x2="20" y2="17" />
             </svg>
           </button>
-          <Link to="/" className="flex items-baseline gap-2">
-            <span className="rounded-lg bg-slate-900 px-2 py-0.5 text-lg font-bold tracking-wide text-white">
-              STE
-            </span>
+          <Link to="/" className="flex items-center gap-2">
+            <img src="/logo-ste.png" alt="STE — Sustainable Teck Exports" className="h-8 w-auto" />
             <span className="hidden text-sm text-slate-500 sm:inline">Gestion scierie</span>
           </Link>
         </div>
@@ -164,12 +162,17 @@ export default function Layout() {
       </header>
 
       {/* Sidebar desktop */}
-      <aside className="fixed bottom-0 left-0 top-14 hidden w-56 flex-col border-r border-slate-200 bg-white px-3 py-4 md:flex">
+      <aside className="fixed bottom-0 left-0 top-header hidden w-56 flex-col border-r border-slate-200 bg-white px-3 py-4 md:flex">
         <NavList nav={nav} user={user} />
       </aside>
 
       {/* Drawer mobile */}
-      <div className={`fixed inset-0 z-40 md:hidden ${menuOpen ? "" : "pointer-events-none"}`}>
+      {/* aria-hidden fermé : le drawer hors écran reste dans le DOM (transition),
+          il ne doit pas être exposé au lecteur d'écran. */}
+      <div
+        aria-hidden={!menuOpen}
+        className={`fixed inset-0 z-overlay md:hidden ${menuOpen ? "" : "pointer-events-none"}`}
+      >
         <div
           onClick={() => setMenuOpen(false)}
           aria-hidden="true"
@@ -183,9 +186,7 @@ export default function Layout() {
           }`}
         >
           <div className="mb-3 flex items-center justify-between px-1">
-            <span className="rounded-lg bg-slate-900 px-2 py-0.5 text-lg font-bold tracking-wide text-white">
-              STE
-            </span>
+            <img src="/logo-ste.png" alt="STE — Sustainable Teck Exports" className="h-7 w-auto" />
             <button
               type="button"
               onClick={() => setMenuOpen(false)}
@@ -203,7 +204,7 @@ export default function Layout() {
       </div>
 
       {/* Contenu */}
-      <div className="pt-14 md:pl-56">
+      <div className="pt-header md:pl-56">
         <main className="pb-[calc(1.5rem_+_env(safe-area-inset-bottom))]">
           <Outlet />
         </main>

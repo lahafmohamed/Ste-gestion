@@ -11,6 +11,8 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Chip from "../components/ui/Chip";
 import { EmptyState, QueryError } from "../components/ui/Feedback";
+import { SearchInput } from "../components/ui/Input";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
   return (
@@ -134,7 +136,7 @@ export default function ContractsPage() {
         }
       />
 
-      <div className="mx-auto max-w-3xl px-4 py-6">
+      <div className="mx-auto max-w-page px-4 py-6">
         {showForm && (
           <div className="mb-6">
             <ContractQuickCreate
@@ -147,25 +149,12 @@ export default function ContractsPage() {
         {/* Recherche + filtres — dès la 2ᵉ année, la liste devient longue. */}
         {all.length > 3 && (
           <div className="mb-4 space-y-2">
-            <div className="relative">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Chercher un n° de contrat, une forêt, un centre…"
-                aria-label="Chercher un contrat"
-                className="w-full rounded-lg border border-slate-300 py-2 pl-3 pr-9 text-base outline-none focus:border-slate-900"
-              />
-              {q && (
-                <button
-                  type="button"
-                  onClick={() => setQ("")}
-                  aria-label="Effacer la recherche"
-                  className="absolute inset-y-0 right-0 px-3 text-lg text-slate-400 hover:text-slate-900 active:text-slate-900"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            <SearchInput
+              value={q}
+              onChange={setQ}
+              placeholder="Chercher un n° de contrat, une forêt, un centre…"
+              aria-label="Chercher un contrat"
+            />
             {(years.length > 1 || closedCount > 0) && (
               <div className="flex flex-wrap gap-1.5">
                 {years.length > 1 && (
@@ -191,7 +180,7 @@ export default function ContractsPage() {
         )}
 
         <div className="space-y-3">
-          {contracts.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+          {contracts.isLoading && <SkeletonList count={3} lines={1} />}
           {contracts.isError && (
             <QueryError error={contracts.error} onRetry={() => contracts.refetch()}>
               Impossible de charger les contrats

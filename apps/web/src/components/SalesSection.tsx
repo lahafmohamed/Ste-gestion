@@ -7,11 +7,15 @@ import {
   type ContractDTO,
   type ContractSummaryDTO,
   type SaleCreateInput,
+  type SaleDTO,
 } from "@ste/shared";
 import { accountsApi, salesApi } from "../lib/api";
 import { fmtFcfa, fmtNum } from "../lib/format";
 import Button from "./ui/Button";
+import { SectionHeading } from "./ui/Card";
+import ConfirmDialog from "./ui/ConfirmDialog";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
+import Input, { Field, Select, inputQuietCls } from "./ui/Input";
 
 type Mode = "USD" | "CFA";
 type RowState = { sizeCode: string; volumeM3: string; mode: Mode; priceUsd: string; rate: string; priceCfa: string };
@@ -118,30 +122,19 @@ function SaleForm({
   return (
     <form onSubmit={submit} className="mb-3 rounded-xl border border-slate-200 bg-white p-4">
       <div className="mb-3 grid grid-cols-2 gap-3 sm:w-96">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Date</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Client</span>
-          <select
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
-          >
+        <Field label="Date">
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Client">
+          <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
             <option value="">— aucun —</option>
             {parties.data?.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
       </div>
 
       {rows.map((r, i) => {
@@ -150,40 +143,42 @@ function SaleForm({
         return (
           <div key={i} className="mb-2 rounded-lg border border-slate-100 p-2">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-slate-600">Taille</span>
-                <input
+              <Field label="Taille">
+                <Input
+                  variant="quiet"
                   list="stock-sizes"
                   value={r.sizeCode}
                   onChange={(e) => setRow(i, { sizeCode: e.target.value })}
                   placeholder="6x4"
-                  className="rounded border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
                 />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-slate-600">
-                  m³ {dispo !== null && <span className="text-slate-400">(dispo {fmtNum(dispo)})</span>}
-                </span>
+              </Field>
+              <Field
+                label={
+                  <>
+                    m³{" "}
+                    {dispo !== null && (
+                      <span className="text-slate-400">(dispo {fmtNum(dispo)})</span>
+                    )}
+                  </>
+                }
+              >
                 <input
                   inputMode="decimal"
                   value={r.volumeM3}
                   onChange={(e) => setRow(i, { volumeM3: e.target.value })}
-                  className={`rounded border px-2 py-1.5 text-sm outline-none ${
-                    over ? "border-red-400 focus:border-red-500" : "border-slate-300 focus:border-slate-900"
+                  className={`w-full min-w-0 min-h-touch rounded-lg border bg-white px-2.5 py-2 text-base outline-none ${
+                    over
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-slate-200 focus:border-slate-900"
                   }`}
                 />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-slate-600">Mode</span>
-                <select
-                  value={r.mode}
-                  onChange={(e) => setRow(i, { mode: e.target.value as Mode })}
-                  className="rounded border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
-                >
+              </Field>
+              <Field label="Mode">
+                <Select value={r.mode} onChange={(e) => setRow(i, { mode: e.target.value as Mode })}>
                   <option value="USD">USD × taux</option>
                   <option value="CFA">CFA direct</option>
-                </select>
-              </label>
+                </Select>
+              </Field>
               <div className="flex items-end text-sm">
                 <span className="text-slate-500">
                   ={" "}
@@ -202,14 +197,14 @@ function SaleForm({
                     value={r.priceUsd}
                     onChange={(e) => setRow(i, { priceUsd: e.target.value })}
                     placeholder="Prix USD"
-                    className="rounded border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
+                    className={inputQuietCls}
                   />
                   <input
                     inputMode="decimal"
                     value={r.rate}
                     onChange={(e) => setRow(i, { rate: e.target.value })}
                     placeholder="Taux CFA"
-                    className="rounded border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
+                    className={inputQuietCls}
                   />
                 </>
               ) : (
@@ -218,13 +213,13 @@ function SaleForm({
                   value={r.priceCfa}
                   onChange={(e) => setRow(i, { priceCfa: e.target.value })}
                   placeholder="Prix CFA/m³"
-                  className="rounded border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
+                  className={inputQuietCls}
                 />
               )}
               <button
                 type="button"
                 onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-                className="ml-auto text-xs text-slate-400 hover:text-red-500"
+                className="ml-auto min-h-9 rounded-lg px-2 text-xs text-slate-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
               >
                 Retirer
               </button>
@@ -291,6 +286,8 @@ export default function SalesSection({
 }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  // Confirmation lisible sur tablette (remplace window.confirm).
+  const [delSale, setDelSale] = useState<SaleDTO | null>(null);
 
   const sales = useQuery({
     queryKey: ["sales", contract.id],
@@ -310,14 +307,15 @@ export default function SalesSection({
 
   return (
     <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Ventes ({sales.data?.length ?? 0})
-        </h2>
-        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? "Fermer" : "+ Vente"}
-        </Button>
-      </div>
+      <SectionHeading
+        right={
+          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+            {showForm ? "Fermer" : "+ Vente"}
+          </Button>
+        }
+      >
+        Ventes ({sales.data?.length ?? 0})
+      </SectionHeading>
 
       {showForm && <SaleForm contract={contract} stock={stock} onDone={() => setShowForm(false)} />}
 
@@ -342,15 +340,8 @@ export default function SalesSection({
                   {fmtFcfa(saleTotalCfa(s))}
                 </span>
                 <button
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `Supprimer cette vente du ${new Date(s.saleDate).toLocaleDateString("fr-FR")} (${fmtFcfa(saleTotalCfa(s))}) ? Action irréversible.`
-                      )
-                    )
-                      remove.mutate(s.id);
-                  }}
-                  className="text-xs text-slate-400 hover:text-red-500"
+                  onClick={() => setDelSale(s)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg text-slate-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
                   aria-label="Supprimer la vente"
                 >
                   ×
@@ -364,6 +355,21 @@ export default function SalesSection({
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={delSale !== null}
+        title="Supprimer cette vente ?"
+        confirmLabel="Supprimer la vente"
+        onConfirm={() => {
+          if (delSale) remove.mutate(delSale.id);
+          setDelSale(null);
+        }}
+        onCancel={() => setDelSale(null)}
+      >
+        {delSale
+          ? `Vente du ${new Date(delSale.saleDate).toLocaleDateString("fr-FR")} (${fmtFcfa(saleTotalCfa(delSale))}). Action irréversible.`
+          : null}
+      </ConfirmDialog>
     </section>
   );
 }

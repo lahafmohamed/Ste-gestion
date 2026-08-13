@@ -6,6 +6,8 @@ import { PageHeader } from "../components/Layout";
 import { getUser } from "../lib/auth";
 import Button from "../components/ui/Button";
 import { FormError, QueryError } from "../components/ui/Feedback";
+import Input, { Field, Select } from "../components/ui/Input";
+import { SkeletonList } from "../components/ui/Skeleton";
 
 const ROLES = UserRole.options;
 
@@ -47,7 +49,7 @@ export default function UsersPage() {
         }
       />
 
-      <div className="mx-auto max-w-3xl px-4 py-6">
+      <div className="mx-auto max-w-page px-4 py-6">
         {showForm && (
           <form
             onSubmit={(e) => {
@@ -61,50 +63,42 @@ export default function UsersPage() {
             }}
             className="mb-6 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-4"
           >
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-600">Nom</span>
-              <input
+            <Field label="Nom">
+              <Input
                 required
                 value={v.name}
                 onChange={(e) => setV((p) => ({ ...p, name: e.target.value }))}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-600">Email</span>
-              <input
+            </Field>
+            <Field label="Email">
+              <Input
                 type="email"
                 required
                 value={v.email}
                 onChange={(e) => setV((p) => ({ ...p, email: e.target.value }))}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-600">Mot de passe</span>
-              <input
+            </Field>
+            <Field label="Mot de passe">
+              <Input
                 type="password"
                 required
                 minLength={6}
                 value={v.password}
                 onChange={(e) => setV((p) => ({ ...p, password: e.target.value }))}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-600">Rôle</span>
-              <select
+            </Field>
+            <Field label="Rôle">
+              <Select
                 value={v.role}
                 onChange={(e) => setV((p) => ({ ...p, role: e.target.value }))}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
               >
                 {ROLES.map((r) => (
                   <option key={r} value={r}>
                     {USER_ROLE_LABELS[r]}
                   </option>
                 ))}
-              </select>
-            </label>
+              </Select>
+            </Field>
             <div className="col-span-2 flex items-center justify-between sm:col-span-4">
               {error && <FormError>{error}</FormError>}
               <Button type="submit" variant="primary" disabled={create.isPending} className="ml-auto">
@@ -115,7 +109,7 @@ export default function UsersPage() {
         )}
 
         <div className="space-y-2">
-          {users.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+          {users.isLoading && <SkeletonList count={3} lines={1} />}
           {users.isError && (
             <QueryError error={users.error} onRetry={() => users.refetch()}>
               Impossible de charger les utilisateurs
@@ -136,21 +130,20 @@ export default function UsersPage() {
                 <div className="text-xs text-slate-500">{u.email}</div>
               </div>
               <div className="flex items-center gap-2">
-                <select
+                <Select
                   value={u.role}
                   disabled={me?.id === u.id}
                   onChange={(e) =>
                     update.mutate({ id: u.id, role: e.target.value as UserRole })
                   }
-                  // 16px : sous ce seuil, iOS zoome la page au focus du select.
-                  className="min-h-11 rounded-lg border border-slate-300 px-2 py-1 text-base outline-none focus:border-slate-900 disabled:opacity-50"
+                  className="w-auto"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>
                       {USER_ROLE_LABELS[r]}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <Button
                   size="xs"
                   disabled={me?.id === u.id}

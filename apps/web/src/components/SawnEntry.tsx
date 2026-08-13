@@ -17,6 +17,7 @@ import { fmtNum, fmtPct, normalizeDecimal, todayISO } from "../lib/format";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
 import Chip from "./ui/Chip";
+import Input, { Field, inputQuietCls } from "./ui/Input";
 
 // Cubage des billons (girth) d'un camion — dénominateur du rendement.
 function truckGirthM3(t: TruckDTO): number {
@@ -45,18 +46,19 @@ function billonsByBill(logs: LogDTO[]) {
   return [...groups.entries()].map(([bill, billons]) => ({ bill, billons }));
 }
 
-type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
+// Une ligne = une pièce sciée mesurée au parc. Pas de quantité : le scieur
+// mesure planche par planche, le comptage se fait en relisant les lignes.
+type RowState = { lengthFt: string; widthIn: string; thicknessIn: string };
 
-const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
+const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "" });
 
 function rowInfo(r: RowState) {
   const L = Number(r.lengthFt);
   const w = Number(r.widthIn);
   const t = Number(r.thicknessIn);
-  const n = Number(r.count);
-  if (!r.lengthFt || !r.widthIn || !r.thicknessIn || !r.count) return null;
-  if (!(L > 0) || !(w > 0) || !(t > 0) || !Number.isInteger(n) || n < 1) return null;
-  return { volume: sawnVolumeM3(L, w, t, n), size: classifySize(w, t), count: n };
+  if (!r.lengthFt || !r.widthIn || !r.thicknessIn) return null;
+  if (!(L > 0) || !(w > 0) || !(t > 0)) return null;
+  return { volume: sawnVolumeM3(L, w, t, 1), size: classifySize(w, t) };
 }
 
 type Props = {
@@ -112,9 +114,23 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
   const infos = rows.map(rowInfo);
   const valid = infos.filter((x) => x !== null);
   const total = valid.reduce((s, x) => s + x!.volume, 0);
-  const pieces = valid.reduce((s, x) => s + x!.count, 0);
+  const pieces = valid.length;
   const groups: Record<SizeGroup, number> = { MAIN: 0, SIDE: 0, ONE_INCH: 0, OTHER: 0 };
   for (const x of valid) groups[x!.size.group] += x!.volume;
+
+  // Récap de fin de session : combien de pièces et combien de m³ sont rentrés
+  // dans chaque taille (6x4, 4x3, 7"+…) — la relecture que fait le scieur.
+  const bySizeMap = new Map<string, { code: string; group: SizeGroup; pieces: number; m3: number }>();
+  for (const x of valid) {
+    const e = bySizeMap.get(x!.size.code);
+    if (e) {
+      e.pieces += 1;
+      e.m3 += x!.volume;
+    } else {
+      bySizeMap.set(x!.size.code, { code: x!.size.code, group: x!.size.group, pieces: 1, m3: x!.volume });
+    }
+  }
+  const bySize = [...bySizeMap.values()].sort((a, b) => b.m3 - a.m3);
 
   // Splits + rendement live (dénominateur = girth des camions sélectionnés).
   const splitLines = rows
@@ -150,7 +166,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
         lengthFt: r.lengthFt.trim(),
         widthIn: r.widthIn.trim(),
         thicknessIn: r.thicknessIn.trim(),
-        count: Number(r.count),
+        count: 1, // 1 ligne = 1 pièce
       }));
     if (lines.length === 0) return;
     onSave({
@@ -166,26 +182,22 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
   return (
     <div>
       <div className="mb-3 grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Date</span>
-          <input
+        <Field label="Date">
+          <Input
             type="date"
             value={date}
             // Une session de sciage n'a pas lieu dans le futur — évite le 2026 → 2062.
             max={todayISO()}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Note</span>
-          <input
+        </Field>
+        <Field label="Note">
+          <Input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="DEBITE TECK…"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
           />
-        </label>
+        </Field>
       </div>
 
       {trucks && trucks.length > 0 && (
@@ -316,13 +328,12 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
       )}
 
       <div className="overflow-x-auto">
-      <div className="min-w-[640px]">
-      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1 text-xs text-slate-500">
+      <div className="min-w-[540px]">
+      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1 text-xs text-slate-500">
         <span>#</span>
         <span>L (ft)</span>
         <span>l (in)</span>
         <span>ép (in)</span>
-        <span>Nbr</span>
         <span>Taille</span>
         <span className="text-right">m³</span>
         <span />
@@ -333,10 +344,10 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
         return (
           <div
             key={i}
-            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1"
+            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1"
           >
             <span className="text-xs text-slate-400">{i + 1}</span>
-            {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
+            {(["lengthFt", "widthIn", "thicknessIn"] as const).map((k) => (
               <input
                 key={k}
                 inputMode="decimal"
@@ -344,7 +355,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
                 // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
                 onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
                 onKeyDown={
-                  k === "count"
+                  k === "thicknessIn"
                     ? (e) => {
                         if (e.key === "Enter" && i === rows.length - 1) {
                           e.preventDefault();
@@ -353,7 +364,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
                       }
                     : undefined
                 }
-                className="w-full min-w-0 rounded-lg border border-slate-200 px-2.5 py-2.5 text-base outline-none focus:border-slate-900"
+                className={inputQuietCls}
               />
             ))}
             {info ? (
@@ -380,20 +391,43 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
       </div>
       </div>
 
-      <div className="mt-2 flex items-center justify-between">
-        <Button size="xs" onClick={() => setRows((p) => [...p, emptyRow()])}>
-          + Ligne
-        </Button>
-        <div className="text-sm">
-          <span className="text-slate-500">
-            {fmtNum(pieces)} pièces ·{" "}
-          </span>
-          <span className="font-semibold text-slate-900">{fmtNum(total.toFixed(6))} m³</span>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={() => setRows((p) => [...p, emptyRow()])}
+        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:border-slate-900 hover:text-slate-900 active:bg-slate-100"
+      >
+        + Ligne
+      </button>
 
       {total > 0 && (
         <div className="mt-2 space-y-2">
+          {/* Relecture de fin de session : ce qui est rentré dans chaque taille. */}
+          <div className="rounded-lg border border-slate-200">
+            <div className="grid grid-cols-[1fr_4rem_6rem] gap-1 border-b border-slate-200 px-3 py-1.5 text-xs text-slate-500">
+              <span>Taille</span>
+              <span className="text-right">Pièces</span>
+              <span className="text-right">m³</span>
+            </div>
+            {bySize.map((s) => (
+              <div
+                key={s.code}
+                className="grid grid-cols-[1fr_4rem_6rem] items-center gap-1 px-3 py-1.5 text-sm"
+              >
+                <Badge tone={SIZE_GROUP_TONE[s.group]} className="justify-self-start">
+                  {s.code}
+                </Badge>
+                <span className="text-right tabular-nums text-slate-700">{fmtNum(s.pieces)}</span>
+                <span className="text-right tabular-nums text-slate-900">
+                  {fmtNum(s.m3.toFixed(3))}
+                </span>
+              </div>
+            ))}
+            <div className="grid grid-cols-[1fr_4rem_6rem] gap-1 border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-900">
+              <span>Total</span>
+              <span className="text-right tabular-nums">{fmtNum(pieces)}</span>
+              <span className="text-right tabular-nums">{fmtNum(total.toFixed(3))}</span>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             {(Object.keys(groups) as SizeGroup[])
               .filter((g) => groups[g] > 0)
@@ -430,15 +464,24 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
         </div>
       )}
 
-      <Button
-        variant="primary"
-        size="lg"
-        className="mt-3 w-full"
-        onClick={save}
-        disabled={saving || valid.length === 0}
-      >
-        {saving ? "Enregistrement…" : `Valider la session (${valid.length} lignes)`}
-      </Button>
+      {/* Récap + validation collés en bas : sur une longue session, le total
+          courant et le bouton Valider restent visibles pendant la saisie
+          (même motif que TallyEntry). */}
+      <div className="sticky bottom-0 z-10 mt-3 rounded-lg border border-slate-200 bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_-6px_16px_-8px_rgba(15,23,42,0.35)]">
+        <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          <span className="text-slate-500">{fmtNum(pieces)} pièces</span>
+          <span className="font-semibold text-slate-900">{fmtNum(total.toFixed(6))} m³</span>
+        </div>
+        <Button
+          variant="primary"
+          size="lg"
+          className="mt-2 w-full"
+          onClick={save}
+          disabled={saving || valid.length === 0}
+        >
+          {saving ? "Enregistrement…" : `Valider la session (${valid.length} lignes)`}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -38,7 +38,7 @@ function rowFromDTO(l: PackingLogDTO): RowState {
   };
 }
 
-const COLS = "grid grid-cols-[1.5rem_1fr_1fr_1fr_1fr_1fr_1.5rem] items-center gap-1";
+const COLS = "grid grid-cols-[1.5rem_1fr_1fr_1fr_1fr_1fr_2.75rem] items-center gap-1";
 
 function PackingEntry({
   truckId,
@@ -108,28 +108,28 @@ function PackingEntry({
             value={r.billNo}
             onChange={(e) => setRow(i, { billNo: e.target.value })}
             placeholder="1509"
-            className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
           />
           <input
             inputMode="decimal"
             value={r.diaTop}
             onChange={(e) => setRow(i, { diaTop: e.target.value })}
             placeholder="34"
-            className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
           />
           <input
             inputMode="decimal"
             value={r.diaBottom}
             onChange={(e) => setRow(i, { diaBottom: e.target.value })}
             placeholder="16"
-            className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
           />
           <input
             inputMode="decimal"
             value={r.diaMean}
             onChange={(e) => setRow(i, { diaMean: e.target.value })}
             placeholder="25"
-            className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
           />
           <div className="grid grid-cols-2 gap-1">
             <input
@@ -137,7 +137,7 @@ function PackingEntry({
               value={r.length}
               onChange={(e) => setRow(i, { length: e.target.value })}
               placeholder="11.2"
-              className="w-full min-w-0 rounded border border-slate-200 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+              className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
             />
             <input
               inputMode="decimal"
@@ -150,13 +150,14 @@ function PackingEntry({
                 }
               }}
               placeholder="0.55"
-              className="w-full min-w-0 rounded border border-slate-300 px-2 py-2.5 text-base outline-none focus:border-slate-900"
+              className="w-full min-w-0 min-h-touch rounded-lg border border-slate-300 px-2 py-2 text-base outline-none focus:border-slate-900"
             />
           </div>
+          {/* Vraie cible tactile — la croix jouxte le champ m³ au pouce. */}
           <button
             type="button"
             onClick={() => removeRow(i)}
-            className="text-slate-300 hover:text-red-500"
+            className="flex h-11 w-full items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
             aria-label="Supprimer la ligne"
           >
             ×
@@ -234,7 +235,7 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
           </EmptyState>
         ) : (
           <>
-            <div className="-mx-4 overflow-x-auto px-4">
+            <div className="-mx-4 overflow-x-auto px-4 scroll-shadow-x">
             <table className="w-full min-w-[520px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-slate-500">

@@ -4,7 +4,10 @@ import { productionApi } from "../lib/api";
 import { fmtInt, fmtNum } from "../lib/format";
 import CuttingCharts from "./CuttingCharts";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
+import { SectionHeading } from "./ui/Card";
 import { EmptyState, QueryError } from "./ui/Feedback";
+import { SkeletonCard } from "./ui/Skeleton";
+import { TableWrap } from "./ui/Table";
 
 export default function CuttingSection({ contractId }: { contractId: string }) {
   const q = useQuery({
@@ -16,11 +19,9 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
 
   return (
     <section className="mt-5">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Débité par taille
-      </h2>
+      <SectionHeading>Débité par taille</SectionHeading>
 
-      {q.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+      {q.isLoading && <SkeletonCard lines={3} />}
       {q.isError && (
         <QueryError error={q.error} onRetry={() => q.refetch()}>
           Impossible de charger le débité par taille
@@ -34,7 +35,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
           <CuttingCharts data={q.data} />
 
           {/* Table par taille */}
-          <div className="overflow-x-auto">
+          <TableWrap>
             <table className="w-full min-w-[400px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-slate-500">
@@ -66,7 +67,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </TableWrap>
         </div>
       )}
     </section>

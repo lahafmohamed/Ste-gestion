@@ -1,0 +1,96 @@
+import { forwardRef } from "react";
+import type {
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+} from "react";
+
+// Champs de formulaire unifiés.
+// text-base (16px) : sous ce seuil iOS zoome la page au focus.
+// min-h-touch : plancher tactile 44px — la saisie se fait au pouce sur tablette.
+export const inputCls =
+  "w-full min-w-0 min-h-touch rounded-lg border border-slate-300 bg-white px-3 py-2 " +
+  "text-base text-slate-900 outline-none focus:border-slate-900 " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
+/** Variante discrète pour les grilles de saisie en rafale (TallyEntry, SawnEntry). */
+export const inputQuietCls =
+  "w-full min-w-0 min-h-touch rounded-lg border border-slate-200 bg-white px-2.5 py-2 " +
+  "text-base text-slate-900 outline-none focus:border-slate-900";
+
+type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+  /** quiet : bordure plus légère (grilles de relevé). */
+  variant?: "default" | "quiet";
+};
+
+const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { variant = "default", className = "", ...rest },
+  ref
+) {
+  const base = variant === "quiet" ? inputQuietCls : inputCls;
+  return (
+    <input ref={ref} className={`${base}${className ? ` ${className}` : ""}`} {...rest} />
+  );
+});
+
+export default Input;
+
+export const Select = forwardRef<
+  HTMLSelectElement,
+  SelectHTMLAttributes<HTMLSelectElement>
+>(function Select({ className = "", ...rest }, ref) {
+  return (
+    <select
+      ref={ref}
+      className={`${inputCls}${className ? ` ${className}` : ""}`}
+      {...rest}
+    />
+  );
+});
+
+/** Libellé + champ empilés — la structure `<label>` répétée de tous les formulaires. */
+export function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`flex flex-col gap-1 text-sm${className ? ` ${className}` : ""}`}>
+      <span className="text-slate-600">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+type SearchInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> & {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+/** Recherche avec croix d'effacement — le bloc copié-collé des pages à liste. */
+export function SearchInput({ value, onChange, className = "", ...rest }: SearchInputProps) {
+  return (
+    <div className={`relative${className ? ` ${className}` : ""}`}>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${inputCls} pr-11`}
+        {...rest}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          aria-label="Effacer la recherche"
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-lg text-slate-400 hover:text-slate-900 active:text-slate-900"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+}

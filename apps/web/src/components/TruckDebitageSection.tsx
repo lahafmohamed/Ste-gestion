@@ -5,6 +5,7 @@ import { runPieceCount, runTotalM3, truckSawnProgress } from "@ste/shared";
 import { contractsApi, productionApi } from "../lib/api";
 import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
 import Badge from "./ui/Badge";
+import { SectionHeading } from "./ui/Card";
 import { QueryError } from "./ui/Feedback";
 
 // Miroir de la feuille « DEBITE TECK DU … » (docs/pdf5) : elle est tenue PAR
@@ -69,12 +70,15 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
 
   return (
     <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Débitage</h2>
-        {debited > 0 && (
-          <span className="text-sm font-semibold text-slate-900">{fmtM3(debited)}</span>
-        )}
-      </div>
+      <SectionHeading
+        right={
+          debited > 0 ? (
+            <span className="text-sm font-semibold text-slate-900">{fmtM3(debited)}</span>
+          ) : undefined
+        }
+      >
+        Débitage
+      </SectionHeading>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         {stats.isError || runs.isError ? (

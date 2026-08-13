@@ -28,6 +28,8 @@ import type {
   ContractCuttingDTO,
   ProductionRunCreateInput,
   ProductionRunDTO,
+  ResawOpCreateInput,
+  ResawOpDTO,
   SaleCreateInput,
   SaleDTO,
   TruckCreateInput,
@@ -218,4 +220,12 @@ export const productionApi = {
   remove: (id: string) => req<void>(`/production-runs/${id}`, { method: "DELETE" }),
   cutting: (contractId: string) =>
     req<ContractCuttingDTO>(`/contracts/${contractId}/cutting`),
+};
+
+export const resawApi = {
+  listByContract: (contractId: string) =>
+    req<ResawOpDTO[]>(`/resaws?contractId=${encodeURIComponent(contractId)}`),
+  create: (data: ResawOpCreateInput) =>
+    req<ResawOpDTO>("/resaws", { method: "POST", body: JSON.stringify(data) }),
+  remove: (id: string) => req<void>(`/resaws/${id}`, { method: "DELETE" }),
 };

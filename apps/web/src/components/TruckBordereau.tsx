@@ -4,7 +4,9 @@ import type { TruckDTO, TruckUpdateInput } from "@ste/shared";
 import { trucksApi } from "../lib/api";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
+import Card, { SectionHeading } from "./ui/Card";
 import { FormError } from "./ui/Feedback";
+import Input, { Field } from "./ui/Input";
 
 // Champs du bordereau SODEFOR « circulation des bois » — saisie progressive.
 // Chaque donnée arrive à son moment ; tout est optionnel et éditable après coup.
@@ -100,40 +102,39 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
 
   return (
     <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Bordereau SODEFOR
-          </h2>
+      <SectionHeading
+        right={
+          <button
+            onClick={() => (editing ? setEditing(false) : openEdit())}
+            className="-my-2 min-h-9 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
+          >
+            {editing ? "Annuler" : "Modifier"}
+          </button>
+        }
+      >
+        <span className="inline-flex items-center gap-2">
+          Bordereau SODEFOR
           <Badge tone={filled === FIELDS.length ? "emerald" : filled <= 2 ? "slate" : "amber"}>
             {filled}/{FIELDS.length}
           </Badge>
-        </div>
-        <button
-          onClick={() => (editing ? setEditing(false) : openEdit())}
-          className="-my-2 min-h-9 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
-        >
-          {editing ? "Annuler" : "Modifier"}
-        </button>
-      </div>
+        </span>
+      </SectionHeading>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <Card>
         {editing ? (
           <form onSubmit={submit}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {FIELDS.map((f) => (
-                <label key={f.key as string} className="flex flex-col gap-1 text-sm">
-                  <span className="text-slate-600">{f.label}</span>
-                  <input
+                <Field key={f.key as string} label={f.label}>
+                  <Input
                     required={f.key === "registration"}
                     type={f.kind === "date" ? "date" : "text"}
                     inputMode={f.kind === "int" || f.kind === "decimal" ? "decimal" : undefined}
                     value={v[f.key as string]}
                     onChange={(e) => setV((p) => ({ ...p, [f.key as string]: e.target.value }))}
                     placeholder={f.ph}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
                   />
-                </label>
+                </Field>
               ))}
             </div>
             <div className="mt-3 flex items-center justify-between gap-3">
@@ -158,7 +159,7 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
             ))}
           </dl>
         )}
-      </div>
+      </Card>
     </section>
   );
 }

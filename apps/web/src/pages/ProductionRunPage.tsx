@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -13,6 +14,10 @@ import { downloadFile, productionApi, trucksApi } from "../lib/api";
 import { fmtInt, fmtNum, fmtPct } from "../lib/format";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
+import Card, { BackLink } from "../components/ui/Card";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { SkeletonList } from "../components/ui/Skeleton";
+import { TableWrap } from "../components/ui/Table";
 
 export default function ProductionRunPage() {
   const { id = "" } = useParams();
@@ -41,7 +46,15 @@ export default function ProductionRunPage() {
     },
   });
 
-  if (q.isLoading) return <p className="p-6 text-sm text-slate-500">Chargement…</p>;
+  // Confirmation lisible sur tablette (remplace window.confirm).
+  const [delOpen, setDelOpen] = useState(false);
+
+  if (q.isLoading)
+    return (
+      <div className="mx-auto max-w-page px-4 py-6">
+        <SkeletonList count={2} />
+      </div>
+    );
   if (q.isError || !q.data)
     return (
       <div className="p-6">
@@ -80,14 +93,8 @@ export default function ProductionRunPage() {
   const rendement = girthLinked > 0 ? (total / girthLinked) * 100 : null;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      {/* Zone de tap élargie : le lien retour se vise au pouce en haut d'écran. */}
-      <Link
-        to={`/contracts/${r.contractId}`}
-        className="-mx-2 inline-flex min-h-9 items-center rounded-lg px-2 text-sm text-slate-500 hover:text-slate-900 active:bg-slate-100"
-      >
-        ← Contrat
-      </Link>
+    <div className="mx-auto max-w-page px-4 py-6">
+      <BackLink to={`/contracts/${r.contractId}`}>Contrat</BackLink>
 
       <div className="mt-2 flex items-start justify-between gap-3">
         <div>
@@ -108,38 +115,23 @@ export default function ProductionRunPage() {
           >
             Exporter Excel
           </Button>
-          <button
-            onClick={() => {
-              if (
-                window.confirm(
-                  `Supprimer cette session de débitage (${r.lines.length} ligne${r.lines.length > 1 ? "s" : ""}, ${fmtNum(total.toFixed(3))} m³) ? Action irréversible.`
-                )
-              )
-                del.mutate();
-            }}
-            className="min-h-9 rounded-lg px-2 text-sm text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
-          >
+          <Button variant="ghost-danger" size="sm" onClick={() => setDelOpen(true)}>
             Supprimer
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <span className="rounded-full bg-slate-900 px-3 py-1 text-sm font-medium text-white">
+        <span className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-sm font-medium text-white">
           {fmtNum(runTotalM3(r).toFixed(6))} m³
         </span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
-          {fmtInt(runPieceCount(r))} pièces
-        </span>
+        <Badge size="md">{fmtInt(runPieceCount(r))} pièces</Badge>
         {(Object.keys(groups) as SizeGroup[])
           .filter((g) => groups[g] > 0)
           .map((g) => (
-            <span
-              key={g}
-              className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700"
-            >
+            <Badge key={g} size="md">
               {SIZE_GROUP_LABELS[g]} {fmtNum(groups[g].toFixed(3))} m³
-            </span>
+            </Badge>
           ))}
       </div>
 
@@ -194,8 +186,8 @@ export default function ProductionRunPage() {
           ))}
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="-mx-4 overflow-x-auto px-4">
+      <Card className="mt-4">
+        <TableWrap className="-mx-4 px-4">
         <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="text-left text-xs text-slate-500">
@@ -234,8 +226,20 @@ export default function ProductionRunPage() {
             </tr>
           </tfoot>
         </table>
-        </div>
-      </div>
+        </TableWrap>
+      </Card>
+
+      <ConfirmDialog
+        open={delOpen}
+        title="Supprimer cette session de débitage ?"
+        confirmLabel="Supprimer la session"
+        pending={del.isPending}
+        onConfirm={() => del.mutate()}
+        onCancel={() => setDelOpen(false)}
+      >
+        {r.lines.length} ligne{r.lines.length > 1 ? "s" : ""}, {fmtNum(total.toFixed(3))} m³
+        seront effacés. Action irréversible.
+      </ConfirmDialog>
     </div>
   );
 }

@@ -14,8 +14,11 @@ import { printContainerPackingList } from "../lib/printPacking";
 import EmpotageEntry from "./EmpotageEntry";
 import Badge, { type BadgeTone } from "./ui/Badge";
 import Button from "./ui/Button";
+import { SectionHeading } from "./ui/Card";
+import ConfirmDialog from "./ui/ConfirmDialog";
 import Chip from "./ui/Chip";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
+import Input, { Field } from "./ui/Input";
 
 // Puces de sélection multi-camions (origine des débités empotés).
 function TruckChips({
@@ -106,16 +109,14 @@ function CreateForm({
             ["destination", "Destination", "MANGALORE", false],
           ] as const
         ).map(([key, label, ph, required]) => (
-          <label key={key} className="flex flex-col gap-1 text-sm">
-            <span className="text-slate-600">{label}</span>
-            <input
+          <Field key={key} label={label}>
+            <Input
               required={required}
               value={v[key]}
               onChange={(e) => setV((p) => ({ ...p, [key]: e.target.value }))}
               placeholder={ph}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
             />
-          </label>
+          </Field>
         ))}
       </div>
       {trucks.length > 0 && (
@@ -161,6 +162,8 @@ function ContainerCard({
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editTrucks, setEditTrucks] = useState(false);
+  // Confirmation lisible sur tablette (remplace window.confirm).
+  const [delOpen, setDelOpen] = useState(false);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ["containers", contractId] });
@@ -197,7 +200,7 @@ function ContainerCard({
     <div className="rounded-xl border border-slate-200 bg-white">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 p-3 text-left"
+        className="flex min-h-touch w-full items-center justify-between gap-2 p-3 text-left hover:bg-slate-50 active:bg-slate-100"
       >
         <div>
           <div className="font-medium text-slate-900">{c.containerNo}</div>
@@ -242,18 +245,25 @@ function ContainerCard({
               Imprimer packing list
             </Button>
             <button
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Supprimer le conteneur ${c.containerNo} (${c.items.length} ligne${c.items.length > 1 ? "s" : ""} d'empotage) ? Action irréversible.`
-                  )
-                )
-                  remove.mutate();
-              }}
-              className="ml-auto text-xs text-slate-400 hover:text-red-600"
+              onClick={() => setDelOpen(true)}
+              className="ml-auto min-h-9 rounded-lg px-2 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
             >
               Supprimer conteneur
             </button>
+            <ConfirmDialog
+              open={delOpen}
+              title={`Supprimer le conteneur ${c.containerNo} ?`}
+              confirmLabel="Supprimer le conteneur"
+              pending={remove.isPending}
+              onConfirm={() => {
+                remove.mutate();
+                setDelOpen(false);
+              }}
+              onCancel={() => setDelOpen(false)}
+            >
+              {c.items.length} ligne{c.items.length > 1 ? "s" : ""} d'empotage seront effacées.
+              Action irréversible.
+            </ConfirmDialog>
           </div>
 
           {/* Camions d'origine (traçabilité) */}
@@ -273,7 +283,7 @@ function ContainerCard({
                 />
                 <button
                   onClick={() => setEditTrucks(false)}
-                  className="self-start text-slate-400 hover:text-slate-700"
+                  className="min-h-9 self-start rounded-lg px-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200"
                 >
                   Fermer
                 </button>
@@ -288,7 +298,7 @@ function ContainerCard({
                 {trucks.length > 0 && (
                   <button
                     onClick={() => setEditTrucks(true)}
-                    className="text-slate-500 hover:text-slate-900"
+                    className="min-h-9 rounded-lg px-2 text-slate-500 underline hover:text-slate-900 active:bg-slate-100"
                   >
                     Modifier
                   </button>
@@ -323,7 +333,8 @@ function ContainerCard({
                     <td className="py-1 text-right">
                       <button
                         onClick={() => removeItem.mutate(it.id)}
-                        className="text-slate-300 hover:text-red-500"
+                        aria-label="Retirer la ligne"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
                       >
                         ×
                       </button>
@@ -381,14 +392,15 @@ export default function ContainersSection({ contractId }: { contractId: string }
 
   return (
     <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Conteneurs / Empotage ({containers.data?.length ?? 0})
-        </h2>
-        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? "Fermer" : "+ Conteneur"}
-        </Button>
-      </div>
+      <SectionHeading
+        right={
+          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+            {showForm ? "Fermer" : "+ Conteneur"}
+          </Button>
+        }
+      >
+        Conteneurs / Empotage ({containers.data?.length ?? 0})
+      </SectionHeading>
 
       {showForm && (
         <CreateForm contractId={contractId} trucks={trucks} onDone={() => setShowForm(false)} />

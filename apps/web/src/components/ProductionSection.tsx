@@ -16,7 +16,9 @@ import { fmtInt, fmtM3, fmtNum } from "../lib/format";
 import SawnEntry from "./SawnEntry";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
+import { SectionHeading } from "./ui/Card";
 import { EmptyState, QueryError } from "./ui/Feedback";
+import { SkeletonList } from "./ui/Skeleton";
 
 export default function ProductionSection({ contractId }: { contractId: string }) {
   const qc = useQueryClient();
@@ -57,14 +59,15 @@ export default function ProductionSection({ contractId }: { contractId: string }
 
   return (
     <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Débitage ({runs.data?.length ?? 0} sessions)
-        </h2>
-        <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? "Fermer" : "+ Session"}
-        </Button>
-      </div>
+      <SectionHeading
+        right={
+          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+            {showForm ? "Fermer" : "+ Session"}
+          </Button>
+        }
+      >
+        Débitage ({runs.data?.length ?? 0} sessions)
+      </SectionHeading>
 
       {showForm && (
         <div className="mb-3 rounded-xl border border-slate-200 bg-white p-4">
@@ -138,7 +141,7 @@ export default function ProductionSection({ contractId }: { contractId: string }
       )}
 
       <div className="space-y-2">
-        {runs.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {runs.isLoading && <SkeletonList count={2} lines={1} />}
         {runs.isError && (
           <QueryError error={runs.error} onRetry={() => runs.refetch()}>
             Impossible de charger les sessions de débitage

@@ -15,6 +15,7 @@ import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Chip from "./ui/Chip";
 import { FormError } from "./ui/Feedback";
+import { inputQuietCls } from "./ui/Input";
 
 // `id` : clé React stable. Avec l'index, supprimer la ligne 3 décalait toutes
 // les suivantes — React réutilisait les <input> et le focus atterrissait sur la
@@ -356,9 +357,9 @@ export default function TallyEntry({
     onSave?.({ context, logs } as MeasurementCreateInput);
   }
 
-  // 16px (text-base) : évite le zoom auto iOS au focus ; py-2.5 : cible tactile.
-  const inputCls =
-    "w-full min-w-0 rounded-lg border border-slate-200 px-2.5 py-2.5 text-base outline-none focus:border-slate-900";
+  // Variante « quiet » partagée (voir ui/Input) : 16px anti-zoom iOS,
+  // min-h-touch 44px, bordure légère pour la grille de relevé.
+  const inputCls = inputQuietCls;
   // Dernière colonne à 2,75rem : la croix doit être une vraie cible tactile,
   // séparée du champ Ø qu'elle jouxte.
   const cols = "grid grid-cols-[1.6rem_1fr_1fr_1fr_4.5rem_2.75rem] items-center gap-1";

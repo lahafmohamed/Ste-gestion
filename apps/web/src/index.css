@@ -23,3 +23,28 @@
     touch-action: manipulation;
   }
 }
+
+@layer utilities {
+  /* Barres de défilement masquées, glissement tactile conservé (onglets,
+     bandeaux horizontaux). */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Ombres de débordement horizontal : signalent qu'un tableau continue hors
+     écran (sur téléphone, un tableau coupé net semble complet). Astuce
+     background-attachment local/scroll — zéro JS. */
+  .scroll-shadow-x {
+    background-image: linear-gradient(to right, white, transparent),
+      linear-gradient(to left, white, transparent),
+      linear-gradient(to right, rgb(15 23 42 / 0.08), transparent),
+      linear-gradient(to left, rgb(15 23 42 / 0.08), transparent);
+    background-position: left center, right center, left center, right center;
+    background-repeat: no-repeat;
+    background-size: 2.5rem 100%, 2.5rem 100%, 0.875rem 100%, 0.875rem 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+}

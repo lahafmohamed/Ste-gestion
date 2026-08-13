@@ -1,6 +1,7 @@
+import { forwardRef } from "react";
 import type { ButtonHTMLAttributes } from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "emerald" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "emerald" | "danger" | "ghost-danger";
 export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 // :active : retour d'appui tactile — le hover n'existe pas au doigt (le
@@ -12,6 +13,9 @@ const VARIANT: Record<ButtonVariant, string> = {
   // Réservé aux actions de la chaîne parc (étaler, billonner, bille suivante).
   emerald: "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800",
   danger: "bg-red-600 text-white hover:bg-red-700 active:bg-red-800",
+  // Action destructrice secondaire (« Supprimer » discret des fiches) : gris
+  // au repos, ne devient rouge qu'à l'intention.
+  "ghost-danger": "text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100",
 };
 
 // lg : saisie tablette — 16px (pas de zoom auto iOS) et grande cible tactile.
@@ -20,8 +24,8 @@ const VARIANT: Record<ButtonVariant, string> = {
 const SIZE: Record<ButtonSize, string> = {
   xs: "min-h-9 px-3 py-1.5 text-xs",
   sm: "min-h-9 px-3 py-1.5 text-sm",
-  md: "min-h-11 px-4 py-2 text-sm",
-  lg: "min-h-12 px-4 py-3 text-base",
+  md: "min-h-touch px-4 py-2 text-sm",
+  lg: "min-h-touch-lg px-4 py-3 text-base",
 };
 
 const BASE =
@@ -39,13 +43,20 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: ButtonSize;
 };
 
-export default function Button({
-  variant = "secondary",
-  size = "md",
-  // type explicite : un bouton nu dans un <form> soumettrait le formulaire.
-  type = "button",
-  className = "",
-  ...rest
-}: Props) {
-  return <button type={type} className={buttonCls(variant, size, className)} {...rest} />;
-}
+const Button = forwardRef<HTMLButtonElement, Props>(function Button(
+  {
+    variant = "secondary",
+    size = "md",
+    // type explicite : un bouton nu dans un <form> soumettrait le formulaire.
+    type = "button",
+    className = "",
+    ...rest
+  },
+  ref
+) {
+  return (
+    <button ref={ref} type={type} className={buttonCls(variant, size, className)} {...rest} />
+  );
+});
+
+export default Button;

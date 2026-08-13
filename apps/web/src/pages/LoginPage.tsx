@@ -4,6 +4,7 @@ import { authApi } from "../lib/api";
 import { setSession } from "../lib/auth";
 import Button from "../components/ui/Button";
 import { FormError } from "../components/ui/Feedback";
+import Input, { Field } from "../components/ui/Input";
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("");
@@ -35,30 +36,26 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         <h1 className="text-xl font-semibold text-slate-900">{APP_NAME}</h1>
         <p className="mt-1 text-sm text-slate-500">Connexion à la gestion scierie.</p>
 
-        <label className="mt-5 flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Email</span>
-          <input
+        <Field label="Email" className="mt-5">
+          <Input
             type="email"
             required
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="admin@local"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
           />
-        </label>
+        </Field>
 
-        <label className="mt-3 flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Mot de passe</span>
-          <input
+        <Field label="Mot de passe" className="mt-3">
+          <Input
             type="password"
             required
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
           />
-        </label>
+        </Field>
 
         {error && (
           <div className="mt-3">

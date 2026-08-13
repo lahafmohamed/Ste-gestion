@@ -22,12 +22,21 @@ export const SIZE_GROUP_TONE: Record<SizeGroup, BadgeTone> = {
   OTHER: "slate",
 };
 
-type Props = HTMLAttributes<HTMLSpanElement> & { tone?: BadgeTone };
+// md : pastilles de synthèse en tête de fiche (lisibles debout, tablette).
+const SIZE = {
+  sm: "px-2 py-0.5 text-xs",
+  md: "px-3 py-1 text-sm",
+} as const;
 
-export default function Badge({ tone = "slate", className = "", ...rest }: Props) {
+type Props = HTMLAttributes<HTMLSpanElement> & {
+  tone?: BadgeTone;
+  size?: keyof typeof SIZE;
+};
+
+export default function Badge({ tone = "slate", size = "sm", className = "", ...rest }: Props) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TONE[tone]}${className ? ` ${className}` : ""}`}
+      className={`inline-flex items-center rounded-full font-medium ${SIZE[size]} ${TONE[tone]}${className ? ` ${className}` : ""}`}
       {...rest}
     />
   );

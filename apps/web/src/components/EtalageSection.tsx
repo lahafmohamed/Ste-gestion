@@ -11,6 +11,8 @@ import TruckCard from "./TruckCard";
 import Button from "./ui/Button";
 import Chip from "./ui/Chip";
 import { EmptyState, QueryError } from "./ui/Feedback";
+import { SearchInput } from "./ui/Input";
+import { SkeletonList } from "./ui/Skeleton";
 
 // Étapes 2 et 3 · le travail du parc, sur tablette :
 //   Étalage — les billes sont étalées et mesurées une par une (longueur + Ø).
@@ -309,31 +311,18 @@ export default function EtalageSection({
           })}
         </div>
         {(trucks.data?.length ?? 0) > 3 && (
-          <div className="relative">
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Immatriculation, B/L, parcelle…"
-              aria-label="Chercher un camion"
-              className="w-full rounded-lg border border-slate-300 py-2 pl-3 pr-9 text-base outline-none focus:border-slate-900"
-            />
-            {q && (
-              <button
-                type="button"
-                onClick={() => setQ("")}
-                aria-label="Effacer la recherche"
-                className="absolute inset-y-0 right-0 px-3 text-lg text-slate-400 hover:text-slate-900 active:text-slate-900"
-              >
-                ×
-              </button>
-            )}
-          </div>
+          <SearchInput
+            value={q}
+            onChange={setQ}
+            placeholder="Immatriculation, B/L, parcelle…"
+            aria-label="Chercher un camion"
+          />
         )}
       </div>
 
       {/* ── Cartes camions : annoncé vs étalé/billonné en un coup d'œil ── */}
       <div className="space-y-2">
-        {trucks.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {trucks.isLoading && <SkeletonList count={3} lines={1} />}
         {trucks.isError && (
           <QueryError error={trucks.error} onRetry={() => trucks.refetch()}>
             Impossible de charger les camions
