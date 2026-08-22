@@ -9,14 +9,14 @@ import type {
 // text-base (16px) : sous ce seuil iOS zoome la page au focus.
 // min-h-touch : plancher tactile 44px — la saisie se fait au pouce sur tablette.
 export const inputCls =
-  "w-full min-w-0 min-h-touch rounded-lg border border-slate-300 bg-white px-3 py-2 " +
-  "text-base text-slate-900 outline-none focus:border-slate-900 " +
+  "w-full min-w-0 min-h-touch rounded-lg border border-brand-300 bg-white px-3 py-2 " +
+  "text-base text-brand-900 outline-none focus:border-brand-900 " +
   "disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Variante discrète pour les grilles de saisie en rafale (TallyEntry, SawnEntry). */
 export const inputQuietCls =
-  "w-full min-w-0 min-h-touch rounded-lg border border-slate-200 bg-white px-2.5 py-2 " +
-  "text-base text-slate-900 outline-none focus:border-slate-900";
+  "w-full min-w-0 min-h-touch rounded-lg border border-brand-200 bg-white px-2.5 py-2 " +
+  "text-base text-brand-900 outline-none focus:border-brand-900";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   /** quiet : bordure plus légère (grilles de relevé). */
@@ -60,7 +60,7 @@ export function Field({
 }) {
   return (
     <label className={`flex flex-col gap-1 text-sm${className ? ` ${className}` : ""}`}>
-      <span className="text-slate-600">{label}</span>
+      <span className="text-brand-600">{label}</span>
       {children}
     </label>
   );
@@ -86,7 +86,7 @@ export function SearchInput({ value, onChange, className = "", ...rest }: Search
           type="button"
           onClick={() => onChange("")}
           aria-label="Effacer la recherche"
-          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-lg text-slate-400 hover:text-slate-900 active:text-slate-900"
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-lg text-brand-400 hover:text-brand-900 active:text-brand-900"
         >
           ×
         </button>

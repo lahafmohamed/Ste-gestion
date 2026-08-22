@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 
 /** Liste vide. Avec `action` : encadré pointillé + bouton ; sans : simple ligne grise. */
 export function EmptyState({ action, children }: { action?: ReactNode; children: ReactNode }) {
-  if (!action) return <p className="text-sm text-slate-500">{children}</p>;
+  if (!action) return <p className="text-sm text-brand-500">{children}</p>;
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
-      <p className="text-sm text-slate-500">{children}</p>
+    <div className="rounded-xl border border-dashed border-brand-300 p-6 text-center">
+      <p className="text-sm text-brand-500">{children}</p>
       <div className="mt-3">{action}</div>
     </div>
   );
@@ -30,7 +30,7 @@ export function QueryError({
       <button
         type="button"
         onClick={onRetry}
-        className="mt-2 min-h-9 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 active:bg-red-200"
+        className="mt-2 min-h-touch rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 active:bg-red-200"
       >
         Réessayer
       </button>

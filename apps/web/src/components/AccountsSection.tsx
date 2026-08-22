@@ -8,6 +8,7 @@ import { SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 import Input, { Field, Select } from "./ui/Input";
+import { TableWrap } from "./ui/Table";
 
 function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => void }) {
   const qc = useQueryClient();
@@ -55,7 +56,7 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
   return (
     <form
       onSubmit={submit}
-      className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3"
+      className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-brand-200 bg-white p-4 sm:grid-cols-3"
     >
       <Field label="Tiers">
         <Input
@@ -177,13 +178,13 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
               .filter((s) => Number(s.delta) > 0)
               .map((s) => (
                 <div key={s.partyId + s.role} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-slate-700">
+                  <span className="text-brand-700">
                     <span className="font-medium">{s.partyName}</span> — {s.label}
                   </span>
                   <button
                     onClick={() => applySuggestion.mutate(s)}
                     disabled={applySuggestion.isPending}
-                    className="min-h-9 shrink-0 rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50"
+                    className="min-h-touch shrink-0 rounded-lg bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50"
                   >
                     + {fmtFcfa(s.delta)}
                   </button>
@@ -194,7 +195,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
       )}
 
       <div className="space-y-2">
-        {accounts.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {accounts.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
         {accounts.isError && (
           <QueryError error={accounts.error} onRetry={() => accounts.refetch()}>
             Impossible de charger les comptes
@@ -207,19 +208,19 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
           const balance = Number(a.balance);
           const isOpen = open === a.party.id;
           return (
-            <div key={a.party.id} className="rounded-xl border border-slate-200 bg-white">
+            <div key={a.party.id} className="rounded-xl border border-brand-200 bg-white">
               <button
                 onClick={() => setOpen(isOpen ? null : a.party.id)}
-                className="flex min-h-touch w-full items-center justify-between gap-3 p-3 text-left hover:bg-slate-50 active:bg-slate-100"
+                className="flex min-h-touch w-full items-center justify-between gap-3 p-3 text-left hover:bg-brand-50 active:bg-brand-100"
               >
-                <span className="font-medium text-slate-900">{a.party.name}</span>
+                <span className="font-medium text-brand-900">{a.party.name}</span>
                 <span className="text-right text-sm">
-                  <span className="text-slate-500">
+                  <span className="text-brand-500">
                     Dû {fmtFcfa(a.due)} · Payé {fmtFcfa(a.paid)} ·{" "}
                   </span>
                   <span
                     className={`font-semibold ${
-                      balance > 0 ? "text-red-600" : "text-emerald-600"
+                      balance > 0 ? "text-red-600" : "text-parc-700"
                     }`}
                   >
                     Solde {fmtFcfa(a.balance)}
@@ -228,12 +229,13 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
               </button>
 
               {isOpen && (
-                <div className="border-t border-slate-100 p-3">
-                  <table className="w-full text-sm">
+                <div className="border-t border-brand-100 p-3">
+                  <TableWrap>
+                  <table className="w-full min-w-[520px] text-base">
                     <tbody>
                       {a.entries.map((e) => (
-                        <tr key={e.id} className="border-b border-slate-50">
-                          <td className="py-1 text-xs text-slate-400">
+                        <tr key={e.id} className="border-b border-brand-50">
+                          <td className="py-1 text-xs text-brand-400">
                             {new Date(e.entryDate).toLocaleDateString("fr-FR")}
                           </td>
                           <td className="py-1">
@@ -241,7 +243,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                               className={`rounded-full px-2 py-0.5 text-xs ${
                                 e.kind === "DUE"
                                   ? "bg-red-50 text-red-700"
-                                  : "bg-emerald-50 text-emerald-700"
+                                  : "bg-parc-50 text-parc-700"
                               }`}
                             >
                               {e.kind === "DUE" ? "Dû" : "Payé"}
@@ -250,7 +252,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                           <td className="py-1 text-right tabular-nums">
                             {fmtFcfa(e.amount)}
                           </td>
-                          <td className="py-1 pl-3 text-xs text-slate-500">
+                          <td className="py-1 pl-3 text-xs text-brand-500">
                             {e.description ?? ""}
                           </td>
                           <td className="py-1 text-right">
@@ -258,7 +260,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                               onClick={() =>
                                 setDelEntry({ id: e.id, kind: e.kind, amount: e.amount })
                               }
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                              className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
                               aria-label="Supprimer l'écriture"
                             >
                               ×
@@ -268,6 +270,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                       ))}
                     </tbody>
                   </table>
+                  </TableWrap>
                 </div>
               )}
             </div>

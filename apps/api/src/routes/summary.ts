@@ -1,6 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import type { SizeGroup } from "@ste/shared";
-import { GIRTH_SPLIT_CM, LONG_SPLIT_FT, billCount, sizeSortIndex } from "@ste/shared";
+import {
+  GIRTH_SPLIT_CM,
+  LONG_SPLIT_FT,
+  billCount,
+  sawnVolumeM3,
+  sizeSortIndex,
+} from "@ste/shared";
 import { prisma } from "../prisma.js";
 
 export async function summaryRoutes(app: FastifyInstance) {
@@ -17,6 +23,7 @@ export async function summaryRoutes(app: FastifyInstance) {
           contractId: true,
           declaredFieldM3: true,
           packingLogs: { select: { volumeM3: true } },
+          _count: { select: { productionRuns: true } },
         },
       }),
       prisma.log.findMany({
@@ -33,8 +40,11 @@ export async function summaryRoutes(app: FastifyInstance) {
 
     // Brousse par camion : même ordre de préférence que le résumé complet
     // (étalage brousse 1-par-1 → packing list → total déclaré au bordereau).
-    const acc = new Map<string, { trucks: number; brousse: number; measured: number }>();
-    for (const c of contracts) acc.set(c.id, { trucks: 0, brousse: 0, measured: 0 });
+    const acc = new Map<
+      string,
+      { trucks: number; sawn: number; brousse: number; measured: number }
+    >();
+    for (const c of contracts) acc.set(c.id, { trucks: 0, sawn: 0, brousse: 0, measured: 0 });
     for (const t of trucks) {
       const a = acc.get(t.contractId);
       if (!a) continue;
@@ -42,6 +52,7 @@ export async function summaryRoutes(app: FastifyInstance) {
       const packing = t.packingLogs.reduce((s, p) => s + Number(p.volumeM3), 0);
       const v = field > 0 ? field : packing > 0 ? packing : Number(t.declaredFieldM3 ?? 0);
       a.trucks += 1;
+      if (t._count.productionRuns > 0) a.sawn += 1;
       a.brousse += v;
       if (v > 0) a.measured += 1;
     }
@@ -54,6 +65,7 @@ export async function summaryRoutes(app: FastifyInstance) {
       return {
         contractId: c.id,
         trucksEntered: a.trucks,
+        trucksSawn: a.sawn,
         brousseM3: a.brousse.toFixed(6),
         estTrucksTotal: estTrucksRemaining !== null ? a.trucks + estTrucksRemaining : null,
       };
@@ -363,6 +375,117 @@ export async function summaryRoutes(app: FastifyInstance) {
       balance: (fullCost - totalPaid).toFixed(2),
       profitEstimate: (salesRevenueCfa - fullCost).toFixed(2),
     };
+  });
+
+  // Stock d'avivés à la granularité L×l×ép — base du panier d'empotage.
+  // Les ventes (m³ par taille, sans dimensions ni nombre de pièces) ne sont pas
+  // déductibles ici : ce stock est celui du bois physique disponible à empoter.
+  app.get<{ Params: { id: string } }>("/contracts/:id/sawn-inventory", async (req, reply) => {
+    const contractId = req.params.id;
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      select: { id: true },
+    });
+    if (!contract) return reply.code(404).send({ error: "Contrat introuvable" });
+
+    const dims = {
+      lengthFt: true,
+      widthIn: true,
+      thicknessIn: true,
+      count: true,
+      sizeCode: true,
+      sizeGroup: true,
+    } as const;
+
+    const [sawn, resaw, packed] = await Promise.all([
+      prisma.sawnLine.findMany({ where: { run: { contractId } }, select: dims }),
+      prisma.resawLine.findMany({
+        where: { op: { contractId } },
+        select: { ...dims, kind: true },
+      }),
+      prisma.containerItem.findMany({
+        where: { container: { contractId } },
+        select: dims,
+      }),
+    ]);
+
+    type Row = {
+      key: string;
+      lengthFt: number;
+      widthIn: number;
+      thicknessIn: number;
+      sizeCode: string;
+      sizeGroup: SizeGroup;
+      producedCount: number;
+      resawnInCount: number;
+      resawnOutCount: number;
+      packedCount: number;
+    };
+    const rows = new Map<string, Row>();
+    const bucket = (l: {
+      lengthFt: unknown;
+      widthIn: unknown;
+      thicknessIn: unknown;
+      sizeCode: string;
+      sizeGroup: string;
+    }) => {
+      const L = Number(l.lengthFt);
+      const w = Number(l.widthIn);
+      const t = Number(l.thicknessIn);
+      const key = `${L}x${w}x${t}`;
+      let r = rows.get(key);
+      if (!r) {
+        r = {
+          key,
+          lengthFt: L,
+          widthIn: w,
+          thicknessIn: t,
+          sizeCode: l.sizeCode,
+          sizeGroup: l.sizeGroup as SizeGroup,
+          producedCount: 0,
+          resawnInCount: 0,
+          resawnOutCount: 0,
+          packedCount: 0,
+        };
+        rows.set(key, r);
+      }
+      return r;
+    };
+
+    for (const l of sawn) bucket(l).producedCount += l.count;
+    for (const l of resaw) {
+      const r = bucket(l);
+      if (l.kind === "PRODUCED") r.resawnInCount += l.count;
+      else r.resawnOutCount += l.count;
+    }
+    for (const l of packed) bucket(l).packedCount += l.count;
+
+    return [...rows.values()]
+      .map((r) => {
+        const available =
+          r.producedCount + r.resawnInCount - r.resawnOutCount - r.packedCount;
+        const unit = sawnVolumeM3(r.lengthFt, r.widthIn, r.thicknessIn, 1);
+        return {
+          key: r.key,
+          lengthFt: String(r.lengthFt),
+          widthIn: String(r.widthIn),
+          thicknessIn: String(r.thicknessIn),
+          sizeCode: r.sizeCode,
+          sizeGroup: r.sizeGroup,
+          producedCount: r.producedCount,
+          resawnInCount: r.resawnInCount,
+          resawnOutCount: r.resawnOutCount,
+          packedCount: r.packedCount,
+          availableCount: available,
+          unitM3: unit.toFixed(6),
+          availableM3: (unit * available).toFixed(6),
+        };
+      })
+      .sort(
+        (a, b) =>
+          sizeSortIndex(a.sizeCode) - sizeSortIndex(b.sizeCode) ||
+          Number(a.lengthFt) - Number(b.lengthFt)
+      );
   });
 
   // Suggestions de dûs (attendu vs existant) pour les tiers assignés

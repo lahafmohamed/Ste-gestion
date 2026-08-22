@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { USER_ROLE_LABELS } from "@ste/shared";
 import { clearSession, getUser } from "../lib/auth";
+import { FEATURES } from "../lib/features";
 import { buttonCls } from "./ui/Button";
 import {
   IconBox,
@@ -21,19 +22,28 @@ import {
 
 type NavItem = { to: string; label: string; Icon: (p: IconProps) => JSX.Element; end: boolean };
 
-const NAV: NavItem[] = [
-  { to: "/", label: "Tableau de bord", Icon: IconDashboard, end: true },
-  { to: "/contracts", label: "Contrats", Icon: IconContract, end: false },
-  { to: "/reception", label: "Réception", Icon: IconTruck, end: false },
-  { to: "/etalage", label: "Étalage", Icon: IconLogs, end: false },
-  { to: "/debitage", label: "Débitage", Icon: IconSaw, end: false },
-  { to: "/stock", label: "Stock", Icon: IconBox, end: false },
-  // Masqué pour la première version en ligne — réactiver quand prêt
-  // { to: "/ventes", label: "Ventes", Icon: IconSales, end: false },
-  // { to: "/empotage", label: "Empotage", Icon: IconContainer, end: false },
-  // { to: "/compta", label: "Comptabilité", Icon: IconLedger, end: false },
-  // { to: "/rapport", label: "Rapport", Icon: IconReport, end: false },
-];
+type NavEntry = NavItem & { enabled?: boolean };
+
+const NAV: NavItem[] = (
+  [
+    { to: "/", label: "Tableau de bord", Icon: IconDashboard, end: true },
+    { to: "/contracts", label: "Contrats", Icon: IconContract, end: false },
+    { to: "/reception", label: "Réception", Icon: IconTruck, end: false },
+    { to: "/etalage", label: "Étalage", Icon: IconLogs, end: false },
+    { to: "/debitage", label: "Débitage", Icon: IconSaw, end: false },
+    { to: "/stock", label: "Stock", Icon: IconBox, end: false },
+    { to: "/ventes", label: "Ventes", Icon: IconSales, end: false, enabled: FEATURES.sales },
+    { to: "/empotage", label: "Empotage", Icon: IconContainer, end: false },
+    {
+      to: "/compta",
+      label: "Comptabilité",
+      Icon: IconLedger,
+      end: false,
+      enabled: FEATURES.accounting,
+    },
+    { to: "/rapport", label: "Rapport", Icon: IconReport, end: false, enabled: FEATURES.report },
+  ] satisfies NavEntry[]
+).filter((n) => n.enabled !== false);
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/utilisateurs", label: "Utilisateurs", Icon: IconUsers, end: false },
@@ -64,10 +74,10 @@ function NavList({
             onClick={onNavigate}
             className={({ isActive }) =>
               // min-h-touch : cible tactile 44px (le drawer se navigue au pouce).
-              `flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+              `flex min-h-touch items-center gap-3 rounded-lg px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900 ${
                 isActive
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100 active:bg-slate-200"
+                  ? "bg-accent-500 text-white"
+                  : "text-brand-600 hover:bg-brand-100 active:bg-brand-200"
               }`
             }
           >
@@ -77,12 +87,12 @@ function NavList({
         ))}
       </nav>
       {user && (
-        <div className="mt-2 border-t border-slate-100 pt-3">
-          <div className="px-2 text-sm font-medium text-slate-900">{user.name}</div>
-          <div className="px-2 text-xs text-slate-400">{USER_ROLE_LABELS[user.role]}</div>
+        <div className="mt-2 border-t border-brand-100 pt-3">
+          <div className="px-2 text-sm font-medium text-brand-900">{user.name}</div>
+          <div className="px-2 text-xs text-brand-400">{USER_ROLE_LABELS[user.role]}</div>
           <button
             onClick={logout}
-            className="mt-2 flex min-h-touch w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-500 hover:bg-slate-100 active:bg-slate-200"
+            className="mt-2 flex min-h-touch w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-brand-500 hover:bg-brand-100 active:bg-brand-200"
           >
             <IconLogout width={16} height={16} />
             Déconnexion
@@ -115,16 +125,16 @@ export default function Layout() {
     };
   }, [menuOpen]);
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900">
+    <div className="min-h-dvh bg-brand-50 text-brand-900">
       {/* Header STE — permanent, toutes tailles d'écran */}
-      <header className="fixed inset-x-0 top-0 z-header flex h-header items-center justify-between border-b border-slate-200 bg-white px-4">
+      <header className="fixed inset-x-0 top-0 z-header flex h-header items-center justify-between border-b border-brand-200 bg-white px-4 short:h-header-sm">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             aria-label="Ouvrir le menu"
             aria-expanded={menuOpen}
-            className="-ml-2.5 rounded-lg p-2.5 text-slate-600 hover:bg-slate-100 active:bg-slate-200 md:hidden"
+            className="-ml-2.5 rounded-lg p-2.5 text-brand-600 hover:bg-brand-100 active:bg-brand-200 md:hidden"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="4" y1="7" x2="20" y2="7" />
@@ -134,7 +144,7 @@ export default function Layout() {
           </button>
           <Link to="/" className="flex items-center gap-2">
             <img src="/logo-ste.png" alt="STE — Sustainable Teck Exports" className="h-8 w-auto" />
-            <span className="hidden text-sm text-slate-500 sm:inline">Gestion scierie</span>
+            <span className="hidden text-sm text-brand-500 sm:inline">Gestion scierie</span>
           </Link>
         </div>
         <div className="flex items-center gap-2">
@@ -152,7 +162,7 @@ export default function Layout() {
             <button
               onClick={logout}
               aria-label="Déconnexion"
-              className="ml-1 hidden items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 md:flex"
+              className="ml-1 hidden items-center gap-1.5 text-xs text-brand-500 hover:text-brand-900 md:flex"
             >
               {user.name}
               <IconLogout width={16} height={16} />
@@ -162,7 +172,7 @@ export default function Layout() {
       </header>
 
       {/* Sidebar desktop */}
-      <aside className="fixed bottom-0 left-0 top-header hidden w-56 flex-col border-r border-slate-200 bg-white px-3 py-4 md:flex">
+      <aside className="fixed bottom-0 left-0 top-header hidden w-56 flex-col border-r border-brand-200 bg-white px-3 py-4 md:flex">
         <NavList nav={nav} user={user} />
       </aside>
 
@@ -176,12 +186,12 @@ export default function Layout() {
         <div
           onClick={() => setMenuOpen(false)}
           aria-hidden="true"
-          className={`absolute inset-0 bg-slate-900/40 transition-opacity duration-200 ${
+          className={`absolute inset-0 bg-brand-900/40 transition-opacity duration-200 ${
             menuOpen ? "opacity-100" : "opacity-0"
           }`}
         />
         <aside
-          className={`absolute inset-y-0 left-0 flex w-64 max-w-[80%] flex-col border-r border-slate-200 bg-white px-3 pb-[calc(1rem_+_env(safe-area-inset-bottom))] pt-[calc(1rem_+_env(safe-area-inset-top))] shadow-xl transition-transform duration-200 ${
+          className={`absolute inset-y-0 left-0 flex w-64 max-w-[80%] flex-col border-r border-brand-200 bg-white px-3 pb-[calc(1rem_+_env(safe-area-inset-bottom))] pt-[calc(1rem_+_env(safe-area-inset-top))] shadow-xl transition-transform duration-200 ${
             menuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -191,7 +201,7 @@ export default function Layout() {
               type="button"
               onClick={() => setMenuOpen(false)}
               aria-label="Fermer le menu"
-              className="rounded-lg p-2.5 text-slate-500 hover:bg-slate-100 active:bg-slate-200"
+              className="rounded-lg p-2.5 text-brand-500 hover:bg-brand-100 active:bg-brand-200"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -204,7 +214,7 @@ export default function Layout() {
       </div>
 
       {/* Contenu */}
-      <div className="pt-header md:pl-56">
+      <div className="pt-header short:pt-header-sm md:pl-56">
         <main className="pb-[calc(1.5rem_+_env(safe-area-inset-bottom))]">
           <Outlet />
         </main>
@@ -224,10 +234,11 @@ export function PageHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-200 bg-white px-4 py-3 short:py-1.5">
       <div>
-        <h1 className="text-lg font-semibold">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="text-title-sm font-semibold">{title}</h1>
+        {/* Téléphone en paysage : le sous-titre coûte une ligne de saisie. */}
+        {subtitle && <p className="text-sm text-brand-500 short:hidden">{subtitle}</p>}
       </div>
       {right}
     </div>

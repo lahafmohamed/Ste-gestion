@@ -18,29 +18,40 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
   return (
     <Link
       to={`/contracts/${c.id}`}
-      className="block rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+      className="block rounded-xl border border-brand-200 bg-white p-4 transition-colors hover:border-brand-400 active:border-brand-500 active:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900"
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="font-medium text-slate-900">{c.code}</div>
-          <div className="text-xs text-slate-500">
-            {c.year ? `${c.year} · ` : ""}
-            {/* Projection dérivée des arrivées ; à défaut le prévu contractuel saisi. */}
-            {o?.estTrucksTotal != null
-              ? `≈ ${fmtInt(o.estTrucksTotal)} camions estimés (${o.trucksEntered} entrés)`
-              : `${fmtInt(c.trucksPlanned)} camions prévus`}
-            {c.forest ? ` · ${c.forest}` : ""}
+        <div className="min-w-0">
+          <div className="truncate text-base font-semibold text-brand-900">{c.code}</div>
+          <div className="truncate text-sm text-brand-500">
+            {[c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ") || "—"}
           </div>
         </div>
-        <Badge tone={c.status === "OPEN" ? "emerald" : "slate"}>
+        <Badge tone={c.status === "OPEN" ? "parc" : "brand"}>
           {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
         </Badge>
       </div>
-      <div className="mt-3">
+      {/* Camions : entrés / total projeté (≈, dérivé des arrivées) ou prévu saisi. */}
+      <div className="mt-3 text-sm text-brand-600">
+        Camions <strong className="text-brand-900">{fmtInt(o?.trucksEntered ?? 0)}</strong>
+        {o?.estTrucksTotal != null
+          ? ` / ≈ ${fmtInt(o.estTrucksTotal)}`
+          : c.trucksPlanned > 0
+            ? ` / ${fmtInt(c.trucksPlanned)} prévus`
+            : ""}
+        {o != null && (
+          <>
+            {" · "}
+            <strong className="text-brand-900">{fmtInt(o.trucksSawn)}</strong> scié
+            {o.trucksSawn > 1 ? "s" : ""}
+          </>
+        )}
+      </div>
+      <div className="mt-2">
         {o ? (
           <QuotaBar brousseM3={o.brousseM3} quotaM3={c.quotaM3} />
         ) : (
-          <div className="h-1.5 w-full animate-pulse rounded-full bg-slate-100" />
+          <div className="h-1.5 w-full animate-pulse rounded-full bg-brand-100" />
         )}
       </div>
     </Link>
@@ -136,7 +147,7 @@ export default function ContractsPage() {
         }
       />
 
-      <div className="mx-auto max-w-page px-4 py-6">
+      <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
         {showForm && (
           <div className="mb-6">
             <ContractQuickCreate
@@ -200,14 +211,14 @@ export default function ContractsPage() {
           )}
 
           {all.length > 0 && shown.length === 0 && (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-brand-500">
               Aucun contrat ne correspond
               {filtering ? " à la recherche" : ""}.{" "}
               {!withClosed && closedCount > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowClosed(true)}
-                  className="underline hover:text-slate-900"
+                  className="underline hover:text-brand-900"
                 >
                   Inclure les {closedCount} clôturé(s)
                 </button>
@@ -215,6 +226,10 @@ export default function ContractsPage() {
             </p>
           )}
 
+        </div>
+
+        {/* Grille : une colonne sur téléphone, 2–3 dès que la largeur le permet. */}
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((c) => (
             <ContractCard key={c.id} c={c} o={ovById.get(c.id)} />
           ))}

@@ -15,7 +15,7 @@ type CardProps = HTMLAttributes<HTMLDivElement> & { pad?: keyof typeof PAD };
 export default function Card({ pad = "md", className = "", ...rest }: CardProps) {
   return (
     <div
-      className={`rounded-xl border border-slate-200 bg-white${PAD[pad]}${className ? ` ${className}` : ""}`}
+      className={`rounded-xl border border-brand-200 bg-white${PAD[pad]}${className ? ` ${className}` : ""}`}
       {...rest}
     />
   );
@@ -35,7 +35,7 @@ export function SectionHeading({
     <div
       className={`mb-2 flex items-center justify-between gap-2${className ? ` ${className}` : ""}`}
     >
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-brand-400">
         {children}
       </h2>
       {right}
@@ -55,10 +55,10 @@ export function Kpi({
 }) {
   return (
     <div
-      className={`rounded-lg border border-slate-200 bg-white p-3${className ? ` ${className}` : ""}`}
+      className={`rounded-lg border border-brand-200 bg-white p-3${className ? ` ${className}` : ""}`}
     >
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-slate-900">{value}</div>
+      <div className="text-xs text-brand-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold text-brand-900">{value}</div>
     </div>
   );
 }
@@ -68,7 +68,7 @@ export function BackLink({ to, children }: { to: string; children: ReactNode }) 
   return (
     <Link
       to={to}
-      className="-mx-2 inline-flex min-h-9 items-center rounded-lg px-2 text-sm text-slate-500 hover:text-slate-900 active:bg-slate-100"
+      className="-mx-2 inline-flex min-h-touch items-center rounded-lg px-2 text-sm text-brand-500 hover:text-brand-900 active:bg-brand-100"
     >
       ← {children}
     </Link>

@@ -15,12 +15,14 @@ import type {
   DailyReportDTO,
   LoginInput,
   LoginResponse,
+  SawnInventoryRowDTO,
   TruckStatDTO,
   UserCreateInput,
   UserDTO,
   UserUpdateInput,
   PartyCreateInput,
   PartyDTO,
+  LogUpdateInput,
   MeasurementCreateInput,
   MeasurementDTO,
   PackingCreateInput,
@@ -127,6 +129,9 @@ export const contractsApi = {
   /** Vue liste de tous les contrats en une requête (voir ContractOverviewDTO). */
   overview: () => req<ContractOverviewDTO[]>("/contracts/overview"),
   summary: (id: string) => req<ContractSummaryDTO>(`/contracts/${id}/summary`),
+  /** Stock d'avivés par dimension exacte (panier d'empotage). */
+  sawnInventory: (id: string) =>
+    req<SawnInventoryRowDTO[]>(`/contracts/${id}/sawn-inventory`),
   truckStats: (id: string) => req<TruckStatDTO[]>(`/contracts/${id}/truck-stats`),
   dailyReport: (id: string, date: string) =>
     req<DailyReportDTO>(`/contracts/${id}/daily-report?date=${date}`),
@@ -153,6 +158,9 @@ export const trucksApi = {
     }),
   removeMeasurement: (id: string) =>
     req<void>(`/measurements/${id}`, { method: "DELETE" }),
+  updateLog: (id: string, data: LogUpdateInput) =>
+    req<MeasurementDTO>(`/logs/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  removeLog: (id: string) => req<void>(`/logs/${id}`, { method: "DELETE" }),
   setPacking: (truckId: string, data: PackingCreateInput) =>
     req<TruckDTO>(`/trucks/${truckId}/packing`, {
       method: "POST",

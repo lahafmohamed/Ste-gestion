@@ -27,12 +27,12 @@ function Line({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1">
-      <span className="text-sm text-slate-500">
+      <span className="text-sm text-brand-500">
         {label}
-        {hint && <span className="ml-1.5 text-xs text-slate-400">{hint}</span>}
+        {hint && <span className="ml-1.5 text-xs text-brand-400">{hint}</span>}
       </span>
       <span
-        className={`tabular-nums ${strong ? "text-base font-semibold text-slate-900" : "text-sm text-slate-900"}`}
+        className={`tabular-nums ${strong ? "text-base font-semibold text-brand-900" : "text-sm text-brand-900"}`}
       >
         {value}
       </span>
@@ -73,14 +73,14 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
       <SectionHeading
         right={
           debited > 0 ? (
-            <span className="text-sm font-semibold text-slate-900">{fmtM3(debited)}</span>
+            <span className="text-sm font-semibold text-brand-900">{fmtM3(debited)}</span>
           ) : undefined
         }
       >
         Débitage
       </SectionHeading>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="rounded-xl border border-brand-200 bg-white p-4">
         {stats.isError || runs.isError ? (
           <QueryError
             error={stats.error ?? runs.error}
@@ -92,16 +92,16 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
             Impossible de charger le débitage du camion
           </QueryError>
         ) : stats.isLoading || runs.isLoading ? (
-          <p className="text-sm text-slate-500">Chargement…</p>
+          <p className="text-sm text-brand-500">Chargement…</p>
         ) : debited === 0 ? (
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-brand-500">
             Camion pas encore scié.
             {girth > 0 ? (
               <>
                 {" "}
                 {s?.billonCount ?? 0} billon{(s?.billonCount ?? 0) > 1 ? "s" : ""} sur parc (
                 {fmtM3(girth)}).{" "}
-                <Link to="/debitage" className="underline hover:text-slate-900">
+                <Link to="/debitage" className="underline hover:text-brand-900">
                   Ouvrir une session de débitage
                 </Link>
               </>
@@ -112,7 +112,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
         ) : (
           <>
             {/* Encadré de la feuille DEBITE, mêmes intitulés que le papier. */}
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-brand-100">
               <Line
                 label="Cubage brousse"
                 hint="bordereau"
@@ -136,7 +136,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
               <div
                 className={`mt-2 rounded-lg px-3 py-2 text-sm ${
                   progress.complete
-                    ? "bg-emerald-50 text-emerald-800"
+                    ? "bg-parc-50 text-parc-800"
                     : "bg-amber-50 text-amber-800"
                 }`}
               >
@@ -169,7 +169,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
 
             {/* Splits Daily Truck Log — ce que le débité a donné, par produit. */}
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <Badge tone="sky">
+              <Badge tone="info">
                 MS {fmtNum(Number(s!.msM3).toFixed(3))} m³
                 <span className="opacity-70">
                   {" "}
@@ -177,7 +177,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
                   {fmtNum(Number(s!.band15M3).toFixed(3))})
                 </span>
               </Badge>
-              <Badge tone="violet">
+              <Badge tone="accent">
                 1″ {fmtNum(Number(s!.oneInchM3).toFixed(3))} m³ ({fmtPct(Number(s!.oneInchPct), 0)}
                 )
               </Badge>
@@ -194,8 +194,8 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
             </div>
 
             {/* Sessions : la saisie reste par session, on y renvoie pour le détail. */}
-            <div className="mt-4 border-t border-slate-100 pt-3">
-              <div className="mb-1.5 text-xs font-medium text-slate-500">
+            <div className="mt-4 border-t border-brand-100 pt-3">
+              <div className="mb-1.5 text-xs font-medium text-brand-500">
                 {myRuns.length} session{myRuns.length > 1 ? "s" : ""} de débitage
               </div>
               <div className="space-y-1.5">
@@ -206,23 +206,23 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
                     <Link
                       key={r.id}
                       to={`/production-runs/${r.id}`}
-                      className="block rounded-lg border border-slate-200 p-2.5 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50"
+                      className="block rounded-lg border border-brand-200 p-2.5 transition-colors hover:border-brand-400 active:border-brand-500 active:bg-brand-50"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-slate-900">
+                        <span className="text-sm text-brand-900">
                           {new Date(r.producedAt).toLocaleDateString("fr-FR")}
                           {r.note ? ` · ${r.note}` : ""}
                         </span>
-                        <span className="shrink-0 text-sm tabular-nums text-slate-700">
+                        <span className="shrink-0 text-sm tabular-nums text-brand-700">
                           {fmtM3(runTotalM3(r))}
                         </span>
                       </div>
-                      <div className="mt-0.5 text-xs text-slate-500">
+                      <div className="mt-0.5 text-sm text-brand-500">
                         {fmtInt(runPieceCount(r))} pièces · {r.lines.length} lignes
                         {r.truckIds.length > 1 &&
                           ` · session partagée entre ${r.truckIds.length} camions`}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-sm text-brand-500">
                         {mine.length > 0
                           ? `Billons sciés : ${mine.map((id) => billonNoById.get(id)).join(", ")}`
                           : "Camion entier (billons non précisés)"}

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import {
   M3_TO_CFT,
+  logUpdateSchema,
   measurementCreateSchema,
   packingCreateSchema,
   truckCreateSchema,
@@ -235,6 +236,85 @@ export async function truckRoutes(app: FastifyInstance) {
       include: { logs: { orderBy: { position: "asc" } } },
     });
     return reply.code(201).send(m);
+  });
+
+  // ── Correction d'une ligne de relevé (erreur de saisie au parc) ─────
+  // Le volume est TOUJOURS recalculé côté serveur à partir des mesures
+  // fusionnées (patch + valeurs existantes) — jamais fourni par le client.
+  app.patch<{ Params: { id: string } }>("/logs/:id", async (req, reply) => {
+    const parsed = logUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.flatten() });
+    }
+    const log = await prisma.log.findUnique({
+      where: { id: req.params.id },
+      include: { measurement: true },
+    });
+    if (!log) return reply.code(404).send({ error: "Ligne introuvable" });
+    if (!(await ensureTruckContractOpen(reply, log.measurement.truckId))) return;
+
+    const d = parsed.data;
+    const isDia = log.measurement.context === "YARD_DIAMETER";
+    if (isDia && (d.lengthM !== undefined || d.circumferenceCm !== undefined)) {
+      return reply.code(400).send({ error: "Relevé en Ø : utiliser lengthFt / diameterIn" });
+    }
+    if (!isDia && (d.lengthFt !== undefined || d.diameterIn !== undefined)) {
+      return reply.code(400).send({ error: "Relevé girth : utiliser lengthM / circumferenceCm" });
+    }
+
+    let data: Prisma.LogUpdateInput;
+    if (isDia) {
+      const lengthFt = d.lengthFt ?? log.lengthFt!.toString();
+      const diameterIn = d.diameterIn ?? log.diameterIn!.toString();
+      const vol = volumeDiameterM3(Number(lengthFt), Number(diameterIn));
+      data = {
+        lengthFt,
+        diameterIn,
+        volumeM3: vol.toFixed(6),
+        cft: (vol * M3_TO_CFT).toFixed(4),
+      };
+    } else {
+      const lengthM = d.lengthM ?? log.lengthM!.toString();
+      const circumferenceCm = d.circumferenceCm ?? log.circumferenceCm!.toString();
+      data = {
+        lengthM,
+        circumferenceCm,
+        volumeM3: volumeGirthM3(Number(lengthM), Number(circumferenceCm)).toFixed(6),
+      };
+    }
+    if (d.externalId !== undefined) data.externalId = d.externalId || null;
+
+    await prisma.log.update({ where: { id: log.id }, data });
+    const m = await prisma.logMeasurement.findUnique({
+      where: { id: log.measurementId },
+      include: { logs: { orderBy: { position: "asc" } } },
+    });
+    return m;
+  });
+
+  // Suppression d'une ligne de relevé. Refusée si le billon est déjà passé à
+  // la scie (le lien production → log partirait en cascade sans trace).
+  // Dernière ligne du relevé → le relevé entier est supprimé.
+  app.delete<{ Params: { id: string } }>("/logs/:id", async (req, reply) => {
+    const log = await prisma.log.findUnique({
+      where: { id: req.params.id },
+      include: { measurement: true, _count: { select: { productionRuns: true } } },
+    });
+    if (!log) return reply.code(404).send({ error: "Ligne introuvable" });
+    if (!(await ensureTruckContractOpen(reply, log.measurement.truckId))) return;
+    if (log._count.productionRuns > 0) {
+      return reply
+        .code(409)
+        .send({ error: "Ce billon est lié à un débitage — supprimer le débitage d'abord" });
+    }
+
+    const remaining = await prisma.log.count({ where: { measurementId: log.measurementId } });
+    if (remaining <= 1) {
+      await prisma.logMeasurement.delete({ where: { id: log.measurementId } });
+    } else {
+      await prisma.log.delete({ where: { id: log.id } });
+    }
+    return reply.code(204).send();
   });
 
   // Suppression d'un étalage

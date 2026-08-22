@@ -4,7 +4,7 @@ import { fmtInt, fmtNum, fmtPct } from "../lib/format";
 import Badge from "./ui/Badge";
 import Card, { SectionHeading } from "./ui/Card";
 import { QueryError } from "./ui/Feedback";
-import { TableWrap } from "./ui/Table";
+import { TableWrap, WideBleed } from "./ui/Table";
 
 const num = (v: string | number) => fmtNum(Number(Number(v).toFixed(3)));
 
@@ -73,34 +73,37 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
   return (
     <section className="mt-5">
       <SectionHeading>Analyse par camion</SectionHeading>
+      {/* 18 colonnes : trop large pour la colonne de contenu, mais un écran de
+          bureau a la place — on déborde à partir de lg. En dessous, défilement
+          horizontal avec la colonne Camion figée, sinon on compare des chiffres
+          sans savoir de quel camion ils sont. */}
+      <WideBleed>
       <Card>
-        {/* 18 colonnes : défilement obligatoire — la colonne Camion reste figée,
-            sinon on compare des chiffres sans savoir de quel camion ils sont. */}
         <TableWrap stickyFirstCol>
-          <table className="w-full min-w-[1280px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
           <thead>
-            <tr className="text-left text-xs text-slate-500">
-              <th className="py-1 pr-3 font-normal">Camion</th>
-              <th className="py-1 pr-3 text-right font-normal"># Billes</th>
+            <tr className="text-left text-xs text-brand-500">
+              <th className="py-1 pr-2 font-normal">Camion</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap"># Billes</th>
               {sessionLetters.map((l) => (
-                <th key={l} className="py-1 pr-3 text-right font-normal">
+                <th key={l} className="py-1 pr-2 text-right font-normal">
                   {l}
                 </th>
               ))}
-              <th className="py-1 pr-3 text-right font-normal"># Billons</th>
-              <th className="py-1 pr-3 text-right font-normal">BDR</th>
-              <th className="py-1 pr-3 text-right font-normal">Ø m³</th>
-              <th className="py-1 pr-3 text-right font-normal">Circ m³</th>
-              <th className="py-1 pr-3 text-right font-normal">Débité</th>
-              <th className="py-1 pr-3 text-right font-normal">Main size</th>
-              <th className="py-1 pr-3 text-right font-normal">1,5″</th>
-              <th className="py-1 pr-3 text-right font-normal">MS</th>
-              <th className="py-1 pr-3 text-right font-normal">1″</th>
-              <th className="py-1 pr-3 text-right font-normal">1″ %</th>
-              <th className="py-1 pr-3 text-right font-normal">Long</th>
-              <th className="py-1 pr-3 text-right font-normal">Court</th>
-              <th className="py-1 pr-3 text-right font-normal">Rend.</th>
-              <th className="py-1 pr-3 text-right font-normal">Coût /m³</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap"># Billons</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">BDR</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Ø m³</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Circ m³</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Débité</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Main size</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">1,5″</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">MS</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">1″</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">1″ %</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Long</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Court</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Rend.</th>
+              <th className="py-1 pr-2 text-right font-normal whitespace-nowrap">Coût /m³</th>
               <th className="py-1 text-right font-normal">Coût /MS</th>
             </tr>
           </thead>
@@ -108,65 +111,65 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
             {q.data.map((t) => {
               const sawn = Number(t.debitedM3) > 0;
               return (
-                <tr key={t.truckId} className="border-t border-slate-100">
-                  <td className="py-1 pr-3 whitespace-nowrap">
+                <tr key={t.truckId} className="border-t border-brand-100">
+                  <td className="py-1 pr-2 whitespace-nowrap">
                     <span className="font-medium">{t.registration}</span>
                     {t.deliveryNote && (
-                      <span className="ml-1.5 text-xs text-slate-400">{t.deliveryNote}</span>
+                      <span className="ml-1.5 text-xs text-brand-400">{t.deliveryNote}</span>
                     )}
                     {t.sawn && (
-                      <Badge tone="sky" className="ml-1.5">
+                      <Badge tone="info" className="ml-1.5">
                         scié
                       </Badge>
                     )}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{t.billeCount || "—"}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{t.billeCount || "—"}</td>
                   {sessionLetters.map((l, i) => (
-                    <td key={l} className="py-1 pr-3 text-right tabular-nums text-slate-500">
+                    <td key={l} className="py-1 pr-2 text-right tabular-nums text-brand-500">
                       {t.billeCounts[i] ?? "—"}
                     </td>
                   ))}
-                  <td className="py-1 pr-3 text-right tabular-nums">{t.billonCount || "—"}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">{t.billonCount || "—"}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {Number(t.fieldM3) > 0 ? num(t.fieldM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {Number(t.diaM3) > 0 ? num(t.diaM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {Number(t.girthM3) > 0 ? num(t.girthM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums font-medium">
+                  <td className="py-1 pr-2 text-right tabular-nums font-medium">
                     {sawn ? num(t.debitedM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {sawn ? num(t.mainM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {sawn ? num(t.band15M3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {sawn ? num(t.msM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {sawn ? num(t.oneInchM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums text-slate-500">
+                  <td className="py-1 pr-2 text-right tabular-nums text-brand-500">
                     {sawn ? fmtPct(Number(t.oneInchPct)) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {sawn ? num(t.longM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {sawn ? num(t.shortM3) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {sawn && Number(t.girthM3) > 0 ? fmtPct(Number(t.outputPct)) : "—"}
                   </td>
-                  <td className="py-1 pr-3 text-right tabular-nums">
+                  <td className="py-1 pr-2 text-right tabular-nums">
                     {t.costPerM3 ? fmtInt(t.costPerM3) : "—"}
                   </td>
-                  <td className="py-1 text-right tabular-nums text-slate-500">
+                  <td className="py-1 text-right tabular-nums text-brand-500">
                     {t.costMsPerM3 ? fmtInt(t.costMsPerM3) : "—"}
                   </td>
                 </tr>
@@ -174,32 +177,32 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 font-semibold">
-              <td className="py-1.5 pr-3">TOTAL</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{totals.billes}</td>
+            <tr className="border-t border-brand-200 font-semibold">
+              <td className="py-1.5 pr-2">TOTAL</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{totals.billes}</td>
               {sessionLetters.map((l, i) => (
-                <td key={l} className="py-1.5 pr-3 text-right tabular-nums">
+                <td key={l} className="py-1.5 pr-2 text-right tabular-nums">
                   {q.data.reduce((s, t) => s + (t.billeCounts[i] ?? 0), 0)}
                 </td>
               ))}
-              <td className="py-1.5 pr-3 text-right tabular-nums">{totals.billons}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.field)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.dia)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.girth)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.debited)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.main)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.band15)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.ms)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.oneInch)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">
+              <td className="py-1.5 pr-2 text-right tabular-nums">{totals.billons}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.field)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.dia)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.girth)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.debited)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.main)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.band15)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.ms)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.oneInch)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">
                 {totals.debited > 0 ? fmtPct((totals.oneInch / totals.debited) * 100) : "—"}
               </td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.long)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">{num(totals.short)}</td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.long)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">{num(totals.short)}</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums">
                 {totals.girth > 0 ? fmtPct((totals.debited / totals.girth) * 100) : "—"}
               </td>
-              <td className="py-1.5 pr-3 text-right tabular-nums">
+              <td className="py-1.5 pr-2 text-right tabular-nums">
                 {totals.debited > 0 ? fmtInt(totals.cost / totals.debited) : "—"}
               </td>
               <td className="py-1.5 text-right tabular-nums">
@@ -209,16 +212,8 @@ export default function TruckStatsSection({ contractId }: { contractId: string }
           </tfoot>
           </table>
         </TableWrap>
-        <p className="mt-2 text-xs text-slate-400">
-          Miroir du Daily Truck Log Excel. A/B/C = billes par relevé d'étalage (camion étalé en
-          plusieurs fois). BDR = cubage brousse (bordereau) · Ø = étalage diamètre · Circ =
-          billons girth. Main size = ép ≥ 3″ · 1,5″ = ép 1,5 – 3″ · MS = main
-          + 1,5″ · 1″ = ép &lt; 1,5″. Long ≥ 6,5 ft. Rendement = débité ÷ billons girth. Coût =
-          (BDR × prix SODEFOR + Ø × prix Ibrahim + transport + cubage) ÷ débité (ou ÷ MS), en
-          FCFA/m³. Débité attribué : volume de session ÷ nb de camions liés (approximation si
-          session multi-camions).
-        </p>
       </Card>
+      </WideBleed>
     </section>
   );
 }

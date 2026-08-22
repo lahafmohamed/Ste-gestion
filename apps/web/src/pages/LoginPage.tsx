@@ -28,13 +28,13 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-brand-50 px-4">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="w-full max-w-sm rounded-2xl border border-brand-200 bg-white p-6 shadow-sm"
       >
-        <h1 className="text-xl font-semibold text-slate-900">{APP_NAME}</h1>
-        <p className="mt-1 text-sm text-slate-500">Connexion à la gestion scierie.</p>
+        <h1 className="text-xl font-semibold text-brand-900">{APP_NAME}</h1>
+        <p className="mt-1 text-sm text-brand-500">Connexion à la gestion scierie.</p>
 
         <Field label="Email" className="mt-5">
           <Input

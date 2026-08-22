@@ -120,48 +120,48 @@ export default function EtalageSection({
       {parcTruck && (
         <div
           ref={parcRef}
-          className="mb-3 scroll-mt-[4.5rem] rounded-xl border border-emerald-200 bg-emerald-50/40 p-4"
+          className="mb-3 scroll-mt-[4.5rem] rounded-xl border border-parc-200 bg-parc-50/40 p-4"
         >
           <div className="mb-1 flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-900">
+            <div className="text-sm font-medium text-brand-900">
               {parcStep === "ETALAGE" ? "Étape 2 · Étalage des billes" : "Étape 3 · Billonnage"} ·{" "}
               {parcTruck.registration}
             </div>
             <Link
               to={`/trucks/${parcTruck.id}`}
-              className="text-xs text-slate-500 underline hover:text-slate-900"
+              className="inline-flex min-h-touch items-center rounded-lg px-2 text-sm text-brand-500 underline hover:text-brand-900 active:bg-brand-100"
             >
               Fiche complète
             </Link>
           </div>
 
           {/* Rappel de l'annoncé — l'objectif du pointage est de le vérifier. */}
-          <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
+          <div className="mb-3 flex flex-wrap gap-1.5 text-sm">
             {parcTruck.deliveryNote && (
-              <span className="rounded-full bg-white px-2 py-0.5 text-slate-600 ring-1 ring-slate-200">
+              <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
                 B/L {parcTruck.deliveryNote}
               </span>
             )}
             {parcTruck.parcel && (
-              <span className="rounded-full bg-white px-2 py-0.5 text-slate-600 ring-1 ring-slate-200">
+              <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
                 Parcelle {parcTruck.parcel}
               </span>
             )}
-            <span className="rounded-full bg-white px-2 py-0.5 text-slate-600 ring-1 ring-slate-200">
+            <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
               Annoncé : {parcDeclared?.count ?? "?"} billes ·{" "}
               {parcDeclared?.m3 != null ? `${fmtNum(parcDeclared.m3.toFixed(3))} m³` : "? m³"}
             </span>
             {/* Au billonnage, la référence n'est plus la brousse mais l'étalage :
                 l'écart girth − Ø, c'est la perte au nettoyage et au tronçonnage. */}
             {parcStep === "BILLONNAGE" && parcDia && (
-              <span className="rounded-full bg-white px-2 py-0.5 text-slate-600 ring-1 ring-slate-200">
+              <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
                 Étalé : {parcDia.logs.length} billes · {fmtM3(measurementTotalM3(parcDia))}
               </span>
             )}
           </div>
 
           {parcStep === "BILLONNAGE" && !parcGirth && (
-            <p className="mb-2 text-xs text-slate-500">
+            <p className="mb-2 text-xs text-brand-500">
               Les billes ne sont pas remesurées : le bois est nettoyé puis tronçonné. Taper une
               bille crée son billon suivant (266 → 266A, 266B, 266C…), chacun avec sa propre
               longueur et circonférence.
@@ -176,11 +176,11 @@ export default function EtalageSection({
               const billes = truckBillCount(parcTruck);
               const d = parcDeclared!;
               return (
-                <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-emerald-200">
-                  <div className="font-medium text-emerald-700">
+                <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-parc-200">
+                  <div className="font-medium text-parc-700">
                     {isEtalage ? "Étalage enregistré ✓" : "Billonnage enregistré ✓"}
                   </div>
-                  <div className="mt-1 space-y-0.5 text-slate-600">
+                  <div className="mt-1 space-y-0.5 text-brand-600">
                     <div>
                       {isEtalage ? (
                         <>
@@ -200,7 +200,7 @@ export default function EtalageSection({
                           <span
                             className={
                               parcDone.logs.length === d.count
-                                ? "text-emerald-700"
+                                ? "text-parc-700"
                                 : "text-amber-700"
                             }
                           >
@@ -227,7 +227,7 @@ export default function EtalageSection({
                               <span
                                 className={
                                   Math.abs(total - d.m3) / d.m3 <= 0.05
-                                    ? "text-emerald-700"
+                                    ? "text-parc-700"
                                     : "text-amber-700"
                                 }
                               >
@@ -247,7 +247,7 @@ export default function EtalageSection({
                                 / {fmtNum(dia.toFixed(3))} m³ étalés{" "}
                                 <span
                                   className={
-                                    lossPct <= 25 ? "text-emerald-700" : "text-amber-700"
+                                    lossPct <= 25 ? "text-parc-700" : "text-amber-700"
                                   }
                                 >
                                   (perte {fmtPct(lossPct, 1)})
@@ -262,7 +262,7 @@ export default function EtalageSection({
                       ne voit plus comment ajouter une bille oubliée. */}
                   <Link
                     to={`/trucks/${parcTruck.id}`}
-                    className="mt-2 inline-block text-xs text-slate-500 underline hover:text-slate-900"
+                    className="mt-2 inline-block text-xs text-brand-500 underline hover:text-brand-900"
                   >
                     Il manque {isEtalage ? "des billes" : "des billons"} ? Compléter sur la fiche
                     camion
@@ -284,7 +284,7 @@ export default function EtalageSection({
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {parcStep === "ETALAGE" && parcDia && !parcGirth && (
-              <Button variant="emerald" onClick={() => setParcStep("BILLONNAGE")}>
+              <Button variant="parc" onClick={() => setParcStep("BILLONNAGE")}>
                 Billonner (266 → 266A, 266B…) →
               </Button>
             )}
@@ -297,7 +297,7 @@ export default function EtalageSection({
 
       {/* ── File d'attente du parc : filtres par étape + recherche ── */}
       <div className="mb-2 space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-brand-400">
           File du parc
         </h2>
         <div className="flex flex-wrap gap-1.5">
@@ -353,7 +353,7 @@ export default function EtalageSection({
               action={
                 stage !== "TERMINE" && !closed ? (
                   <Button
-                    variant="emerald"
+                    variant="parc"
                     size="lg"
                     className="mt-3 w-full"
                     onClick={() => {

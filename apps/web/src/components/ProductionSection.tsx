@@ -70,7 +70,7 @@ export default function ProductionSection({ contractId }: { contractId: string }
       </SectionHeading>
 
       {showForm && (
-        <div className="mb-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 rounded-xl border border-brand-200 bg-white p-4">
           <SawnEntry
             saving={create.isPending}
             trucks={trucks.data}
@@ -85,38 +85,38 @@ export default function ProductionSection({ contractId }: { contractId: string }
       {/* Avancement par camion — la question du parc est « qu'est-ce qui reste
           à scier ? », pas « quelles sessions ont eu lieu ? ». */}
       {sortedProgress.length > 0 && (
-        <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <div className="mb-3 rounded-xl border border-brand-200 bg-white p-3">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-brand-400">
             Camions — avancement sciage
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-brand-50">
             {sortedProgress.map(({ truck: t, p }) => (
               <Link
                 key={t.id}
                 to={`/trucks/${t.id}`}
-                className="flex min-h-11 items-center gap-3 rounded-lg px-1 py-1.5 hover:bg-slate-50 active:bg-slate-100"
+                className="flex min-h-touch items-center gap-3 rounded-lg px-1 py-1.5 hover:bg-brand-50 active:bg-brand-100"
               >
-                <span className="w-28 shrink-0 truncate text-sm font-medium text-slate-900">
+                <span className="w-28 shrink-0 truncate text-sm font-medium text-brand-900">
                   {t.registration}
                   {t.deliveryNote && (
-                    <span className="ml-1 text-xs font-normal text-slate-400">
+                    <span className="ml-1 text-xs font-normal text-brand-400">
                       B/L {t.deliveryNote}
                     </span>
                   )}
                 </span>
                 {p.total > 0 ? (
                   <>
-                    <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-100">
                       <div
-                        className={`h-full rounded-full ${p.complete ? "bg-emerald-500" : "bg-amber-400"}`}
+                        className={`h-full rounded-full ${p.complete ? "bg-parc-500" : "bg-amber-400"}`}
                         style={{ width: `${Math.round((p.sawn / p.total) * 100)}%` }}
                       />
                     </div>
-                    <span className="w-24 shrink-0 text-right text-xs tabular-nums text-slate-500">
+                    <span className="w-28 shrink-0 text-right text-sm tabular-nums text-brand-500">
                       {p.sawn}/{p.total} billons
                     </span>
                     <Badge
-                      tone={p.complete ? "emerald" : p.sawn > 0 ? "amber" : "slate"}
+                      tone={p.complete ? "parc" : p.sawn > 0 ? "amber" : "brand"}
                       className="w-20 shrink-0 justify-center"
                     >
                       {p.complete ? "✓ Fini" : p.sawn > 0 ? "En cours" : "À scier"}
@@ -127,7 +127,7 @@ export default function ProductionSection({ contractId }: { contractId: string }
                     <div className="min-w-0 flex-1" />
                     {/* Scié « camion entier » sans étalage girth : fini quand même. */}
                     <Badge
-                      tone={p.complete ? "emerald" : "slate"}
+                      tone={p.complete ? "parc" : "brand"}
                       className="w-20 shrink-0 justify-center"
                     >
                       {p.complete ? "✓ Fini" : "À billonner"}
@@ -157,18 +157,18 @@ export default function ProductionSection({ contractId }: { contractId: string }
             <Link
               key={r.id}
               to={`/production-runs/${r.id}`}
-              className="block rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50"
+              className="block rounded-xl border border-brand-200 bg-white p-3 transition-colors hover:border-brand-400 active:border-brand-500 active:bg-brand-50"
             >
               <div className="flex items-center justify-between">
-                <div className="font-medium text-slate-900">
+                <div className="font-medium text-brand-900">
                   {new Date(r.producedAt).toLocaleDateString("fr-FR")}
                   {r.note ? ` · ${r.note}` : ""}
                 </div>
-                <div className="text-sm font-semibold text-slate-900">
+                <div className="text-sm font-semibold text-brand-900">
                   {fmtM3(runTotalM3(r))}
                 </div>
               </div>
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 text-sm text-brand-500">
                 {fmtInt(runPieceCount(r))} pièces · {r.lines.length} lignes
                 {(Object.keys(groups) as SizeGroup[])
                   .filter((g) => groups[g] > 0)

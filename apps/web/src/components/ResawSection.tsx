@@ -24,6 +24,14 @@ type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count:
 
 const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
 
+// Mini-libellés des cartes téléphone (< sm) — l'en-tête de colonnes disparaît.
+const COL_LABELS = {
+  lengthFt: "L (ft)",
+  widthIn: "l (in)",
+  thicknessIn: "ép (in)",
+  count: "Nbr",
+} as const;
+
 function rowInfo(r: RowState) {
   const L = Number(r.lengthFt);
   const w = Number(r.widthIn);
@@ -59,9 +67,9 @@ function LinesEditor({
   }
   return (
     <div>
-      <div className="overflow-x-auto">
-        <div className="min-w-[560px]">
-          <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1 text-xs text-slate-500">
+      <div className="overflow-x-auto sm:overflow-visible">
+        <div className="sm:min-w-[560px]">
+          <div className="hidden items-center gap-1 text-xs text-brand-500 sm:grid sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem]">
             <span>#</span>
             <span>L (ft)</span>
             <span>l (in)</span>
@@ -71,48 +79,62 @@ function LinesEditor({
             <span className="text-right">m³</span>
             <span />
           </div>
+          {/* Téléphone (< sm) : carte 2 rangées — même motif que EmpotageEntry,
+              ordre DOM inchangé. */}
           {rows.map((r, i) => {
             const info = infos[i];
             return (
               <div
                 key={i}
-                className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1"
+                className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
               >
-                <span className="text-xs text-slate-400">{i + 1}</span>
+                <span className="text-xs text-brand-400">{i + 1}</span>
                 {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
-                  <input
+                  <div
                     key={k}
-                    inputMode="decimal"
-                    value={r[k]}
-                    // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
-                    onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
-                    onKeyDown={
-                      k === "count"
-                        ? (e) => {
-                            if (e.key === "Enter" && i === rows.length - 1) {
-                              e.preventDefault();
-                              setRows((p) => [...p, emptyRow()]);
+                    className={`min-w-0${k === "count" ? " col-start-2 sm:col-auto" : ""}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mb-0.5 block text-xs text-brand-500 sm:hidden"
+                    >
+                      {COL_LABELS[k]}
+                    </span>
+                    <input
+                      inputMode="decimal"
+                      value={r[k]}
+                      aria-label={`${COL_LABELS[k]} ligne ${i + 1}`}
+                      // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
+                      onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
+                      onKeyDown={
+                        k === "count"
+                          ? (e) => {
+                              if (e.key === "Enter" && i === rows.length - 1) {
+                                e.preventDefault();
+                                setRows((p) => [...p, emptyRow()]);
+                              }
                             }
-                          }
-                        : undefined
-                    }
-                    className={inputQuietCls}
-                  />
+                          : undefined
+                      }
+                      className={inputQuietCls}
+                    />
+                  </div>
                 ))}
                 {info ? (
                   <Badge tone={SIZE_GROUP_TONE[info.size.group]} className="justify-self-center">
                     {info.size.code}
                   </Badge>
                 ) : (
-                  <span className="text-center text-xs text-slate-300">—</span>
+                  <span className="text-center text-xs text-brand-300">—</span>
                 )}
-                <span className="text-right text-sm tabular-nums text-slate-700">
+                <span className="text-right text-base tabular-nums text-brand-700">
+                  <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
                   {info ? info.volume.toFixed(3) : "—"}
                 </span>
                 <button
                   type="button"
                   onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-                  className="flex h-11 w-full items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
+                  className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
                   aria-label="Supprimer la ligne"
                 >
                   ×
@@ -125,7 +147,7 @@ function LinesEditor({
       <button
         type="button"
         onClick={() => setRows((p) => [...p, emptyRow()])}
-        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600 hover:border-slate-900 hover:text-slate-900 active:bg-slate-100"
+        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2 text-base font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
       >
         + Ligne
       </button>
@@ -251,12 +273,12 @@ export default function ResawSection({
             </Field>
           </div>
 
-          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-500">
             Bois consommé (pris du stock)
           </div>
           <LinesEditor rows={consumedRows} setRows={setConsumedRows} />
 
-          <div className="mb-1 mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <div className="mb-1 mt-4 text-xs font-medium uppercase tracking-wide text-brand-500">
             Bois produit (sections plus petites)
           </div>
           <LinesEditor rows={producedRows} setRows={setProducedRows} />
@@ -282,11 +304,11 @@ export default function ResawSection({
           )}
 
           {(inM3 > 0 || outM3 > 0) && (
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-              <span className="text-slate-500">
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm">
+              <span className="text-brand-500">
                 Consommé {fmtNum(inM3.toFixed(3))} → produit {fmtNum(outM3.toFixed(3))} m³
               </span>
-              <span className="font-medium text-slate-700">
+              <span className="font-medium text-brand-700">
                 Perte {fmtNum(Math.max(lossM3, 0).toFixed(3))} m³
                 {inM3 > 0 && ` (${fmtPct((Math.max(lossM3, 0) / inM3) * 100, 1)})`}
               </span>
@@ -314,24 +336,24 @@ export default function ResawSection({
 
       {(ops.data?.length ?? 0) > 0 && (
         <Card className="mb-4">
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-brand-100">
             {ops.data!.map((o) => {
               const inTotal = o.consumed.reduce((s, l) => s + Number(l.volumeM3), 0);
               const outTotal = o.produced.reduce((s, l) => s + Number(l.volumeM3), 0);
               return (
                 <li key={o.id} className="flex items-start justify-between gap-2 py-2">
                   <div className="min-w-0 text-sm">
-                    <div className="text-slate-900">
+                    <div className="text-brand-900">
                       <span className="font-medium">
                         {new Date(o.resawnAt).toLocaleDateString("fr-FR")}
                       </span>{" "}
-                      <span className="text-slate-500">
+                      <span className="text-brand-500">
                         — {fmtNum(inTotal.toFixed(3))} → {fmtNum(outTotal.toFixed(3))} m³
                       </span>
-                      {o.note && <span className="ml-1 text-slate-500">· {o.note}</span>}
+                      {o.note && <span className="ml-1 text-brand-500">· {o.note}</span>}
                     </div>
-                    <div className="mt-0.5 text-xs text-slate-500">
-                      {linesSummary(o.consumed)} <span className="text-slate-400">→</span>{" "}
+                    <div className="mt-0.5 text-xs text-brand-500">
+                      {linesSummary(o.consumed)} <span className="text-brand-400">→</span>{" "}
                       {linesSummary(o.produced)}
                     </div>
                   </div>

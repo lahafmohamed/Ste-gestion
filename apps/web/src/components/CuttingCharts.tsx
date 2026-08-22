@@ -2,12 +2,14 @@ import type { ContractCuttingDTO } from "@ste/shared";
 import { SIZE_GROUP_LABELS, type SizeGroup } from "@ste/shared";
 import { fmtNum, fmtPct } from "../lib/format";
 
-// Palette validée (validate_palette.js : CVD ΔE 62+, labels directs requis).
+// Palette marque (sève / ambre / teck / stone) alignée sur SIZE_GROUP_TONE.
+// Les teintes vert/brun se rapprochent en vision deutan : écart de luminance
+// volontaire entre MAIN et ONE_INCH + labels directs toujours requis.
 const GROUP_COLOR: Record<SizeGroup, string> = {
-  MAIN: "#0ea5e9",
+  MAIN: "#74A82C",
   SIDE: "#f59e0b",
-  ONE_INCH: "#8b5cf6",
-  OTHER: "#94a3b8",
+  ONE_INCH: "#856656",
+  OTHER: "#A8A29E",
 };
 
 const ORDER: SizeGroup[] = ["MAIN", "SIDE", "ONE_INCH", "OTHER"];
@@ -45,10 +47,10 @@ function GroupDonut({ groups, total }: { groups: Record<SizeGroup, string>; tota
           </circle>
         ))}
       </g>
-      <text x="60" y="57" textAnchor="middle" className="fill-slate-900" fontSize="13" fontWeight="600">
+      <text x="60" y="57" textAnchor="middle" className="fill-brand-900" fontSize="13" fontWeight="600">
         {fmtNum(total.toFixed(1))}
       </text>
-      <text x="60" y="71" textAnchor="middle" className="fill-slate-400" fontSize="8">
+      <text x="60" y="71" textAnchor="middle" className="fill-brand-400" fontSize="8">
         m³ débités
       </text>
     </svg>
@@ -65,8 +67,8 @@ function SizeBars({ sizes }: { sizes: ContractCuttingDTO["sizes"] }) {
         const v = Number(s.volumeM3);
         return (
           <div key={s.code} className="grid grid-cols-[3rem_1fr_4.5rem] items-center gap-2">
-            <span className="text-xs font-medium text-slate-700">{s.code}</span>
-            <div className="h-3.5 overflow-hidden rounded-r-sm bg-slate-100">
+            <span className="text-xs font-medium text-brand-700">{s.code}</span>
+            <div className="h-3.5 overflow-hidden rounded-r-sm bg-brand-100">
               <div
                 className="h-full rounded-r-sm"
                 style={{ width: `${(v / max) * 100}%`, backgroundColor: GROUP_COLOR[s.group] }}
@@ -74,7 +76,7 @@ function SizeBars({ sizes }: { sizes: ContractCuttingDTO["sizes"] }) {
                 <title>{`${s.code} : ${fmtNum(v.toFixed(3))} m³`}</title>
               </div>
             </div>
-            <span className="text-right text-xs tabular-nums text-slate-600">
+            <span className="text-right text-xs tabular-nums text-brand-600">
               {fmtNum(v.toFixed(2))}
             </span>
           </div>
@@ -97,7 +99,7 @@ export default function CuttingCharts({ data }: { data: ContractCuttingDTO }) {
       {/* Légende (identité par pastille, valeurs en encre) */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
         {ORDER.filter((g) => Number(data.groups[g]) > 0).map((g) => (
-          <span key={g} className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+          <span key={g} className="inline-flex items-center gap-1.5 text-xs text-brand-600">
             <span
               className="inline-block h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: GROUP_COLOR[g] }}

@@ -154,17 +154,17 @@ function RapportInner({
 
   return (
     <>
-      <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">Date</span>
+          <span className="text-brand-600">Date</span>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-slate-900"
+            className="min-h-touch rounded-lg border border-brand-300 px-3 py-2 text-base outline-none focus:border-brand-900"
           />
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={printReport} disabled={!text}>
             Imprimer / PDF
           </Button>
@@ -174,7 +174,7 @@ function RapportInner({
         </div>
       </div>
 
-      {q.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+      {q.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
       {q.isError && (
         <QueryError error={q.error} onRetry={() => q.refetch()}>
           Erreur de chargement
@@ -182,7 +182,7 @@ function RapportInner({
       )}
 
       {q.data && (
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 font-mono text-sm leading-6 text-slate-800">
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-brand-200 bg-white p-4 font-mono text-sm leading-6 text-brand-800">
           {text}
         </pre>
       )}

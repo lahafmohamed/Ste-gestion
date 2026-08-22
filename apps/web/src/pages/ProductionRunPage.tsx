@@ -59,7 +59,7 @@ export default function ProductionRunPage() {
     return (
       <div className="p-6">
         <p className="text-sm text-red-600">Session introuvable.</p>
-        <Link to="/contracts" className="text-sm text-slate-500 underline">
+        <Link to="/contracts" className="text-sm text-brand-500 underline">
           ← Contrats
         </Link>
       </div>
@@ -93,15 +93,15 @@ export default function ProductionRunPage() {
   const rendement = girthLinked > 0 ? (total / girthLinked) * 100 : null;
 
   return (
-    <div className="mx-auto max-w-page px-4 py-6">
+    <div className="mx-auto max-w-page px-4 py-6 short:py-3">
       <BackLink to={`/contracts/${r.contractId}`}>Contrat</BackLink>
 
       <div className="mt-2 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
+          <h1 className="text-title font-semibold text-brand-900">
             Débitage du {new Date(r.producedAt).toLocaleDateString("fr-FR")}
           </h1>
-          <div className="text-sm text-slate-500">{r.note ?? ""}</div>
+          <div className="text-sm text-brand-500">{r.note ?? ""}</div>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -122,7 +122,7 @@ export default function ProductionRunPage() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <span className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-sm font-medium text-white">
+        <span className="inline-flex items-center rounded-full bg-brand-900 px-3 py-1 text-sm font-medium text-white">
           {fmtNum(runTotalM3(r).toFixed(6))} m³
         </span>
         <Badge size="md">{fmtInt(runPieceCount(r))} pièces</Badge>
@@ -137,22 +137,22 @@ export default function ProductionRunPage() {
 
       {/* Camions sciés + rendement de la session */}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-xs uppercase tracking-wide text-slate-400">Camions sciés :</span>
+        <span className="text-xs uppercase tracking-wide text-brand-400">Camions sciés :</span>
         {linkedTrucks.length === 0 ? (
-          <span className="text-slate-400">aucun camion lié</span>
+          <span className="text-brand-400">aucun camion lié</span>
         ) : (
           linkedTrucks.map((t) => (
             <Link
               key={t.id}
               to={`/trucks/${t.id}`}
-              className="inline-flex min-h-9 items-center rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 transition-colors hover:border-slate-900 active:bg-slate-100"
+              className="inline-flex min-h-touch items-center rounded-full border border-brand-300 px-3 py-1 text-sm text-brand-700 transition-colors hover:border-brand-900 active:bg-brand-100"
             >
               {t.registration}
             </Link>
           ))
         )}
         {rendement !== null && (
-          <Badge tone="emerald">
+          <Badge tone="parc">
             Rendement {fmtPct(rendement)} ({fmtNum(girthLinked.toFixed(3))} m³ de billons
             {sawnBillons.length > 0 ? ` · ${sawnBillons.length} billons` : ""})
           </Badge>
@@ -162,9 +162,9 @@ export default function ProductionRunPage() {
       {/* Billons sciés précisés */}
       {sawnBillons.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="uppercase tracking-wide text-slate-400">Billons sciés :</span>
+          <span className="uppercase tracking-wide text-brand-400">Billons sciés :</span>
           {sawnBillons.map((l) => (
-            <Badge key={l.id} tone="emerald" title={`${Number(l.volumeM3).toFixed(4)} m³`}>
+            <Badge key={l.id} tone="parc" title={`${Number(l.volumeM3).toFixed(4)} m³`}>
               {l.externalId ?? `#${l.position}`}
             </Badge>
           ))}
@@ -173,7 +173,7 @@ export default function ProductionRunPage() {
 
       {/* Splits longueur & épaisseur (rapport d'activité) */}
       <div className="mt-2 flex flex-wrap gap-2">
-        <Badge tone="sky">
+        <Badge tone="info">
           Long ≥6,5ft {fmtNum(longM3.toFixed(3))} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
           {fmtNum(shortM3.toFixed(3))} ({fmtPct((shortM3 / total) * 100, 0)})
         </Badge>
@@ -188,9 +188,9 @@ export default function ProductionRunPage() {
 
       <Card className="mt-4">
         <TableWrap className="-mx-4 px-4">
-        <table className="w-full min-w-[520px] text-sm">
+        <table className="w-full min-w-[560px] text-base">
           <thead>
-            <tr className="text-left text-xs text-slate-500">
+            <tr className="text-left text-xs text-brand-500">
               <th className="py-1 font-normal">#</th>
               <th className="py-1 font-normal">L (ft)</th>
               <th className="py-1 font-normal">l (in)</th>
@@ -202,8 +202,8 @@ export default function ProductionRunPage() {
           </thead>
           <tbody>
             {r.lines.map((l) => (
-              <tr key={l.id} className="border-t border-slate-100">
-                <td className="py-1 text-slate-400">{l.position}</td>
+              <tr key={l.id} className="border-t border-brand-100">
+                <td className="py-1 text-brand-400">{l.position}</td>
                 <td className="py-1 tabular-nums">{fmtNum(l.lengthFt)}</td>
                 <td className="py-1 tabular-nums">{fmtNum(l.widthIn)}</td>
                 <td className="py-1 tabular-nums">{fmtNum(l.thicknessIn)}</td>
@@ -214,7 +214,7 @@ export default function ProductionRunPage() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 font-semibold">
+            <tr className="border-t border-brand-200 font-semibold">
               <td colSpan={4} className="py-1.5">
                 Total
               </td>

@@ -106,7 +106,7 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
         right={
           <button
             onClick={() => (editing ? setEditing(false) : openEdit())}
-            className="-my-2 min-h-9 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
+            className="-my-2 min-h-touch rounded-lg px-2.5 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
           >
             {editing ? "Annuler" : "Modifier"}
           </button>
@@ -114,7 +114,7 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
       >
         <span className="inline-flex items-center gap-2">
           Bordereau SODEFOR
-          <Badge tone={filled === FIELDS.length ? "emerald" : filled <= 2 ? "slate" : "amber"}>
+          <Badge tone={filled === FIELDS.length ? "parc" : filled <= 2 ? "brand" : "amber"}>
             {filled}/{FIELDS.length}
           </Badge>
         </span>
@@ -153,8 +153,8 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
             {FIELDS.map((f) => (
               <div key={f.key as string}>
-                <dt className="text-xs text-slate-500">{f.label}</dt>
-                <dd className="text-sm text-slate-900">{display(truck, f)}</dd>
+                <dt className="text-xs text-brand-500">{f.label}</dt>
+                <dd className="text-sm text-brand-900">{display(truck, f)}</dd>
               </div>
             ))}
           </dl>

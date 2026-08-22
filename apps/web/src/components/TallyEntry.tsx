@@ -362,13 +362,17 @@ export default function TallyEntry({
   const inputCls = inputQuietCls;
   // Dernière colonne à 2,75rem : la croix doit être une vraie cible tactile,
   // séparée du champ Ø qu'elle jouxte.
-  const cols = "grid grid-cols-[1.6rem_1fr_1fr_1fr_4.5rem_2.75rem] items-center gap-1";
+  // Téléphone (< sm) : la ligne se replie en carte 2 rangées — rangée 1 :
+  // n° + mesures (mini-libellés), rangée 2 : m³ + suppression. Même ordre DOM,
+  // le focus auto et l'Entrée-chaînage ne changent pas.
+  const cols =
+    "grid grid-cols-[1.6rem_1fr_1fr_1fr_2.75rem] sm:grid-cols-[1.6rem_1fr_1fr_1fr_4.5rem_2.75rem] items-center gap-1";
 
   return (
     <div>
       {/* Brouillon restauré après interruption (reload, écran verrouillé…) */}
       {restored.current && (
-        <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <span>Saisie interrompue restaurée ({validCount} ligne{validCount > 1 ? "s" : ""} valide{validCount > 1 ? "s" : ""})</span>
           <button
             type="button"
@@ -377,7 +381,7 @@ export default function TallyEntry({
               if (draftKey) clearTallyDraft(draftKey);
               setRows([emptyRow()]);
             }}
-            className="-my-2 min-h-9 shrink-0 rounded-lg px-2 font-medium text-amber-700 underline hover:text-amber-900 active:bg-amber-100"
+            className="-my-2 min-h-touch shrink-0 rounded-lg px-2 font-medium text-amber-700 underline hover:text-amber-900 active:bg-amber-100"
           >
             Repartir à zéro
           </button>
@@ -387,8 +391,8 @@ export default function TallyEntry({
       {/* Sélecteur de bille mère — après nettoyage/tronçonnage, taper la bille
           crée directement le billon suivant avec son n° (266A, 266B, 266C…). */}
       {isGirth && bills && bills.length > 0 && (
-        <div className="mb-3 rounded-lg bg-slate-50 p-2">
-          <div className="mb-1.5 flex items-center justify-between gap-2 text-xs text-slate-500">
+        <div className="mb-3 rounded-lg bg-brand-50 p-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2 text-xs text-brand-500">
             <span>
               Bille tronçonnée → nouveau billon ({billsTouched.size}/{bills.length} billes
               entamées)
@@ -397,7 +401,7 @@ export default function TallyEntry({
               <button
                 type="button"
                 onClick={() => setAllBills((s) => !s)}
-                className="-my-2 min-h-9 shrink-0 rounded-lg px-2 underline hover:text-slate-900 active:bg-slate-200"
+                className="-my-2 min-h-touch shrink-0 rounded-lg px-2 underline hover:text-brand-900 active:bg-brand-200"
               >
                 {allBills ? "Réduire" : `Toutes (${bills.length})`}
               </button>
@@ -421,7 +425,7 @@ export default function TallyEntry({
               )}
               {nextBill && (
                 <Button
-                  variant="emerald"
+                  variant="parc"
                   size="lg"
                   className="w-full tabular-nums"
                   onClick={() => addBillon(nextBill)}
@@ -432,7 +436,7 @@ export default function TallyEntry({
             </div>
           )}
           {!nextBill && !allBills && (
-            <p className="mb-2 text-xs text-slate-500">Toutes les billes sont entamées.</p>
+            <p className="mb-2 text-xs text-brand-500">Toutes les billes sont entamées.</p>
           )}
 
           <div className="flex flex-wrap gap-1.5">
@@ -455,9 +459,11 @@ export default function TallyEntry({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-      <div className="min-w-[460px]">
-      <div className={`${cols} text-xs text-slate-500`}>
+      <div className="overflow-x-auto sm:overflow-visible">
+      <div className="sm:min-w-[460px]">
+      {/* En-tête de colonnes : inutile sous sm (mini-libellés dans les cartes),
+          collant sous le header fixe pendant les longs relevés dès sm. */}
+      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:sticky sm:top-header sm:z-10 sm:grid sm:grid-cols-[1.6rem_1fr_1fr_1fr_4.5rem_2.75rem] sm:rounded-lg sm:bg-white sm:py-1">
         <span>#</span>
         <span>{KIND[kind].idLabel}</span>
         <span>{KIND[kind].aLabel}</span>
@@ -467,50 +473,69 @@ export default function TallyEntry({
       </div>
 
       {rows.map((r, i) => (
-        <div key={r.id} className={`mt-1 ${cols}`}>
-          <span className="text-xs text-slate-400">{i + 1}</span>
-          <input
-            value={r.externalId}
-            onChange={(e) => setRow(i, { externalId: e.target.value })}
-            placeholder={isGirth ? "266A (opt.)" : "N° (opt.)"}
-            aria-label={`${KIND[kind].idLabel} ligne ${i + 1}`}
-            className={`${inputCls} ${
-              isDup(r.externalId) ? "border-amber-400 bg-amber-50 text-amber-900" : ""
-            }`}
-          />
-          <input
-            ref={(el) => {
-              aRefs.current[i] = el;
-            }}
-            inputMode="decimal"
-            value={r.a}
-            onChange={(e) => setRow(i, { a: normalizeDecimal(e.target.value) })}
-            aria-label={`${KIND[kind].aLabel} ligne ${i + 1}`}
-            className={inputCls}
-          />
-          <input
-            inputMode="decimal"
-            value={r.b}
-            onChange={(e) => setRow(i, { b: normalizeDecimal(e.target.value) })}
-            aria-label={`${KIND[kind].bLabel} ligne ${i + 1}`}
-            onKeyDown={(e) => {
-              // Desktop : Entrée sur la dernière ligne = nouvelle ligne.
-              // (Clavier numérique mobile n'a pas de Entrée → bouton + Bille ci-dessous.)
-              if (e.key === "Enter" && i === rows.length - 1) {
-                e.preventDefault();
-                // Girth : enchaîner sur le billon suivant de la même bille.
-                addRow(isGirth && r.externalId ? nextBillonId(r.externalId, knownIds) : undefined);
-              }
-            }}
-            className={inputCls}
-          />
-          <span className="text-right text-sm tabular-nums text-slate-700">
+        <div
+          key={r.id}
+          className={`mt-1 ${cols} border-b border-brand-100 pb-2 sm:border-b-0 sm:pb-0`}
+        >
+          <span className="text-xs text-brand-400">{i + 1}</span>
+          <div className="min-w-0">
+            <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
+              {KIND[kind].idLabel}
+            </span>
+            <input
+              value={r.externalId}
+              onChange={(e) => setRow(i, { externalId: e.target.value })}
+              placeholder={isGirth ? "266A (opt.)" : "N° (opt.)"}
+              aria-label={`${KIND[kind].idLabel} ligne ${i + 1}`}
+              className={`${inputCls} ${
+                isDup(r.externalId) ? "border-amber-400 bg-amber-50 text-amber-900" : ""
+              }`}
+            />
+          </div>
+          <div className="min-w-0">
+            <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
+              {KIND[kind].aLabel}
+            </span>
+            <input
+              ref={(el) => {
+                aRefs.current[i] = el;
+              }}
+              inputMode="decimal"
+              value={r.a}
+              onChange={(e) => setRow(i, { a: normalizeDecimal(e.target.value) })}
+              aria-label={`${KIND[kind].aLabel} ligne ${i + 1}`}
+              className={inputCls}
+            />
+          </div>
+          <div className="min-w-0">
+            <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
+              {KIND[kind].bLabel}
+            </span>
+            <input
+              inputMode="decimal"
+              value={r.b}
+              onChange={(e) => setRow(i, { b: normalizeDecimal(e.target.value) })}
+              aria-label={`${KIND[kind].bLabel} ligne ${i + 1}`}
+              onKeyDown={(e) => {
+                // Desktop : Entrée sur la dernière ligne = nouvelle ligne.
+                // (Clavier numérique mobile n'a pas de Entrée → bouton + Bille ci-dessous.)
+                if (e.key === "Enter" && i === rows.length - 1) {
+                  e.preventDefault();
+                  // Girth : enchaîner sur le billon suivant de la même bille.
+                  addRow(isGirth && r.externalId ? nextBillonId(r.externalId, knownIds) : undefined);
+                }
+              }}
+              className={inputCls}
+            />
+          </div>
+          <span className="col-span-3 col-start-2 text-right text-base tabular-nums text-brand-700 sm:col-auto">
+            <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
             {volumes[i] !== null ? volumes[i]!.toFixed(3) : "—"}
           </span>
           <button
             type="button"
             onClick={() => removeRow(i)}
-            className="flex h-11 w-full items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
+            className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
             aria-label={`Supprimer la ligne ${i + 1}`}
           >
             ×
@@ -523,7 +548,7 @@ export default function TallyEntry({
       <button
         type="button"
         onClick={() => addRow()}
-        className="mt-2 min-h-11 w-full rounded-lg border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:border-slate-900 hover:text-slate-900 active:bg-slate-100"
+        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2.5 text-base font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
       >
         + {isGirth ? "Billon" : "Bille"}
       </button>
@@ -535,12 +560,12 @@ export default function TallyEntry({
         className={
           embedded
             ? "mt-3"
-            : "sticky bottom-0 z-10 mt-3 rounded-lg border border-slate-200 bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_-6px_16px_-8px_rgba(15,23,42,0.35)]"
+            : "sticky bottom-0 z-10 mt-3 rounded-lg border border-brand-200 bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_-6px_16px_-8px_rgba(15,23,42,0.35)]"
         }
       >
       {/* Ligne supprimée par erreur → un tap pour la remettre à sa place. */}
       {undo && (
-        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs text-white">
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-brand-900 px-3 py-2 text-sm text-white">
           <span>
             Ligne {undo.index + 1} supprimée
             {undo.row.externalId.trim() ? ` (n° ${undo.row.externalId.trim()})` : ""}
@@ -549,7 +574,7 @@ export default function TallyEntry({
             <button
               type="button"
               onClick={restoreRow}
-              className="-my-2 min-h-9 rounded-lg px-2 font-medium underline active:bg-white/20"
+              className="-my-2 min-h-touch rounded-lg px-2 font-medium underline active:bg-white/20"
             >
               Annuler
             </button>
@@ -557,7 +582,7 @@ export default function TallyEntry({
               type="button"
               onClick={() => setUndo(null)}
               aria-label="Masquer"
-              className="-my-2 min-h-9 rounded-lg px-2 text-base text-slate-400 hover:text-white active:bg-white/20"
+              className="-my-2 min-h-touch rounded-lg px-2 text-base text-brand-400 hover:text-white active:bg-white/20"
             >
               ×
             </button>
@@ -565,46 +590,46 @@ export default function TallyEntry({
         </div>
       )}
 
-      <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+      <div className="rounded-lg bg-brand-50 px-3 py-2 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-slate-500">
+          <span className="text-brand-500">
             Total ({validCount} {KIND[kind].unit}
             {validCount > 1 ? "s" : ""}
             {isGirth && billValidCount > 0 && ` · ${billValidCount} bille${billValidCount > 1 ? "s" : ""}`}
             )
           </span>
-          <span className="font-semibold text-slate-900">
+          <span className="font-semibold text-brand-900">
             {fmtNum(total.toFixed(6))} m³
             {kind === "dia" && total > 0 && (
-              <span className="ml-2 text-xs font-normal text-slate-500">
+              <span className="ml-2 text-xs font-normal text-brand-500">
                 CFT {fmtNum((total * M3_TO_CFT).toFixed(2))}
               </span>
             )}
           </span>
         </div>
         {isGirth && validCount > 0 && (
-          <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+          <div className="mt-1 flex items-center justify-between text-sm text-brand-500">
             <span>
               ≥85&nbsp;cm :{" "}
-              <span className="tabular-nums text-slate-700">{fmtNum(ge85.toFixed(3))}</span> m³ ({ge85n})
+              <span className="tabular-nums text-brand-700">{fmtNum(ge85.toFixed(3))}</span> m³ ({ge85n})
             </span>
             <span>
               &lt;85 :{" "}
-              <span className="tabular-nums text-slate-700">{fmtNum(lt85.toFixed(3))}</span> m³ ({lt85n})
+              <span className="tabular-nums text-brand-700">{fmtNum(lt85.toFixed(3))}</span> m³ ({lt85n})
             </span>
           </div>
         )}
 
         {/* Écarts live vs annoncé au bordereau — le pointeur voit tout de suite s'il manque des billes. */}
         {declared != null && (declared.count != null || declared.m3 != null) && (
-          <div className="mt-2 space-y-1 border-t border-slate-200 pt-2 text-xs">
+          <div className="mt-2 space-y-1 border-t border-brand-200 pt-2 text-sm">
             {declared.count != null && (
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">
+                <span className="text-brand-500">
                   Billes : {billValidCount} / {declared.count} annoncées
                 </span>
                 <Badge
-                  tone={billValidCount === declared.count ? "emerald" : "amber"}
+                  tone={billValidCount === declared.count ? "parc" : "amber"}
                   className="tabular-nums"
                 >
                   {billValidCount === declared.count
@@ -615,11 +640,11 @@ export default function TallyEntry({
             )}
             {declared.m3 != null && declared.m3 > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">
+                <span className="text-brand-500">
                   Volume : {fmtNum(total.toFixed(3))} / {fmtNum(declared.m3.toFixed(3))} m³ brousse
                 </span>
                 <Badge
-                  tone={Math.abs(total - declared.m3) / declared.m3 <= 0.05 ? "emerald" : "amber"}
+                  tone={Math.abs(total - declared.m3) / declared.m3 <= 0.05 ? "parc" : "amber"}
                   className="tabular-nums"
                 >
                   {total - declared.m3 >= 0 ? "+" : ""}
@@ -633,7 +658,7 @@ export default function TallyEntry({
 
       {/* N° en double — le total est faux et rien ne le signale après coup. */}
       {dupCount > 0 && (
-        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           ⚠ {dupCount} n° en double (surlignés) — même {KIND[kind].unit} comptée deux fois, ou
           faute de frappe.
         </div>
@@ -644,7 +669,7 @@ export default function TallyEntry({
           valide : sur un relevé prérempli (packing list) toutes les lignes sont
           « incomplètes » à l'ouverture, ce n'est pas une anomalie. */}
       {incompleteCount > 0 && validCount > 0 && (
-        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           ⚠ {incompleteCount} ligne{incompleteCount > 1 ? "s" : ""} incomplète
           {incompleteCount > 1 ? "s" : ""} ({KIND[kind].aLabel} et {KIND[kind].bLabel} obligatoires)
           {incompleteCount > 1 ? " — elles ne seront pas" : " — elle ne sera pas"} enregistrée

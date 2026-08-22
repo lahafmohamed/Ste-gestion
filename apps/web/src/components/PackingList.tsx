@@ -38,7 +38,19 @@ function rowFromDTO(l: PackingLogDTO): RowState {
   };
 }
 
-const COLS = "grid grid-cols-[1.5rem_1fr_1fr_1fr_1fr_1fr_2.75rem] items-center gap-1";
+// Téléphone (< sm) : carte 2 rangées — n° + Ø gros/petit, puis Ø moy + L·m³ + ×.
+// Même ordre DOM, l'Entrée-chaînage sur m³ ne change pas.
+const COLS =
+  "grid grid-cols-[1.5rem_1fr_1fr_1fr_2.75rem] sm:grid-cols-[1.5rem_1fr_1fr_1fr_1fr_1fr_2.75rem] items-center gap-1";
+
+/** Mini-libellé au-dessus d'un champ, visible seulement sous sm. */
+function ColLabel({ children }: { children: string }) {
+  return (
+    <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
+      {children}
+    </span>
+  );
+}
 
 function PackingEntry({
   truckId,
@@ -90,9 +102,10 @@ function PackingEntry({
 
   return (
     <div>
-      <div className="overflow-x-auto">
-      <div className="min-w-[620px]">
-      <div className={`${COLS} text-xs text-slate-500`}>
+      {/* min-w 620 : défilement horizontal jusqu'à md, en-tête collant au-delà. */}
+      <div className="overflow-x-auto md:overflow-visible">
+      <div className="sm:min-w-[620px]">
+      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:grid sm:grid-cols-[1.5rem_1fr_1fr_1fr_1fr_1fr_2.75rem] md:sticky md:top-header md:z-10 md:rounded-lg md:bg-white md:py-1">
         <span>#</span>
         <span>N° bille</span>
         <span>Ø gros</span>
@@ -102,62 +115,89 @@ function PackingEntry({
         <span />
       </div>
       {rows.map((r, i) => (
-        <div key={i} className={`mt-1 ${COLS}`}>
-          <span className="text-xs text-slate-400">{i + 1}</span>
-          <input
-            value={r.billNo}
-            onChange={(e) => setRow(i, { billNo: e.target.value })}
-            placeholder="1509"
-            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
-          />
-          <input
-            inputMode="decimal"
-            value={r.diaTop}
-            onChange={(e) => setRow(i, { diaTop: e.target.value })}
-            placeholder="34"
-            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
-          />
-          <input
-            inputMode="decimal"
-            value={r.diaBottom}
-            onChange={(e) => setRow(i, { diaBottom: e.target.value })}
-            placeholder="16"
-            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
-          />
-          <input
-            inputMode="decimal"
-            value={r.diaMean}
-            onChange={(e) => setRow(i, { diaMean: e.target.value })}
-            placeholder="25"
-            className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
-          />
-          <div className="grid grid-cols-2 gap-1">
+        <div
+          key={i}
+          className={`mt-1 ${COLS} border-b border-brand-100 pb-2 sm:border-b-0 sm:pb-0`}
+        >
+          <span className="text-xs text-brand-400">{i + 1}</span>
+          <div className="min-w-0">
+            <ColLabel>N° bille</ColLabel>
+            <input
+              value={r.billNo}
+              onChange={(e) => setRow(i, { billNo: e.target.value })}
+              placeholder="1509"
+              aria-label={`N° bille ligne ${i + 1}`}
+              className="w-full min-w-0 min-h-touch rounded-lg border border-brand-200 px-2 py-2 text-base outline-none focus:border-brand-900"
+            />
+          </div>
+          <div className="min-w-0">
+            <ColLabel>Ø gros</ColLabel>
             <input
               inputMode="decimal"
-              value={r.length}
-              onChange={(e) => setRow(i, { length: e.target.value })}
-              placeholder="11.2"
-              className="w-full min-w-0 min-h-touch rounded-lg border border-slate-200 px-2 py-2 text-base outline-none focus:border-slate-900"
+              value={r.diaTop}
+              onChange={(e) => setRow(i, { diaTop: e.target.value })}
+              placeholder="34"
+              aria-label={`Ø gros ligne ${i + 1}`}
+              className="w-full min-w-0 min-h-touch rounded-lg border border-brand-200 px-2 py-2 text-base outline-none focus:border-brand-900"
             />
+          </div>
+          <div className="min-w-0">
+            <ColLabel>Ø petit</ColLabel>
             <input
               inputMode="decimal"
-              value={r.volume}
-              onChange={(e) => setRow(i, { volume: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && i === rows.length - 1) {
-                  e.preventDefault();
-                  addRow();
-                }
-              }}
-              placeholder="0.55"
-              className="w-full min-w-0 min-h-touch rounded-lg border border-slate-300 px-2 py-2 text-base outline-none focus:border-slate-900"
+              value={r.diaBottom}
+              onChange={(e) => setRow(i, { diaBottom: e.target.value })}
+              placeholder="16"
+              aria-label={`Ø petit ligne ${i + 1}`}
+              className="w-full min-w-0 min-h-touch rounded-lg border border-brand-200 px-2 py-2 text-base outline-none focus:border-brand-900"
             />
+          </div>
+          <div className="col-start-2 min-w-0 sm:col-auto">
+            <ColLabel>Ø moy</ColLabel>
+            <input
+              inputMode="decimal"
+              value={r.diaMean}
+              onChange={(e) => setRow(i, { diaMean: e.target.value })}
+              placeholder="25"
+              aria-label={`Ø moy ligne ${i + 1}`}
+              className="w-full min-w-0 min-h-touch rounded-lg border border-brand-200 px-2 py-2 text-base outline-none focus:border-brand-900"
+            />
+          </div>
+          <div className="col-span-2 grid grid-cols-2 gap-1 sm:col-span-1">
+            <div className="min-w-0">
+              <ColLabel>L (m)</ColLabel>
+              <input
+                inputMode="decimal"
+                value={r.length}
+                onChange={(e) => setRow(i, { length: e.target.value })}
+                placeholder="11.2"
+                aria-label={`L (m) ligne ${i + 1}`}
+                className="w-full min-w-0 min-h-touch rounded-lg border border-brand-200 px-2 py-2 text-base outline-none focus:border-brand-900"
+              />
+            </div>
+            <div className="min-w-0">
+              <ColLabel>m³</ColLabel>
+              <input
+                inputMode="decimal"
+                value={r.volume}
+                onChange={(e) => setRow(i, { volume: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && i === rows.length - 1) {
+                    e.preventDefault();
+                    addRow();
+                  }
+                }}
+                placeholder="0.55"
+                aria-label={`m³ ligne ${i + 1}`}
+                className="w-full min-w-0 min-h-touch rounded-lg border border-brand-300 px-2 py-2 text-base outline-none focus:border-brand-900"
+              />
+            </div>
           </div>
           {/* Vraie cible tactile — la croix jouxte le champ m³ au pouce. */}
           <button
             type="button"
             onClick={() => removeRow(i)}
-            className="flex h-11 w-full items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+            className="flex min-h-touch w-full items-center justify-center self-end rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100 sm:self-center"
             aria-label="Supprimer la ligne"
           >
             ×
@@ -172,10 +212,10 @@ function PackingEntry({
           + Ligne
         </Button>
         <div className="text-sm">
-          <span className="text-slate-500">Total ({valid.length} billes) : </span>
-          <span className="font-semibold text-slate-900">{fmtM3(total.toFixed(6))}</span>
+          <span className="text-brand-500">Total ({valid.length} billes) : </span>
+          <span className="font-semibold text-brand-900">{fmtM3(total.toFixed(6))}</span>
           {gap !== null && Math.abs(gap) >= 0.001 && (
-            <span className={`ml-2 text-xs ${Math.abs(gap) > 0.5 ? "text-amber-600" : "text-slate-500"}`}>
+            <span className={`ml-2 text-xs ${Math.abs(gap) > 0.5 ? "text-amber-600" : "text-brand-500"}`}>
               écart brousse déclaré {gap > 0 ? "+" : ""}
               {fmtNum(gap.toFixed(3))}
             </span>
@@ -210,7 +250,7 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
   return (
     <section className="mt-5">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-brand-400">
           Packing list grumes ({rows.length})
         </h2>
         {!editing && (
@@ -220,7 +260,7 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="rounded-xl border border-brand-200 bg-white p-4">
         {editing ? (
           <PackingEntry
             truckId={truck.id}
@@ -236,9 +276,9 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
         ) : (
           <>
             <div className="-mx-4 overflow-x-auto px-4 scroll-shadow-x">
-            <table className="w-full min-w-[520px] text-sm">
+            <table className="w-full min-w-[560px] text-base">
               <thead>
-                <tr className="text-left text-xs text-slate-500">
+                <tr className="text-left text-xs text-brand-500">
                   <th className="py-1 font-normal">#</th>
                   <th className="py-1 font-normal">N° bille</th>
                   <th className="py-1 text-right font-normal">Ø gros</th>
@@ -250,8 +290,8 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
               </thead>
               <tbody>
                 {rows.map((l) => (
-                  <tr key={l.id} className="border-t border-slate-100">
-                    <td className="py-1 text-slate-400">{l.position}</td>
+                  <tr key={l.id} className="border-t border-brand-100">
+                    <td className="py-1 text-brand-400">{l.position}</td>
                     <td className="py-1">{l.billNo ?? "—"}</td>
                     <td className="py-1 text-right tabular-nums">{l.diaTopCm ? fmtNum(l.diaTopCm) : "—"}</td>
                     <td className="py-1 text-right tabular-nums">{l.diaBottomCm ? fmtNum(l.diaBottomCm) : "—"}</td>
@@ -262,7 +302,7 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-slate-200 font-semibold">
+                <tr className="border-t border-brand-200 font-semibold">
                   <td colSpan={6} className="py-1.5">
                     Total ({rows.length} billes)
                   </td>
@@ -273,8 +313,8 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
             </div>
             {gap !== null && Math.abs(gap) >= 0.001 && (
               <p
-                className={`mt-2 text-xs ${
-                  Math.abs(gap) > 0.5 ? "text-amber-600" : "text-slate-500"
+                className={`mt-2 text-sm ${
+                  Math.abs(gap) > 0.5 ? "text-amber-600" : "text-brand-500"
                 }`}
               >
                 Écart avec le brousse déclaré ({fmtM3(truck.declaredFieldM3!)}) :{" "}

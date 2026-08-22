@@ -2,24 +2,27 @@ import type { HTMLAttributes } from "react";
 import type { SizeGroup } from "@ste/shared";
 
 // Pastille statique (statut, écart, groupe de taille). Une seule gamme de
-// teintes : fond -50 / texte -700 (slate : -100/-600, le -50 est invisible
-// sur fond blanc).
-export type BadgeTone = "emerald" | "amber" | "sky" | "violet" | "slate";
+// teintes : fond -50 / texte -700 (brand et accent : -100, le -50 est
+// invisible sur fond blanc).
+// info : seul ton froid conservé — stats sciage (longueurs, MS, « scié »,
+// « à billonner »). Jusqu'à 5 badges cohabitent (SawnEntry) : la palette
+// chaude seule ne suffit pas à les distinguer.
+export type BadgeTone = "parc" | "amber" | "accent" | "brand" | "info";
 
 const TONE: Record<BadgeTone, string> = {
-  emerald: "bg-emerald-50 text-emerald-700",
+  parc: "bg-parc-50 text-parc-700",
   amber: "bg-amber-50 text-amber-700",
-  sky: "bg-sky-50 text-sky-700",
-  violet: "bg-violet-50 text-violet-700",
-  slate: "bg-slate-100 text-slate-600",
+  accent: "bg-accent-100 text-accent-700",
+  brand: "bg-brand-100 text-brand-600",
+  info: "bg-sky-50 text-sky-700",
 };
 
 /** Teinte par groupe de taille débitée — partagé par toutes les vues sciage/stock. */
 export const SIZE_GROUP_TONE: Record<SizeGroup, BadgeTone> = {
-  MAIN: "sky",
+  MAIN: "parc",
   SIDE: "amber",
-  ONE_INCH: "violet",
-  OTHER: "slate",
+  ONE_INCH: "accent",
+  OTHER: "brand",
 };
 
 // md : pastilles de synthèse en tête de fiche (lisibles debout, tablette).
@@ -33,7 +36,7 @@ type Props = HTMLAttributes<HTMLSpanElement> & {
   size?: keyof typeof SIZE;
 };
 
-export default function Badge({ tone = "slate", size = "sm", className = "", ...rest }: Props) {
+export default function Badge({ tone = "brand", size = "sm", className = "", ...rest }: Props) {
   return (
     <span
       className={`inline-flex items-center rounded-full font-medium ${SIZE[size]} ${TONE[tone]}${className ? ` ${className}` : ""}`}

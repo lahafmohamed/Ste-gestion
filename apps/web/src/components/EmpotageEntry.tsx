@@ -8,6 +8,14 @@ import { inputQuietCls } from "./ui/Input";
 type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
 const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
 
+// Mini-libellés des cartes téléphone (< sm) — l'en-tête de colonnes disparaît.
+const COL_LABELS = {
+  lengthFt: "L (ft)",
+  widthIn: "l (in)",
+  thicknessIn: "ép (in)",
+  count: "Nbr",
+} as const;
+
 function rowInfo(r: RowState) {
   const L = Number(r.lengthFt);
   const w = Number(r.widthIn);
@@ -51,9 +59,10 @@ export default function EmpotageEntry({
 
   return (
     <div>
-      <div className="overflow-x-auto">
-      <div className="min-w-[620px]">
-      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1 text-xs text-slate-500">
+      {/* min-w 620 : défilement horizontal jusqu'à md, en-tête collant au-delà. */}
+      <div className="overflow-x-auto md:overflow-visible">
+      <div className="sm:min-w-[620px]">
+      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:grid sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] md:sticky md:top-header md:z-10 md:rounded-lg md:bg-white md:py-1">
         <span>#</span>
         <span>L (ft)</span>
         <span>l (in)</span>
@@ -64,48 +73,59 @@ export default function EmpotageEntry({
         <span />
       </div>
 
+      {/* Téléphone (< sm) : carte 2 rangées — # + L/l/ép, puis Nbr/Taille/m³/×.
+          Même ordre DOM, l'Entrée-chaînage sur Nbr ne change pas. */}
       {rows.map((r, i) => {
         const info = infos[i];
         return (
           <div
             key={i}
-            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] items-center gap-1"
+            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
           >
-            <span className="text-xs text-slate-400">{i + 1}</span>
+            <span className="text-xs text-brand-400">{i + 1}</span>
             {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
-              <input
+              <div
                 key={k}
-                inputMode="decimal"
-                value={r[k]}
-                // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
-                onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
-                onKeyDown={
-                  k === "count"
-                    ? (e) => {
-                        if (e.key === "Enter" && i === rows.length - 1) {
-                          e.preventDefault();
-                          setRows((p) => [...p, emptyRow()]);
+                className={`min-w-0${k === "count" ? " col-start-2 sm:col-auto" : ""}`}
+              >
+                <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
+                  {COL_LABELS[k]}
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={r[k]}
+                  aria-label={`${COL_LABELS[k]} ligne ${i + 1}`}
+                  // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
+                  onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
+                  onKeyDown={
+                    k === "count"
+                      ? (e) => {
+                          if (e.key === "Enter" && i === rows.length - 1) {
+                            e.preventDefault();
+                            setRows((p) => [...p, emptyRow()]);
+                          }
                         }
-                      }
-                    : undefined
-                }
-                className={inputQuietCls}
-              />
+                      : undefined
+                  }
+                  className={inputQuietCls}
+                />
+              </div>
             ))}
             {info ? (
               <Badge tone={SIZE_GROUP_TONE[info.size.group]} className="justify-self-center">
                 {info.size.code}
               </Badge>
             ) : (
-              <span className="text-center text-xs text-slate-300">—</span>
+              <span className="text-center text-xs text-brand-300">—</span>
             )}
-            <span className="text-right text-sm tabular-nums text-slate-700">
+            <span className="text-right text-base tabular-nums text-brand-700">
+              <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
               {info ? info.volume.toFixed(3) : "—"}
             </span>
             <button
               type="button"
               onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-              className="flex h-11 w-full items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
+              className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
               aria-label="Supprimer la ligne"
             >
               ×
@@ -116,25 +136,29 @@ export default function EmpotageEntry({
       </div>
       </div>
 
-      <div className="mt-2 flex items-center justify-between">
-        <Button variant="secondary" size="xs" onClick={() => setRows((p) => [...p, emptyRow()])}>
-          + Ligne
-        </Button>
-        <div className="text-sm">
-          <span className="text-slate-500">{fmtNum(pieces)} pièces · </span>
-          <span className="font-semibold text-slate-900">{fmtNum(total.toFixed(6))} m³</span>
+      {/* Récap sticky : + Ligne, total et validation restent sous le pouce
+          même quand la saisie fait défiler la page. */}
+      <div className="sticky bottom-0 z-10 border-t border-brand-200 bg-white pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] pt-2">
+        <div className="flex items-center justify-between">
+          <Button variant="secondary" size="xs" onClick={() => setRows((p) => [...p, emptyRow()])}>
+            + Ligne
+          </Button>
+          <div className="text-sm">
+            <span className="text-brand-500">{fmtNum(pieces)} pièces · </span>
+            <span className="font-semibold text-brand-900">{fmtNum(total.toFixed(6))} m³</span>
+          </div>
         </div>
-      </div>
 
-      <Button
-        variant="primary"
-        size="lg"
-        onClick={save}
-        disabled={saving || valid.length === 0}
-        className="mt-3 w-full"
-      >
-        {saving ? "Enregistrement…" : `Ajouter ${valid.length} ligne(s)`}
-      </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={save}
+          disabled={saving || valid.length === 0}
+          className="mt-2 w-full"
+        >
+          {saving ? "Enregistrement…" : `Ajouter ${valid.length} ligne(s)`}
+        </Button>
+      </div>
     </div>
   );
 }

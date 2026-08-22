@@ -1,5 +1,5 @@
 import type { ContainerDTO } from "@ste/shared";
-import { containerPieceCount, containerTotalM3 } from "@ste/shared";
+import { containerPieceCount, containerSections, containerTotalM3 } from "@ste/shared";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 6 });
 const n = (v: string | number) => nf.format(Number(v));
@@ -12,9 +12,22 @@ export function printContainerPackingList(
   c: ContainerDTO,
   opts: { contractCode?: string; truckRegistrations?: string[] } = {}
 ): void {
-  const rows = c.items
+  // Lignes groupées par section l×ép (largeur ↑, épaisseur ↑, longueur ↓) —
+  // ordre de lecture du document d'empotage papier.
+  const sections = containerSections(c);
+
+  const rows = sections
     .map(
-      (it) => `<tr>
+      (sec) =>
+        `<tr class="sec">
+        <td colspan="4">Section ${n(sec.widthIn)} × ${n(sec.thicknessIn)} — ${esc(sec.sizeCode)}</td>
+        <td class="r">${sec.count}</td>
+        <td></td>
+        <td class="r">${n(sec.volumeM3.toFixed(6))}</td>
+      </tr>` +
+        sec.items
+          .map(
+            (it) => `<tr>
         <td>${it.position}</td>
         <td>${n(it.lengthFt)}</td>
         <td>${n(it.widthIn)}</td>
@@ -22,6 +35,19 @@ export function printContainerPackingList(
         <td class="r">${it.count}</td>
         <td>${esc(it.sizeCode)}</td>
         <td class="r">${n(it.volumeM3)}</td>
+      </tr>`
+          )
+          .join("")
+    )
+    .join("");
+
+  const recapRows = sections
+    .map(
+      (sec) => `<tr>
+        <td>${n(sec.widthIn)} × ${n(sec.thicknessIn)}</td>
+        <td>${esc(sec.sizeCode)}</td>
+        <td class="r">${sec.count}</td>
+        <td class="r">${n(sec.volumeM3.toFixed(6))}</td>
       </tr>`
     )
     .join("");
@@ -54,6 +80,9 @@ export function printContainerPackingList(
     th { background: #eee; }
     td.r, th.r { text-align: right; }
     tfoot td { font-weight: bold; background: #f4f4f4; }
+    tr.sec td { background: #f0f0f0; font-weight: bold; }
+    h2 { font-size: 13px; margin: 20px 0 6px; }
+    table.recap { width: auto; min-width: 320px; }
     .foot { margin-top: 24px; font-size: 11px; color: #666; display: flex; justify-content: space-between; }
     @media print { body { margin: 0; } }
   </style></head><body>
@@ -70,6 +99,18 @@ export function printContainerPackingList(
         <td colspan="4">Total</td>
         <td class="r">${containerPieceCount(c)}</td>
         <td></td>
+        <td class="r">${n(containerTotalM3(c).toFixed(6))}</td>
+      </tr></tfoot>
+    </table>
+    <h2>Récapitulatif par section</h2>
+    <table class="recap">
+      <thead><tr>
+        <th>Section (l × ép)</th><th>Taille</th><th class="r">Nbr</th><th class="r">Volume m³</th>
+      </tr></thead>
+      <tbody>${recapRows}</tbody>
+      <tfoot><tr>
+        <td colspan="2">Total (${sections.length} section${sections.length > 1 ? "s" : ""})</td>
+        <td class="r">${containerPieceCount(c)}</td>
         <td class="r">${n(containerTotalM3(c).toFixed(6))}</td>
       </tr></tfoot>
     </table>

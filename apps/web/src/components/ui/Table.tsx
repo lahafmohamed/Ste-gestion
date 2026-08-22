@@ -28,6 +28,31 @@ export function TableWrap({
   );
 }
 
+/**
+ * Sort de la colonne de contenu (`max-w-page`, 48rem) à partir de lg, pour les
+ * tableaux trop larges pour elle : sur un grand écran la place existe, autant
+ * afficher les colonnes plutôt que de les faire défiler.
+ * Le shell desktop réserve 14rem de barre latérale (+ marges + barre de
+ * défilement) : on ne prend que le reste, jamais 100vw.
+ */
+export function WideBleed({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`lg:relative lg:left-1/2 lg:w-[calc(100vw-17rem)] lg:-translate-x-1/2${
+        className ? ` ${className}` : ""
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** Cellule d'en-tête standard (libellé gris non gras). */
 export function Th({
   children,

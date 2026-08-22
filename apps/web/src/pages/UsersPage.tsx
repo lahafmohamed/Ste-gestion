@@ -49,7 +49,7 @@ export default function UsersPage() {
         }
       />
 
-      <div className="mx-auto max-w-page px-4 py-6">
+      <div className="mx-auto max-w-page px-4 py-6 short:py-3">
         {showForm && (
           <form
             onSubmit={(e) => {
@@ -61,7 +61,7 @@ export default function UsersPage() {
                 role: v.role as UserRole,
               });
             }}
-            className="mb-6 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-4"
+            className="mb-6 grid grid-cols-2 gap-3 rounded-xl border border-brand-200 bg-white p-4 sm:grid-cols-4"
           >
             <Field label="Nom">
               <Input
@@ -118,16 +118,16 @@ export default function UsersPage() {
           {users.data?.map((u) => (
             <div
               key={u.id}
-              className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 ${
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-white p-3 ${
                 u.active ? "" : "opacity-50"
               }`}
             >
               <div>
-                <div className="font-medium text-slate-900">
+                <div className="font-medium text-brand-900">
                   {u.name}
-                  {me?.id === u.id && <span className="ml-2 text-xs text-slate-400">(moi)</span>}
+                  {me?.id === u.id && <span className="ml-2 text-xs text-brand-400">(moi)</span>}
                 </div>
-                <div className="text-xs text-slate-500">{u.email}</div>
+                <div className="text-xs text-brand-500">{u.email}</div>
               </div>
               <div className="flex items-center gap-2">
                 <Select

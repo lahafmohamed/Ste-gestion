@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CONTAINER_STATUS_LABELS,
   containerPieceCount,
+  containerSections,
   containerTotalM3,
   type ContainerDTO,
   type ContainerStatus,
@@ -11,7 +12,7 @@ import {
 import { containersApi, contractsApi, trucksApi } from "../lib/api";
 import { fmtM3, fmtNum } from "../lib/format";
 import { printContainerPackingList } from "../lib/printPacking";
-import EmpotageEntry from "./EmpotageEntry";
+import EmpotagePicker from "./EmpotagePicker";
 import Badge, { type BadgeTone } from "./ui/Badge";
 import Button from "./ui/Button";
 import { SectionHeading } from "./ui/Card";
@@ -43,10 +44,10 @@ function TruckChips({
 }
 
 const STATUS_TONE: Record<ContainerStatus, BadgeTone> = {
-  PLANNED: "slate",
+  PLANNED: "brand",
   LOADING: "amber",
-  LOADED: "sky",
-  SHIPPED: "emerald",
+  LOADED: "info",
+  SHIPPED: "parc",
 };
 
 const STATUSES: ContainerStatus[] = ["PLANNED", "LOADING", "LOADED", "SHIPPED"];
@@ -96,7 +97,7 @@ function CreateForm({
           truckIds: truckIds.length ? truckIds : undefined,
         });
       }}
-      className="mb-3 rounded-xl border border-slate-200 bg-white p-4"
+      className="mb-3 rounded-xl border border-brand-200 bg-white p-4"
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(
@@ -121,7 +122,7 @@ function CreateForm({
       </div>
       {trucks.length > 0 && (
         <div className="mt-3">
-          <div className="mb-1 text-xs text-slate-500">Camions d'origine (optionnel)</div>
+          <div className="mb-1 text-xs text-brand-500">Camions d'origine (optionnel)</div>
           <TruckChips
             trucks={trucks}
             selected={truckIds}
@@ -131,7 +132,7 @@ function CreateForm({
           />
         </div>
       )}
-      <div className="mt-3 border-t border-slate-100 pt-3">
+      <div className="mt-3 border-t border-brand-100 pt-3">
         {error && (
           <div className="mb-2">
             <FormError>{error}</FormError>
@@ -167,9 +168,12 @@ function ContainerCard({
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ["containers", contractId] });
+    // Le panier lit le stock restant : il doit refléter ce qui vient d'être empoté.
+    qc.invalidateQueries({ queryKey: ["sawn-inventory", contractId] });
   }
 
   const linkedRegs = trucks.filter((t) => c.truckIds.includes(t.id)).map((t) => t.registration);
+  const sections = containerSections(c);
 
   const addItems = useMutation({
     mutationFn: (items: { lengthFt: string; widthIn: string; thicknessIn: string; count: number }[]) =>
@@ -197,14 +201,14 @@ function ContainerCard({
   const remove = useMutation({ mutationFn: () => containersApi.remove(c.id), onSuccess: invalidate });
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="rounded-xl border border-brand-200 bg-white">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-touch w-full items-center justify-between gap-2 p-3 text-left hover:bg-slate-50 active:bg-slate-100"
+        className="flex min-h-touch w-full items-center justify-between gap-2 p-3 text-left hover:bg-brand-50 active:bg-brand-100"
       >
         <div>
-          <div className="font-medium text-slate-900">{c.containerNo}</div>
-          <div className="text-xs text-slate-500">
+          <div className="font-medium text-brand-900">{c.containerNo}</div>
+          <div className="text-sm text-brand-500">
             {[
               c.grade,
               c.destination,
@@ -216,17 +220,26 @@ function ContainerCard({
           </div>
         </div>
         <div className="flex items-center gap-2 text-right">
-          <span className="text-sm font-semibold text-slate-900">
-            {fmtM3(containerTotalM3(c))}
-          </span>
+          <div>
+            <div className="text-sm font-semibold text-brand-900">
+              {fmtM3(containerTotalM3(c))}
+            </div>
+            {/* Contenu visible sans déplier : pièces + sections l×ép. */}
+            {c.items.length > 0 && (
+              <div className="text-xs text-brand-500">
+                {fmtNum(containerPieceCount(c))} pièces · {sections.length} section
+                {sections.length > 1 ? "s" : ""}
+              </div>
+            )}
+          </div>
           <Badge tone={STATUS_TONE[c.status]}>{CONTAINER_STATUS_LABELS[c.status]}</Badge>
         </div>
       </button>
 
       {open && (
-        <div className="border-t border-slate-100 p-3">
+        <div className="border-t border-brand-100 p-3">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">Statut :</span>
+            <span className="text-xs text-brand-500">Statut :</span>
             {STATUSES.map((st) => (
               <Chip key={st} selected={c.status === st} onClick={() => setStatus.mutate(st)}>
                 {CONTAINER_STATUS_LABELS[st]}
@@ -246,7 +259,7 @@ function ContainerCard({
             </Button>
             <button
               onClick={() => setDelOpen(true)}
-              className="ml-auto min-h-9 rounded-lg px-2 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+              className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
             >
               Supprimer conteneur
             </button>
@@ -267,8 +280,8 @@ function ContainerCard({
           </div>
 
           {/* Camions d'origine (traçabilité) */}
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-slate-500">Camions d'origine :</span>
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-brand-500">Camions d'origine :</span>
             {editTrucks ? (
               <div className="flex flex-1 flex-col gap-2">
                 <TruckChips
@@ -283,7 +296,7 @@ function ContainerCard({
                 />
                 <button
                   onClick={() => setEditTrucks(false)}
-                  className="min-h-9 self-start rounded-lg px-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200"
+                  className="min-h-touch self-start rounded-lg px-2 text-brand-400 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
                 >
                   Fermer
                 </button>
@@ -293,12 +306,12 @@ function ContainerCard({
                 {linkedRegs.length ? (
                   linkedRegs.map((r) => <Badge key={r}>{r}</Badge>)
                 ) : (
-                  <span className="text-slate-400">aucun</span>
+                  <span className="text-brand-400">aucun</span>
                 )}
                 {trucks.length > 0 && (
                   <button
                     onClick={() => setEditTrucks(true)}
-                    className="min-h-9 rounded-lg px-2 text-slate-500 underline hover:text-slate-900 active:bg-slate-100"
+                    className="min-h-touch rounded-lg px-2 text-brand-500 underline hover:text-brand-900 active:bg-brand-100"
                   >
                     Modifier
                   </button>
@@ -308,12 +321,12 @@ function ContainerCard({
           </div>
 
           {c.items.length > 0 && (
-            <div className="-mx-3 overflow-x-auto px-3">
-            <table className="w-full min-w-[440px] text-sm">
+            <div className="-mx-3 overflow-x-auto px-3 scroll-shadow-x">
+            <table className="w-full min-w-[480px] text-base">
               <thead>
-                <tr className="text-left text-xs text-slate-500">
+                <tr className="text-left text-xs text-brand-500">
                   <th className="py-1 font-normal">#</th>
-                  <th className="py-1 font-normal">L×l×ép</th>
+                  <th className="py-1 font-normal">Long. (ft)</th>
                   <th className="py-1 font-normal">Taille</th>
                   <th className="py-1 text-right font-normal">Nbr</th>
                   <th className="py-1 text-right font-normal">m³</th>
@@ -321,33 +334,51 @@ function ContainerCard({
                 </tr>
               </thead>
               <tbody>
-                {c.items.map((it) => (
-                  <tr key={it.id} className="border-t border-slate-100">
-                    <td className="py-1 text-slate-400">{it.position}</td>
-                    <td className="py-1 tabular-nums">
-                      {fmtNum(it.lengthFt)}×{fmtNum(it.widthIn)}×{fmtNum(it.thicknessIn)}
-                    </td>
-                    <td className="py-1">{it.sizeCode}</td>
-                    <td className="py-1 text-right tabular-nums">{it.count}</td>
-                    <td className="py-1 text-right tabular-nums">{fmtNum(it.volumeM3)}</td>
-                    <td className="py-1 text-right">
-                      <button
-                        onClick={() => removeItem.mutate(it.id)}
-                        aria-label="Retirer la ligne"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg text-slate-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
+                {sections.map((sec) => (
+                  <Fragment key={sec.key}>
+                    {/* En-tête de section l×ép — le doc d'empotage se lit par paquets. */}
+                    <tr className="border-t border-brand-200 bg-brand-50">
+                      <td colSpan={3} className="py-1 text-sm font-medium text-brand-700">
+                        Section {fmtNum(sec.widthIn)}×{fmtNum(sec.thicknessIn)}
+                        <span className="ml-2 text-xs font-normal text-brand-500">
+                          {sec.sizeCode}
+                        </span>
+                      </td>
+                      <td className="py-1 text-right text-sm font-medium tabular-nums text-brand-700">
+                        {sec.count}
+                      </td>
+                      <td className="py-1 text-right text-sm font-medium tabular-nums text-brand-700">
+                        {fmtNum(sec.volumeM3.toFixed(3))}
+                      </td>
+                      <td />
+                    </tr>
+                    {sec.items.map((it) => (
+                      <tr key={it.id} className="border-t border-brand-100">
+                        <td className="py-1 text-brand-400">{it.position}</td>
+                        <td className="py-1 tabular-nums">{fmtNum(it.lengthFt)}</td>
+                        <td className="py-1">{it.sizeCode}</td>
+                        <td className="py-1 text-right tabular-nums">{it.count}</td>
+                        <td className="py-1 text-right tabular-nums">{fmtNum(it.volumeM3)}</td>
+                        <td className="py-1 text-right">
+                          <button
+                            onClick={() => removeItem.mutate(it.id)}
+                            aria-label="Retirer la ligne"
+                            className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-slate-200 font-semibold">
+                <tr className="border-t border-brand-200 font-semibold">
                   <td colSpan={3} className="py-1.5">
-                    Total ({containerPieceCount(c)} pièces)
+                    Total ({sections.length} section{sections.length > 1 ? "s" : ""})
                   </td>
-                  <td />
+                  <td className="py-1.5 text-right tabular-nums">{containerPieceCount(c)}</td>
                   <td className="py-1.5 text-right tabular-nums">
                     {fmtNum(containerTotalM3(c).toFixed(6))}
                   </td>
@@ -360,7 +391,11 @@ function ContainerCard({
 
           <div className="mt-3">
             {adding ? (
-              <EmpotageEntry saving={addItems.isPending} onSave={(items) => addItems.mutate(items)} />
+              <EmpotagePicker
+                contractId={contractId}
+                saving={addItems.isPending}
+                onSave={(items) => addItems.mutate(items)}
+              />
             ) : (
               <Button size="xs" onClick={() => setAdding(true)}>
                 + Lignes d'empotage
@@ -407,7 +442,7 @@ export default function ContainersSection({ contractId }: { contractId: string }
       )}
 
       <div className="space-y-2">
-        {containers.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {containers.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
         {containers.isError && (
           <QueryError error={containers.error} onRetry={() => containers.refetch()}>
             Impossible de charger les conteneurs

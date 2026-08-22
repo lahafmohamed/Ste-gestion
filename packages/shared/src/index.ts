@@ -345,6 +345,18 @@ export const measurementCreateSchema = z.discriminatedUnion("context", [
 ]);
 export type MeasurementCreateInput = z.infer<typeof measurementCreateSchema>;
 
+// Correction d'une ligne de relevé déjà enregistrée (erreur de saisie au parc).
+// Champs selon le contexte du relevé parent : m+cm (girth) ou ft+in (Ø) —
+// vérifié côté route. `externalId: null` efface le n°.
+export const logUpdateSchema = z.object({
+  externalId: z.string().trim().max(30).nullable().optional(),
+  lengthM: decimalString.optional(),
+  circumferenceCm: decimalString.optional(),
+  lengthFt: decimalString.optional(),
+  diameterIn: decimalString.optional(),
+});
+export type LogUpdateInput = z.infer<typeof logUpdateSchema>;
+
 export type LogDTO = {
   id: string;
   position: number;
@@ -613,6 +625,7 @@ export type ContractAccountDTO = {
 export type ContractOverviewDTO = {
   contractId: string;
   trucksEntered: number;
+  trucksSawn: number; // camions avec au moins un débitage saisi
   brousseM3: string; // même règle que le résumé : étalage brousse > packing > déclaré
   estTrucksTotal: number | null;
 };
@@ -838,12 +851,81 @@ export type ContainerDTO = {
   items: ContainerItemDTO[];
 };
 
+// ── Stock d'avivés par dimension exacte (GET /contracts/:id/sawn-inventory) ──
+// L'empotage se choisit pièce par pièce dans du bois réel : il faut le stock à
+// la granularité L×l×ép (le stock par taille du résumé n'est qu'en m³).
+// Les ventes ne portent ni dimensions ni nombre de pièces : elles ne peuvent
+// pas être déduites ici. Disponible = débité + rescié entrant − rescié sortant
+// − déjà empoté.
+export type SawnInventoryRowDTO = {
+  key: string; // "6.5x6x3" — identifiant de regroupement
+  lengthFt: string;
+  widthIn: string;
+  thicknessIn: string;
+  sizeCode: string;
+  sizeGroup: SizeGroup;
+  producedCount: number;
+  resawnInCount: number;
+  resawnOutCount: number;
+  packedCount: number; // déjà empoté (tous conteneurs du contrat)
+  availableCount: number;
+  unitM3: string; // volume d'une pièce
+  availableM3: string;
+};
+
 export function containerTotalM3(c: ContainerDTO): number {
   return c.items.reduce((s, i) => s + Number(i.volumeM3), 0);
 }
 
 export function containerPieceCount(c: ContainerDTO): number {
   return c.items.reduce((s, i) => s + i.count, 0);
+}
+
+// Une « section » = un couple largeur × épaisseur (8×6, 9×7…). C'est l'unité de
+// lecture du document d'empotage réel : les paquets partent en conteneur par
+// section, longueurs décroissantes à l'intérieur. Le sizeGroup (MAIN/SIDE/…)
+// est trop grossier pour ça.
+export type ContainerSectionDTO = {
+  key: string; // "8x6"
+  widthIn: string;
+  thicknessIn: string;
+  sizeCode: string;
+  sizeGroup: SizeGroup;
+  items: ContainerItemDTO[]; // longueur décroissante
+  count: number;
+  volumeM3: number;
+};
+
+export function containerSections(c: ContainerDTO): ContainerSectionDTO[] {
+  const map = new Map<string, ContainerSectionDTO>();
+  for (const it of c.items) {
+    const key = `${Number(it.widthIn)}x${Number(it.thicknessIn)}`;
+    let sec = map.get(key);
+    if (!sec) {
+      sec = {
+        key,
+        widthIn: it.widthIn,
+        thicknessIn: it.thicknessIn,
+        sizeCode: it.sizeCode,
+        sizeGroup: it.sizeGroup,
+        items: [],
+        count: 0,
+        volumeM3: 0,
+      };
+      map.set(key, sec);
+    }
+    sec.items.push(it);
+    sec.count += it.count;
+    sec.volumeM3 += Number(it.volumeM3);
+  }
+  const out = [...map.values()];
+  out.sort(
+    (a, b) =>
+      Number(a.widthIn) - Number(b.widthIn) ||
+      Number(a.thicknessIn) - Number(b.thicknessIn)
+  );
+  for (const sec of out) sec.items.sort((a, b) => Number(b.lengthFt) - Number(a.lengthFt));
+  return out;
 }
 
 export type TruckStatDTO = {

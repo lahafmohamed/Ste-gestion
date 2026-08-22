@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { ContractDTO } from "@ste/shared";
 import { contractsApi } from "../lib/api";
 import { fmtFcfa, fmtM3, fmtPct } from "../lib/format";
+import { SHOW_MONEY } from "../lib/features";
 import { PageHeader } from "../components/Layout";
 import { QuotaBar } from "../components/QuotaGauge";
 import Badge from "../components/ui/Badge";
@@ -20,11 +21,11 @@ function ContractCard({ c }: { c: ContractDTO }) {
   return (
     <Link
       to={`/contracts/${c.id}`}
-      className="block rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-400 active:border-slate-500 active:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+      className="block rounded-xl border border-brand-200 bg-white p-4 transition-colors hover:border-brand-400 active:border-brand-500 active:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900"
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="font-medium text-slate-900">{c.code}</div>
-        <Badge tone={c.status === "OPEN" ? "emerald" : "slate"}>
+        <div className="font-medium text-brand-900">{c.code}</div>
+        <Badge tone={c.status === "OPEN" ? "parc" : "brand"}>
           {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
         </Badge>
       </div>
@@ -32,7 +33,7 @@ function ContractCard({ c }: { c: ContractDTO }) {
       {s ? (
         <div className="mt-3 space-y-2">
           <div>
-            <div className="mb-1 text-xs text-slate-500">
+            <div className="mb-1 text-sm text-brand-500">
               Camions {s.trucksEntered}
               {/* Total projeté depuis la moyenne des arrivées ; à défaut le prévu saisi. */}
               {s.estTrucksTotal != null
@@ -44,11 +45,15 @@ function ContractCard({ c }: { c: ContractDTO }) {
             </div>
             <QuotaBar brousseM3={s.brousseM3} quotaM3={c.quotaM3} />
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-brand-600">
             <span>Débité : {fmtM3(s.debitedM3)} ({fmtPct(Number(s.outputPct))})</span>
             <span>Stock : {fmtM3(s.stockProductsM3)}</span>
-            <span>CA : {fmtFcfa(s.salesRevenueCfa)}</span>
-            <span>Solde : {fmtFcfa(s.balance)}</span>
+            {SHOW_MONEY && (
+              <>
+                <span>CA : {fmtFcfa(s.salesRevenueCfa)}</span>
+                <span>Solde : {fmtFcfa(s.balance)}</span>
+              </>
+            )}
           </div>
         </div>
       ) : (
@@ -68,7 +73,7 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble par contrat." />
-      <div className="mx-auto max-w-page px-4 py-6">
+      <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
         {contracts.isLoading && <SkeletonList count={2} lines={3} />}
         {contracts.isError && (
           <QueryError error={contracts.error} onRetry={() => contracts.refetch()}>
@@ -86,7 +91,7 @@ export default function DashboardPage() {
             Aucun contrat pour l'instant.
           </EmptyState>
         )}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {contracts.data?.map((c) => (
             <ContractCard key={c.id} c={c} />
           ))}

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import type { ContractDTO, ContractSummaryDTO } from "@ste/shared";
 import { contractsApi, downloadFile } from "../lib/api";
 import { fmtFcfa, fmtM3, fmtPct } from "../lib/format";
+import { FEATURES, SHOW_MONEY } from "../lib/features";
 import { ContractSections } from "../components/ContractSections";
 import { QuotaGauge } from "../components/QuotaGauge";
 import ReceptionSection from "../components/ReceptionSection";
@@ -36,19 +37,19 @@ function FlowStep({
   return (
     <div
       className={`min-w-[8.5rem] flex-1 rounded-lg border p-3 ${
-        muted ? "border-dashed border-slate-200 bg-slate-50" : "border-slate-200 bg-white"
+        muted ? "border-dashed border-brand-200 bg-brand-50" : "border-brand-200 bg-white"
       }`}
     >
-      <div className="flex items-baseline gap-1.5 text-xs text-slate-500">
-        <span className="tabular-nums text-slate-400">{step}</span>
+      <div className="flex items-baseline gap-1.5 text-xs text-brand-500">
+        <span className="tabular-nums text-brand-400">{step}</span>
         {label}
       </div>
       <div
-        className={`mt-1 font-semibold tabular-nums ${muted ? "text-slate-400" : "text-slate-900"}`}
+        className={`mt-1 font-semibold tabular-nums ${muted ? "text-brand-400" : "text-brand-900"}`}
       >
         {value}
       </div>
-      <div className="text-xs text-slate-400">{sub ?? "—"}</div>
+      <div className="text-xs text-brand-400">{sub ?? "—"}</div>
     </div>
   );
 }
@@ -67,10 +68,10 @@ function PipelineBar({
   return (
     <div>
       <div className="flex justify-between text-sm">
-        <span className="text-slate-600">{label}</span>
-        <span className="text-slate-900">{value}</span>
+        <span className="text-brand-600">{label}</span>
+        <span className="text-brand-900">{value}</span>
       </div>
-      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-brand-100">
         <div className={`h-full ${color}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
       </div>
     </div>
@@ -81,16 +82,21 @@ function PipelineBar({
 // termes). Tout empiler sur une page obligeait à traverser huit sections pour
 // corriger un prix. Onglets, avec l'onglet courant dans l'URL (partageable, et
 // conservé au rechargement).
-const TABS = [
+const ALL_TABS = [
   { key: "suivi", label: "Suivi" },
   { key: "parc", label: "Parc" },
   { key: "debitage", label: "Débitage" },
-  { key: "ventes", label: "Ventes" },
-  { key: "compta", label: "Comptabilité" },
+  { key: "ventes", label: "Ventes", enabled: FEATURES.sales },
+  // Empotage : les conteneurs partaient avec l'onglet Ventes, alors que le poste
+  // tourne toujours quand le commercial est en veille.
+  { key: "empotage", label: "Empotage" },
+  { key: "compta", label: "Comptabilité", enabled: FEATURES.accounting },
   { key: "termes", label: "Termes" },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+type TabKey = (typeof ALL_TABS)[number]["key"];
+
+const TABS = ALL_TABS.filter((t) => !("enabled" in t) || t.enabled);
 
 export default function ContractDetailPage() {
   const { id = "" } = useParams();
@@ -124,12 +130,12 @@ export default function ContractDetailPage() {
     },
   });
 
-  if (q.isLoading) return <p className="p-6 text-sm text-slate-500">Chargement…</p>;
+  if (q.isLoading) return <p className="p-6 text-sm text-brand-500">Chargement…</p>;
   if (q.isError || !q.data)
     return (
       <div className="p-6">
         <p className="text-sm text-red-600">Contrat introuvable.</p>
-        <Link to="/contracts" className="text-sm text-slate-500 underline">
+        <Link to="/contracts" className="text-sm text-brand-500 underline">
           ← Retour
         </Link>
       </div>
@@ -139,13 +145,13 @@ export default function ContractDetailPage() {
   const s: ContractSummaryDTO | undefined = summaryQ.data;
 
   return (
-    <div className="mx-auto max-w-page px-4 py-6">
+    <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
       <BackLink to="/contracts">Contrats</BackLink>
 
       <div className="mt-2 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{c.code}</h1>
-          <div className="text-sm text-slate-500">
+          <h1 className="text-title font-semibold text-brand-900">{c.code}</h1>
+          <div className="text-sm text-brand-500">
             {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
             {c.year ? ` · ${c.year}` : ""}
             {c.forest ? ` · ${c.forest}` : ""}
@@ -223,16 +229,16 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      {c.note && <p className="mt-2 text-sm text-slate-600">{c.note}</p>}
+      {c.note && <p className="mt-2 text-sm text-brand-600">{c.note}</p>}
 
       {/* Contrat clôturé : l'API refuse toute opération métier (409). */}
       {c.status === "CLOSED" && (
-        <div className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">
+        <div className="mt-3 rounded-lg bg-brand-100 px-3 py-2 text-sm text-brand-600">
           🔒 Contrat clôturé — lecture seule. Le repasser en « Ouvert » dans{" "}
           <button
             type="button"
             onClick={() => setTab("termes")}
-            className="underline hover:text-slate-900"
+            className="underline hover:text-brand-900"
           >
             Termes
           </button>{" "}
@@ -243,7 +249,7 @@ export default function ContractDetailPage() {
       {/* overflow-x-auto force aussi overflow-y en auto (règle CSS) : le -mb-px des
           onglets déborde d'1px et Chrome affiche une barre de défilement verticale
           fantôme à droite. Barres masquées, le glissement tactile reste possible. */}
-      <div className="-mx-4 mt-4 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none">
+      <div className="-mx-4 mt-4 overflow-x-auto border-b border-brand-200 px-4 scrollbar-none scroll-shadow-x">
         <div className="flex min-w-max gap-1">
           {TABS.map((t) => (
             <button
@@ -251,10 +257,10 @@ export default function ContractDetailPage() {
               type="button"
               onClick={() => setTab(t.key)}
               aria-current={tab === t.key ? "page" : undefined}
-              className={`-mb-px min-h-touch whitespace-nowrap border-b-2 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-900 ${
+              className={`-mb-px min-h-touch whitespace-nowrap border-b-2 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-900 ${
                 tab === t.key
-                  ? "border-slate-900 font-medium text-slate-900"
-                  : "border-transparent text-slate-500 hover:text-slate-900 active:bg-slate-100"
+                  ? "border-brand-900 font-medium text-brand-900"
+                  : "border-transparent text-brand-500 hover:text-brand-900 active:bg-brand-100"
               }`}
             >
               {t.label}
@@ -327,7 +333,7 @@ export default function ContractDetailPage() {
                 label={`Débitage — ${s.trucksSawn} camion${s.trucksSawn > 1 ? "s" : ""} scié${s.trucksSawn > 1 ? "s" : ""} · ${s.trucksOnParcUncut} sur parc`}
                 value={`${fmtM3(s.debitedM3)} (${fmtPct(Number(s.outputPct))} des billons)`}
                 pct={Number(s.outputPct)}
-                color="bg-sky-500"
+                color="bg-accent-500"
               />
               {(Number(s.girthM3) > 0 || Number(s.debitedM3) > 0) && (
                 <div className="flex flex-wrap gap-2 text-xs">
@@ -335,7 +341,7 @@ export default function ContractDetailPage() {
                       nettoyage, sur-déclaration. Anomalie forte = à creuser. */}
                   {Number(s.brousseM3) > 0 && Number(s.diaM3) > 0 && (
                     <Badge
-                      tone={1 - Number(s.diaM3) / Number(s.brousseM3) > 0.25 ? "amber" : "slate"}
+                      tone={1 - Number(s.diaM3) / Number(s.brousseM3) > 0.25 ? "amber" : "brand"}
                       title="Écart entre le cubage brousse déclaré et les billes mesurées à l'étalage"
                     >
                       Perte brousse → parc :{" "}
@@ -343,17 +349,17 @@ export default function ContractDetailPage() {
                     </Badge>
                   )}
                   {Number(s.girthM3) > 0 && (
-                    <Badge tone="emerald">
+                    <Badge tone="parc">
                       Billons ≥85 cm : {fmtM3(s.girthGte85M3)} · &lt;85 : {fmtM3(s.girthLt85M3)}
                     </Badge>
                   )}
                   {Number(s.debitedM3) > 0 && (
                     <>
-                      <Badge tone="sky">
+                      <Badge tone="info">
                         Long 6,5ft+ : {fmtM3(s.longM3)} ({fmtPct(Number(s.longPct), 0)}) · court :{" "}
                         {fmtM3(s.shortM3)}
                       </Badge>
-                      <Badge tone="violet">1" : {fmtPct(Number(s.oneInchPct))}</Badge>
+                      <Badge tone="accent">1" : {fmtPct(Number(s.oneInchPct))}</Badge>
                     </>
                   )}
                 </div>
@@ -361,12 +367,17 @@ export default function ContractDetailPage() {
               <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
                 <Kpi label="Stock produits" value={fmtM3(s.stockProductsM3)} />
                 <Kpi label="Stock parc (billons)" value={fmtM3(s.stockParcM3)} />
-                <Kpi label="Vendu" value={fmtM3(s.soldM3)} />
-                <Kpi label="CA ventes" value={fmtFcfa(s.salesRevenueCfa)} />
-                <Kpi label="Full cost" value={fmtFcfa(s.fullCost)} />
-                <Kpi label="Payé" value={fmtFcfa(s.totalPaid)} />
-                <Kpi label="Solde" value={fmtFcfa(s.balance)} />
-                <Kpi label="Profit estimé" value={fmtFcfa(s.profitEstimate)} />
+                {/* Argent : dépend des ventes et de la compta, en veille tous les deux. */}
+                {SHOW_MONEY && (
+                  <>
+                    <Kpi label="Vendu" value={fmtM3(s.soldM3)} />
+                    <Kpi label="CA ventes" value={fmtFcfa(s.salesRevenueCfa)} />
+                    <Kpi label="Full cost" value={fmtFcfa(s.fullCost)} />
+                    <Kpi label="Payé" value={fmtFcfa(s.totalPaid)} />
+                    <Kpi label="Solde" value={fmtFcfa(s.balance)} />
+                    <Kpi label="Profit estimé" value={fmtFcfa(s.profitEstimate)} />
+                  </>
+                )}
               </div>
             </Card>
           </section>
@@ -405,12 +416,9 @@ export default function ContractDetailPage() {
         </>
       )}
 
-      {tab === "ventes" && (
-        <>
-          {s && <SalesSection contract={c} stock={s.stockBySize} />}
-          <ContainersSection contractId={c.id} />
-        </>
-      )}
+      {tab === "ventes" && s && <SalesSection contract={c} stock={s.stockBySize} />}
+
+      {tab === "empotage" && <ContainersSection contractId={c.id} />}
 
       {tab === "compta" && <AccountsSection contractId={c.id} />}
 

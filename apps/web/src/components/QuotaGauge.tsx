@@ -8,7 +8,7 @@ import { fmtM3, fmtPct } from "../lib/format";
 function pctColor(pct: number): string {
   if (pct >= 100) return "bg-red-500";
   if (pct >= 80) return "bg-amber-500";
-  return "bg-emerald-500";
+  return "bg-parc-500";
 }
 
 /** Barre compacte (cartes liste / dashboard). */
@@ -17,13 +17,13 @@ export function QuotaBar({ brousseM3, quotaM3 }: { brousseM3: string; quotaM3: s
   const pct = quota > 0 ? (Number(brousseM3) / quota) * 100 : 0;
   return (
     <div>
-      <div className="flex justify-between text-xs text-slate-500">
+      <div className="flex justify-between text-sm text-brand-500">
         <span>
           {fmtM3(brousseM3)} / {fmtM3(quotaM3)}
         </span>
-        <span className="font-medium text-slate-700">{fmtPct(pct, 0)}</span>
+        <span className="font-medium text-brand-700">{fmtPct(pct, 0)}</span>
       </div>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand-100">
         <div className={`h-full ${pctColor(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
     </div>
@@ -58,34 +58,34 @@ export function QuotaGauge({
   const remaining = Math.max(quota - Number(brousseM3), 0);
   const avg = Number(avgBrousseM3PerTruck ?? 0);
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-brand-200 bg-white p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <div className="text-xs font-semibold uppercase tracking-wide text-brand-400">
             Utilisation du quota
           </div>
-          <div className="mt-1 text-2xl font-semibold text-slate-900">
+          <div className="mt-1 text-2xl font-semibold text-brand-900">
             {fmtM3(brousseM3)}{" "}
-            <span className="text-base font-normal text-slate-400">/ {fmtM3(quotaM3)}</span>
+            <span className="text-base font-normal text-brand-400">/ {fmtM3(quotaM3)}</span>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-semibold text-slate-900">{fmtPct(pct, 1)}</div>
-          <div className="text-xs text-slate-500">reste {fmtM3(remaining)}</div>
+          <div className="text-2xl font-semibold text-brand-900">{fmtPct(pct, 1)}</div>
+          <div className="text-xs text-brand-500">reste {fmtM3(remaining)}</div>
         </div>
       </div>
-      <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-brand-100">
         <div className={`h-full ${pctColor(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
-      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-brand-500">
         <span>
-          Cubage brousse (quota) : <strong className="text-slate-900">{fmtM3(brousseM3)}</strong>
+          Cubage brousse (quota) : <strong className="text-brand-900">{fmtM3(brousseM3)}</strong>
         </span>
         <span>
-          Cubage billons (rendement) : <strong className="text-slate-900">{fmtM3(girthM3)}</strong>
+          Cubage billons (rendement) : <strong className="text-brand-900">{fmtM3(girthM3)}</strong>
         </span>
         <span>
-          Camions : <strong className="text-slate-900">{trucksEntered}</strong>
+          Camions : <strong className="text-brand-900">{trucksEntered}</strong>
           {trucksPlanned > 0 ? ` / ${trucksPlanned} prévus` : ""} entrés · {trucksSawn} sciés
         </span>
       </div>
@@ -93,21 +93,21 @@ export function QuotaGauge({
       {/* Projection terrain : au rythme des camions déjà mesurés, combien il en
           faut encore pour finir le quota. S'affine à chaque arrivée. */}
       {estTrucksRemaining != null && avg > 0 && remaining > 0 && (
-        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          ≈ <strong className="text-slate-900">{estTrucksRemaining}</strong> camion
+        <div className="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-600">
+          ≈ <strong className="text-brand-900">{estTrucksRemaining}</strong> camion
           {estTrucksRemaining > 1 ? "s" : ""} encore nécessaire
           {estTrucksRemaining > 1 ? "s" : ""} pour finir
           {estTrucksTotal != null && (
             <>
               {" "}
-              (<strong className="text-slate-900">≈ {estTrucksTotal}</strong> au total)
+              (<strong className="text-brand-900">≈ {estTrucksTotal}</strong> au total)
             </>
           )}{" "}
           — moyenne {fmtM3(avg)}/camion sur {trucksEntered} arrivé{trucksEntered > 1 ? "s" : ""}
         </div>
       )}
       {estTrucksRemaining != null && remaining === 0 && (
-        <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+        <div className="mt-2 rounded-lg bg-parc-50 px-3 py-2 text-sm text-parc-700">
           Quota atteint — plus aucun camion nécessaire.
         </div>
       )}

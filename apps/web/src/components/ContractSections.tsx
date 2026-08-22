@@ -206,29 +206,29 @@ function SectionCard({
     <Card>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-slate-900">{section.title}</h3>
-          <Badge tone={filled === total ? "emerald" : filled === 0 ? "slate" : "amber"}>
+          <h3 className="text-sm font-semibold text-brand-900">{section.title}</h3>
+          <Badge tone={filled === total ? "parc" : filled === 0 ? "brand" : "amber"}>
             {filled}/{total}
           </Badge>
         </div>
-        {/* min-h-9 : « Modifier » se tape au pouce sur la fiche. */}
+        {/* min-h-touch : « Modifier » se tape au pouce sur la fiche. */}
         <button
           onClick={() => (editing ? closeEdit() : openEdit())}
-          className="-my-1 min-h-9 rounded-lg px-2 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
+          className="-my-1 min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
         >
           {editing ? "Annuler" : "Modifier"}
         </button>
       </div>
       {section.hint && !editing && (
-        <p className="mt-1 text-xs text-slate-400">{section.hint}</p>
+        <p className="mt-1 text-xs text-brand-400">{section.hint}</p>
       )}
 
       {!editing ? (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
           {section.fields.map((f) => (
             <div key={f.key}>
-              <dt className="text-xs text-slate-500">{f.label}</dt>
-              <dd className="text-sm text-slate-900">{display(contract, f, partyName)}</dd>
+              <dt className="text-xs text-brand-500">{f.label}</dt>
+              <dd className="text-sm text-brand-900">{display(contract, f, partyName)}</dd>
             </div>
           ))}
         </dl>
@@ -347,10 +347,10 @@ export function ContractQuickCreate({
         setError(null);
         create.mutate();
       }}
-      className="rounded-xl border border-slate-200 bg-white p-4"
+      className="rounded-xl border border-brand-200 bg-white p-4"
     >
-      <h3 className="text-sm font-semibold text-slate-900">Nouveau contrat</h3>
-      <p className="mt-1 text-xs text-slate-400">
+      <h3 className="text-sm font-semibold text-brand-900">Nouveau contrat</h3>
+      <p className="mt-1 text-xs text-brand-400">
         Seuls le numéro et le quota sont connus au départ — le reste se complète sur la
         fiche, au fil du contrat.
       </p>

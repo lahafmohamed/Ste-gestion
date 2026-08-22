@@ -137,14 +137,14 @@ export default function ReceptionSection({
 
       {/* ── Réception : uniquement l'en-tête recopié du bordereau ── */}
       {showForm && (
-        <form onSubmit={submit} className="mb-3 rounded-xl border border-slate-200 bg-white p-4">
-          <div className="mb-3 text-sm font-medium text-slate-900">
+        <form onSubmit={submit} className="mb-3 rounded-xl border border-brand-200 bg-white p-4">
+          <div className="mb-3 text-sm font-medium text-brand-900">
             Étape 1 · Réception du camion
           </div>
 
           {/* Bordereau précédent enregistré : de quoi vérifier et enchaîner. */}
           {justReceived && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-parc-50 px-3 py-2 text-sm text-parc-800">
               <span>
                 {justReceived.registration} réceptionné ✓
                 {justReceived.deliveryNote ? ` · B/L ${justReceived.deliveryNote}` : ""}
@@ -157,7 +157,7 @@ export default function ReceptionSection({
                     setJustReceived(null);
                     onEtaler(justReceived.id);
                   }}
-                  className="-my-1.5 min-h-9 rounded-lg px-2 font-medium underline hover:text-emerald-900 active:bg-emerald-100"
+                  className="-my-1.5 min-h-touch rounded-lg px-2 font-medium underline hover:text-parc-900 active:bg-parc-100"
                 >
                   Étaler ses billes
                 </button>
@@ -205,14 +205,14 @@ export default function ReceptionSection({
 
           {/* B/L déjà vu sur ce contrat → probable faute de frappe (non bloquant). */}
           {blDup && (
-            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
               ⚠ B/L {blDup.deliveryNote} déjà saisi sur ce contrat (camion {blDup.registration},
               arrivé le {new Date(blDup.arrivedAt).toLocaleDateString("fr-FR")}). Vérifier le
               bordereau avant de continuer.
             </p>
           )}
 
-          <div className="mt-3 border-t border-slate-100 pt-3">
+          <div className="mt-3 border-t border-brand-100 pt-3">
             {error && (
               <div className="mb-2">
                 <FormError>{error}</FormError>
@@ -255,7 +255,7 @@ export default function ReceptionSection({
         <button
           type="button"
           onClick={() => onEtaler(null)}
-          className="mb-3 flex w-full items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 text-left text-sm text-emerald-800 hover:bg-emerald-50"
+          className="mb-3 flex w-full items-center justify-between gap-2 rounded-xl border border-parc-200 bg-parc-50/60 px-3 py-2.5 text-left text-sm text-parc-800 hover:bg-parc-50"
         >
           <span>
             <span className="font-medium tabular-nums">{aEtaler}</span> camion

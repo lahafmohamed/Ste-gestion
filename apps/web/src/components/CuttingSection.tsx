@@ -31,14 +31,14 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
       {q.data && total <= 0 && <EmptyState>Aucun débit enregistré.</EmptyState>}
 
       {q.data && total > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-brand-200 bg-white p-4">
           <CuttingCharts data={q.data} />
 
           {/* Table par taille */}
           <TableWrap>
-            <table className="w-full min-w-[400px] text-sm">
+            <table className="w-full min-w-[440px] text-base">
               <thead>
-                <tr className="text-left text-xs text-slate-500">
+                <tr className="text-left text-xs text-brand-500">
                   <th className="py-1 pr-4 font-normal">Taille</th>
                   <th className="py-1 pr-4 font-normal">Groupe</th>
                   <th className="py-1 pr-4 text-right font-normal">m³</th>
@@ -47,7 +47,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
               </thead>
               <tbody>
                 {q.data.sizes.map((s) => (
-                  <tr key={s.code} className="border-t border-slate-100">
+                  <tr key={s.code} className="border-t border-brand-100">
                     <td className="py-1 pr-4 font-medium">{s.code}</td>
                     <td className="py-1 pr-4">
                       <Badge tone={SIZE_GROUP_TONE[s.group]}>{SIZE_GROUP_LABELS[s.group]}</Badge>
@@ -58,7 +58,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-slate-200 font-semibold">
+                <tr className="border-t border-brand-200 font-semibold">
                   <td className="py-1.5 pr-4" colSpan={2}>
                     TOTAL
                   </td>

@@ -120,7 +120,7 @@ function SaleForm({
   }
 
   return (
-    <form onSubmit={submit} className="mb-3 rounded-xl border border-slate-200 bg-white p-4">
+    <form onSubmit={submit} className="mb-3 rounded-xl border border-brand-200 bg-white p-4">
       <div className="mb-3 grid grid-cols-2 gap-3 sm:w-96">
         <Field label="Date">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -141,7 +141,7 @@ function SaleForm({
         const dispo = stockOf(r.sizeCode);
         const over = dispo !== null && Number(r.volumeM3) > dispo;
         return (
-          <div key={i} className="mb-2 rounded-lg border border-slate-100 p-2">
+          <div key={i} className="mb-2 rounded-lg border border-brand-100 p-2">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Field label="Taille">
                 <Input
@@ -157,7 +157,7 @@ function SaleForm({
                   <>
                     m³{" "}
                     {dispo !== null && (
-                      <span className="text-slate-400">(dispo {fmtNum(dispo)})</span>
+                      <span className="text-brand-400">(dispo {fmtNum(dispo)})</span>
                     )}
                   </>
                 }
@@ -169,7 +169,7 @@ function SaleForm({
                   className={`w-full min-w-0 min-h-touch rounded-lg border bg-white px-2.5 py-2 text-base outline-none ${
                     over
                       ? "border-red-400 focus:border-red-500"
-                      : "border-slate-200 focus:border-slate-900"
+                      : "border-brand-200 focus:border-brand-900"
                   }`}
                 />
               </Field>
@@ -180,9 +180,9 @@ function SaleForm({
                 </Select>
               </Field>
               <div className="flex items-end text-sm">
-                <span className="text-slate-500">
+                <span className="text-brand-500">
                   ={" "}
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-brand-900">
                     {amounts[i] !== null ? fmtFcfa(amounts[i]!) : "—"}
                   </span>
                 </span>
@@ -219,7 +219,7 @@ function SaleForm({
               <button
                 type="button"
                 onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-                className="ml-auto min-h-9 rounded-lg px-2 text-xs text-slate-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
               >
                 Retirer
               </button>
@@ -239,8 +239,8 @@ function SaleForm({
           + Ligne
         </Button>
         <div className="text-sm">
-          <span className="text-slate-500">Total : </span>
-          <span className="font-semibold text-slate-900">{fmtFcfa(total)}</span>
+          <span className="text-brand-500">Total : </span>
+          <span className="font-semibold text-brand-900">{fmtFcfa(total)}</span>
         </div>
       </div>
 
@@ -250,14 +250,19 @@ function SaleForm({
           {oversold
             .map((x) => `${x.code} (demandé ${fmtNum(x.req.toFixed(2))}, dispo ${fmtNum(x.dispo!.toFixed(2))})`)
             .join(", ")}
-          <label className="mt-1 flex items-center gap-2 text-amber-800">
-            <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
+          <label className="mt-1 flex min-h-touch items-center gap-2 text-sm text-amber-800">
+            <input
+              type="checkbox"
+              checked={override}
+              onChange={(e) => setOverride(e.target.checked)}
+              className="h-5 w-5"
+            />
             Vendre quand même
           </label>
         </div>
       )}
 
-      <div className="mt-3 border-t border-slate-100 pt-3">
+      <div className="mt-3 border-t border-brand-100 pt-3">
         {error && (
           <div className="mb-2">
             <FormError>{error}</FormError>
@@ -320,7 +325,7 @@ export default function SalesSection({
       {showForm && <SaleForm contract={contract} stock={stock} onDone={() => setShowForm(false)} />}
 
       <div className="space-y-2">
-        {sales.isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
+        {sales.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
         {sales.isError && (
           <QueryError error={sales.error} onRetry={() => sales.refetch()}>
             Impossible de charger les ventes
@@ -328,27 +333,27 @@ export default function SalesSection({
         )}
         {sales.data?.length === 0 && !showForm && <EmptyState>Aucune vente.</EmptyState>}
         {sales.data?.map((s) => (
-          <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-3">
+          <div key={s.id} className="rounded-xl border border-brand-200 bg-white p-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-slate-900">
+              <div className="text-sm font-medium text-brand-900">
                 {new Date(s.saleDate).toLocaleDateString("fr-FR")}
                 {clientName(s.clientId) ? ` · ${clientName(s.clientId)}` : ""}
                 {s.deliveryNote ? ` · B/L ${s.deliveryNote}` : ""}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-slate-900">
+                <span className="text-sm font-semibold text-brand-900">
                   {fmtFcfa(saleTotalCfa(s))}
                 </span>
                 <button
                   onClick={() => setDelSale(s)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg text-slate-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                  className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
                   aria-label="Supprimer la vente"
                 >
                   ×
                 </button>
               </div>
             </div>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-1 text-sm text-brand-500">
               {fmtNum(saleTotalM3(s).toFixed(3))} m³ ·{" "}
               {s.lines.map((l) => `${l.sizeCode} ${Number(l.volumeM3).toFixed(2)}`).join(" · ")}
             </div>
