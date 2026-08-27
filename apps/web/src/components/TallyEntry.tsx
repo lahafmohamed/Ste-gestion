@@ -11,22 +11,21 @@ import {
   type MeasurementContext,
 } from "@ste/shared";
 import { fmtNum, normalizeDecimal } from "../lib/format";
+import {
+  clearTallyDraft,
+  emptyRow,
+  loadDraft,
+  rowEmpty,
+  saveDraft,
+  type RowState,
+} from "../lib/tallyDraft";
+import BillPicker from "./BillPicker";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
-import Chip from "./ui/Chip";
 import { FormError } from "./ui/Feedback";
 import { inputQuietCls } from "./ui/Input";
 
-// `id` : clé React stable. Avec l'index, supprimer la ligne 3 décalait toutes
-// les suivantes — React réutilisait les <input> et le focus atterrissait sur la
-// mauvaise ligne au milieu d'un relevé.
-type RowState = { id: string; externalId: string; a: string; b: string };
-
-let rowSeq = 0;
-const nextRowId = () => `r${++rowSeq}`;
-
-/** Nb de pastilles de billes affichées avant de replier le sélecteur. */
-const BILL_CHIPS = 12;
+export { clearTallyDraft } from "../lib/tallyDraft";
 
 const KIND = {
   girth: {
@@ -47,56 +46,6 @@ const KIND = {
 
 function kindOf(ctx: MeasurementContext): keyof typeof KIND {
   return ctx === "YARD_DIAMETER" ? "dia" : "girth";
-}
-
-const emptyRow = (externalId = ""): RowState => ({ id: nextRowId(), externalId, a: "", b: "" });
-
-// ── Brouillon localStorage ────────────────────────────────────────────
-// La saisie au parc dure de longues minutes sur tablette : un écran verrouillé
-// ou un onglet tué ne doit pas coûter 275 lignes. Sauvé à chaque frappe,
-// restauré à l'ouverture, purgé par le parent après enregistrement réussi.
-
-function rowEmpty(r: RowState) {
-  return !r.externalId.trim() && !r.a.trim() && !r.b.trim();
-}
-
-function loadDraft(key: string | undefined): RowState[] | null {
-  if (!key) return null;
-  try {
-    const raw = localStorage.getItem(`tally-draft:${key}`);
-    if (!raw) return null;
-    const raw2 = JSON.parse(raw) as Partial<RowState>[];
-    if (!Array.isArray(raw2) || raw2.length === 0) return null;
-    // Id réattribué à la lecture : les brouillons d'avant n'en ont pas, et un id
-    // de session précédente pourrait entrer en collision avec le compteur courant.
-    const rows: RowState[] = raw2.map((r) => ({
-      id: nextRowId(),
-      externalId: r.externalId ?? "",
-      a: r.a ?? "",
-      b: r.b ?? "",
-    }));
-    return rows.some((r) => !rowEmpty(r)) ? rows : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveDraft(key: string, rows: RowState[]) {
-  try {
-    if (rows.every(rowEmpty)) localStorage.removeItem(`tally-draft:${key}`);
-    else localStorage.setItem(`tally-draft:${key}`, JSON.stringify(rows));
-  } catch {
-    // stockage plein/indisponible : la saisie en cours reste en mémoire
-  }
-}
-
-/** À appeler après enregistrement réussi (le brouillon devient obsolète). */
-export function clearTallyDraft(key: string) {
-  try {
-    localStorage.removeItem(`tally-draft:${key}`);
-  } catch {
-    // rien à purger si le stockage est indisponible
-  }
 }
 
 function rowVolume(kind: keyof typeof KIND, r: RowState): number | null {
@@ -155,7 +104,6 @@ export default function TallyEntry({
   );
   const restored = useRef(loadDraft(draftKey) !== null);
   const [undo, setUndo] = useState<{ row: RowState; index: number } | null>(null);
-  const [allBills, setAllBills] = useState(false);
 
   // Brouillon : débouncé. À 275 lignes, un JSON.stringify + écriture
   // localStorage synchrone à chaque frappe se sent au doigt sur tablette.
@@ -235,22 +183,6 @@ export default function TallyEntry({
     });
   }
   const billValidCount = isGirth ? billsTouched.size + unnamedValid : validCount;
-
-  // Nb de billons déjà saisis par bille → badge du sélecteur.
-  const billonsPerBill = new Map<string, number>();
-  if (isGirth && bills?.length) {
-    for (const id of knownIds) {
-      const p = billParent(id);
-      if (p) billonsPerBill.set(p, (billonsPerBill.get(p) ?? 0) + 1);
-    }
-  }
-  // Billes pas encore tronçonnées, dans l'ordre du parc. Repliées par défaut :
-  // un camion de 60 billes remplissait l'écran de pastilles.
-  const untouchedBills = (bills ?? []).filter(
-    (b) => (billonsPerBill.get(billParent(b) ?? b) ?? 0) === 0
-  );
-  const nextBill = untouchedBills[0] ?? null;
-  const visibleBills = allBills ? (bills ?? []) : untouchedBills.slice(0, BILL_CHIPS);
 
   // Bille en cours (dernière ligne avec un n°) : une bille tronçonnée donne
   // souvent 2-3 billons — le suivant de la même bille doit être à un tap, sans
@@ -388,75 +320,14 @@ export default function TallyEntry({
         </div>
       )}
 
-      {/* Sélecteur de bille mère — après nettoyage/tronçonnage, taper la bille
-          crée directement le billon suivant avec son n° (266A, 266B, 266C…). */}
       {isGirth && bills && bills.length > 0 && (
-        <div className="mb-3 rounded-lg bg-brand-50 p-2">
-          <div className="mb-1.5 flex items-center justify-between gap-2 text-xs text-brand-500">
-            <span>
-              Bille tronçonnée → nouveau billon ({billsTouched.size}/{bills.length} billes
-              entamées)
-            </span>
-            {bills.length > BILL_CHIPS && (
-              <button
-                type="button"
-                onClick={() => setAllBills((s) => !s)}
-                className="-my-2 min-h-touch shrink-0 rounded-lg px-2 underline hover:text-brand-900 active:bg-brand-200"
-              >
-                {allBills ? "Réduire" : `Toutes (${bills.length})`}
-              </button>
-            )}
-          </div>
-
-          {/* Le parc se dépile dans l'ordre : la bille suivante à tronçonner
-              mérite un bouton pleine largeur, pas d'être cherchée dans 60
-              pastilles. Une bille donne souvent plusieurs billons → « Même
-              bille » enchaîne 266A → 266B sans rouvrir le sélecteur. */}
-          {(nextBill || currentBill) && (
-            <div className={`mb-2 grid gap-2 ${nextBill && currentBill ? "grid-cols-2" : ""}`}>
-              {currentBill && (
-                <Button
-                  size="lg"
-                  className="w-full tabular-nums"
-                  onClick={() => addBillon(currentBill)}
-                >
-                  Même bille · {nextBillonId(currentBill, knownIds)}
-                </Button>
-              )}
-              {nextBill && (
-                <Button
-                  variant="parc"
-                  size="lg"
-                  className="w-full tabular-nums"
-                  onClick={() => addBillon(nextBill)}
-                >
-                  Bille suivante · {nextBill}
-                </Button>
-              )}
-            </div>
-          )}
-          {!nextBill && !allBills && (
-            <p className="mb-2 text-xs text-brand-500">Toutes les billes sont entamées.</p>
-          )}
-
-          <div className="flex flex-wrap gap-1.5">
-            {visibleBills.map((b) => {
-              const n = billonsPerBill.get(billParent(b) ?? b) ?? 0;
-              return (
-                <Chip
-                  key={b}
-                  size="lg"
-                  selected={n > 0}
-                  className="tabular-nums"
-                  onClick={() => addBillon(b)}
-                >
-                  {b}
-                  {n > 0 && <span className="ml-1 text-xs opacity-70">×{n}</span>}
-                </Chip>
-              );
-            })}
-          </div>
-        </div>
+        <BillPicker
+          bills={bills}
+          knownIds={knownIds}
+          currentBill={currentBill}
+          billsTouchedCount={billsTouched.size}
+          onAddBillon={addBillon}
+        />
       )}
 
       <div className="overflow-x-auto sm:overflow-visible">
