@@ -76,6 +76,24 @@ export default {
         header: "20",
         overlay: "40",
       },
+      keyframes: {
+        // Entrée de carte (login…) : fondu + légère montée.
+        "rise-in": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        // Secousse horizontale d'erreur de formulaire.
+        shake: {
+          "0%, 100%": { transform: "translateX(0)" },
+          "25%": { transform: "translateX(-4px)" },
+          "75%": { transform: "translateX(4px)" },
+        },
+      },
+      animation: {
+        // Toujours utiliser via motion-safe: (prefers-reduced-motion).
+        "rise-in": "rise-in 0.3s ease-out both",
+        shake: "shake 0.25s ease-in-out",
+      },
     },
   },
   plugins: [],

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import UsersPage from "./pages/UsersPage";
-import { isSessionValid } from "./lib/auth";
+import { authApi } from "./lib/api";
+import { isSessionValid, setSession } from "./lib/auth";
 import { FEATURES } from "./lib/features";
 import DashboardPage from "./pages/DashboardPage";
 import ContractsPage from "./pages/ContractsPage";
@@ -24,6 +25,24 @@ const queryClient = new QueryClient();
 
 export default function App() {
   const [authed, setAuthed] = useState(() => isSessionValid());
+
+  // Dev uniquement : connexion automatique avec l'admin du seed pour éviter le
+  // formulaire à chaque rechargement. La branche est éliminée du build de prod
+  // (import.meta.env.DEV → false), les identifiants ne partent jamais en ligne.
+  useEffect(() => {
+    if (!import.meta.env.DEV || authed) return;
+    const email = import.meta.env.VITE_DEV_LOGIN_EMAIL ?? "admin@local";
+    const password = import.meta.env.VITE_DEV_LOGIN_PASSWORD ?? "admin123";
+    authApi
+      .login({ email, password })
+      .then((res) => {
+        setSession(res.token, res.user);
+        setAuthed(true);
+      })
+      .catch(() => {
+        // Identifiants dev invalides : le formulaire de connexion reste affiché.
+      });
+  }, [authed]);
 
   if (!authed) {
     return <LoginPage onLogin={() => setAuthed(true)} />;
