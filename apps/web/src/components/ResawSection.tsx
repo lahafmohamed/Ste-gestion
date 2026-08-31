@@ -13,6 +13,7 @@ import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
 import Card, { SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
+import DateField from "./ui/DateField";
 import { FormError } from "./ui/Feedback";
 import Input, { Field, inputQuietCls } from "./ui/Input";
 
@@ -257,12 +258,7 @@ export default function ResawSection({
         <Card className="mb-4">
           <div className="mb-3 grid grid-cols-2 gap-3">
             <Field label="Date">
-              <Input
-                type="date"
-                value={date}
-                max={todayISO()}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <DateField value={date} max={todayISO()} onChange={setDate} />
             </Field>
             <Field label="Note">
               <Input

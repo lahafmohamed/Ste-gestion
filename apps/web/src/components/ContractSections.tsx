@@ -6,8 +6,10 @@ import { fmtInt, fmtNum, normalizeDecimal } from "../lib/format";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Card from "./ui/Card";
+import DateField from "./ui/DateField";
 import { FormError } from "./ui/Feedback";
-import Input, { Field, Select } from "./ui/Input";
+import Input, { Field } from "./ui/Input";
+import SelectField from "./ui/SelectField";
 
 // ── Saisie progressive : la fiche contrat est découpée en cartes
 // indépendantes ; chaque carte s'édite et s'enregistre séparément (PATCH
@@ -49,6 +51,9 @@ const SECTIONS: Section[] = [
       { key: "exploitationStartAt", label: "Mise en exploitation", kind: "date", nullable: true },
       { key: "forest", label: "Forêt classée", kind: "text", ph: "SANGOUÉ", nullable: true },
       { key: "managementCenter", label: "Centre de gestion", kind: "text", ph: "GAGNOA", nullable: true },
+      // Recopiées sur chaque camion réceptionné (plus saisies au portail).
+      { key: "parcel", label: "Parcelle", kind: "text", ph: "146-99/04", nullable: true },
+      { key: "origin", label: "Origine du bois", kind: "text", ph: "SANGOUE", nullable: true },
     ],
   },
   {
@@ -238,28 +243,30 @@ function SectionCard({
             {section.fields.map((f) => (
               <Field key={f.key} label={f.label}>
                 {f.kind === "status" ? (
-                  <Select
+                  <SelectField
                     value={v[f.key]}
-                    onChange={(e) => setV((p) => ({ ...p, [f.key]: e.target.value }))}
-                  >
-                    <option value="OPEN">Ouvert</option>
-                    <option value="CLOSED">Clôturé</option>
-                  </Select>
+                    onChange={(val) => setV((p) => ({ ...p, [f.key]: val }))}
+                    aria-label={f.label}
+                    options={[
+                      { value: "OPEN", label: "Ouvert" },
+                      { value: "CLOSED", label: "Clôturé" },
+                    ]}
+                  />
                 ) : f.kind === "party" ? (
-                  <Select
+                  <SelectField
                     value={v[f.key]}
-                    onChange={(e) => setV((p) => ({ ...p, [f.key]: e.target.value }))}
-                  >
-                    <option value="">— aucun —</option>
-                    {parties.data?.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={(val) => setV((p) => ({ ...p, [f.key]: val }))}
+                    placeholder="— aucun —"
+                    aria-label={f.label}
+                    options={(parties.data ?? []).map((p) => ({ value: p.id, label: p.name }))}
+                  />
+                ) : f.kind === "date" ? (
+                  <DateField
+                    value={v[f.key]}
+                    onChange={(iso) => setV((p) => ({ ...p, [f.key]: iso }))}
+                  />
                 ) : (
                   <Input
-                    type={f.kind === "date" ? "date" : "text"}
                     inputMode={f.kind === "int" || f.kind === "decimal" ? "decimal" : undefined}
                     value={v[f.key]}
                     onChange={(e) =>

@@ -14,28 +14,34 @@ import { fmtNum, fmtPct, normalizeDecimal, todayISO } from "../lib/format";
 import SawnTruckPicker, { truckBillons, truckGirthM3 } from "./SawnTruckPicker";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
+import DateField from "./ui/DateField";
 import Input, { Field, inputQuietCls } from "./ui/Input";
+import { useOnline } from "../lib/online";
 
-// Une ligne = une pièce sciée mesurée au parc. Pas de quantité : le scieur
-// mesure planche par planche, le comptage se fait en relisant les lignes.
-type RowState = { lengthFt: string; widthIn: string; thicknessIn: string };
+// Une ligne = une dimension, avec sa quantité. Le scieur qui mesure planche
+// par planche laisse Nbr à 1 et enchaîne comme avant ; celui qui sort douze
+// pièces identiques les saisit une fois. D'où le défaut à « 1 » : la quantité
+// ne coûte aucune frappe tant qu'on n'en a pas besoin.
+type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
 
-const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "" });
+const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "1" });
 
 // Mini-libellés des cartes téléphone (< sm) — l'en-tête de colonnes disparaît.
 const COL_LABELS = {
   lengthFt: "L (ft)",
   widthIn: "l (in)",
   thicknessIn: "ép (in)",
+  count: "Nbr",
 } as const;
 
 function rowInfo(r: RowState) {
   const L = Number(r.lengthFt);
   const w = Number(r.widthIn);
   const t = Number(r.thicknessIn);
-  if (!r.lengthFt || !r.widthIn || !r.thicknessIn) return null;
-  if (!(L > 0) || !(w > 0) || !(t > 0)) return null;
-  return { volume: sawnVolumeM3(L, w, t, 1), size: classifySize(w, t) };
+  const n = Number(r.count);
+  if (!r.lengthFt || !r.widthIn || !r.thicknessIn || !r.count) return null;
+  if (!(L > 0) || !(w > 0) || !(t > 0) || !Number.isInteger(n) || n < 1) return null;
+  return { volume: sawnVolumeM3(L, w, t, n), size: classifySize(w, t), count: n };
 }
 
 type Props = {
@@ -46,6 +52,7 @@ type Props = {
 };
 
 export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
+  const online = useOnline();
   const [rows, setRows] = useState<RowState[]>([emptyRow()]);
   const [date, setDate] = useState("");
   const [note, setNote] = useState("");
@@ -55,7 +62,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
   const infos = rows.map(rowInfo);
   const valid = infos.filter((x) => x !== null);
   const total = valid.reduce((s, x) => s + x!.volume, 0);
-  const pieces = valid.length;
+  const pieces = valid.reduce((n, x) => n + x!.count, 0);
   const groups: Record<SizeGroup, number> = { MAIN: 0, SIDE: 0, ONE_INCH: 0, OTHER: 0 };
   for (const x of valid) groups[x!.size.group] += x!.volume;
 
@@ -65,10 +72,15 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
   for (const x of valid) {
     const e = bySizeMap.get(x!.size.code);
     if (e) {
-      e.pieces += 1;
+      e.pieces += x!.count;
       e.m3 += x!.volume;
     } else {
-      bySizeMap.set(x!.size.code, { code: x!.size.code, group: x!.size.group, pieces: 1, m3: x!.volume });
+      bySizeMap.set(x!.size.code, {
+        code: x!.size.code,
+        group: x!.size.group,
+        pieces: x!.count,
+        m3: x!.volume,
+      });
     }
   }
   const bySize = [...bySizeMap.values()].sort((a, b) => b.m3 - a.m3);
@@ -107,7 +119,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
         lengthFt: r.lengthFt.trim(),
         widthIn: r.widthIn.trim(),
         thicknessIn: r.thicknessIn.trim(),
-        count: 1, // 1 ligne = 1 pièce
+        count: Number(r.count),
       }));
     if (lines.length === 0) return;
     onSave({
@@ -124,13 +136,8 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
     <div>
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Field label="Date">
-          <Input
-            type="date"
-            value={date}
-            // Une session de sciage n'a pas lieu dans le futur — évite le 2026 → 2062.
-            max={todayISO()}
-            onChange={(e) => setDate(e.target.value)}
-          />
+          {/* Une session de sciage n'a pas lieu dans le futur — évite le 2026 → 2062. */}
+          <DateField value={date} max={todayISO()} onChange={setDate} />
         </Field>
         <Field label="Note">
           <Input
@@ -153,31 +160,36 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
       )}
 
       <div className="overflow-x-auto sm:overflow-visible">
-      <div className="sm:min-w-[540px]">
+      <div className="sm:min-w-[620px]">
       {/* En-tête inutile sous sm (mini-libellés) ; collant dès sm pour les
           longues sessions. */}
-      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:sticky sm:top-header sm:z-10 sm:grid sm:grid-cols-[2rem_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:rounded-lg sm:bg-white sm:py-1">
+      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:sticky sm:top-header sm:z-10 sm:grid sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:rounded-lg sm:bg-white sm:py-1">
         <span>#</span>
         <span>L (ft)</span>
         <span>l (in)</span>
         <span>ép (in)</span>
+        <span>Nbr</span>
         <span>Taille</span>
         <span className="text-right">m³</span>
         <span />
       </div>
 
-      {/* Téléphone (< sm) : carte 2 rangées — # + L/l/ép, puis Taille/m³/×.
-          Même ordre DOM, l'Entrée-chaînage sur ép ne change pas. */}
+      {/* Téléphone (< sm) : carte 2 rangées — # + L/l/ép, puis Nbr/Taille/m³/×.
+          Même ordre DOM ; l'Entrée-chaînage passe de ép à Nbr, dernier champ
+          de la ligne. */}
       {rows.map((r, i) => {
         const info = infos[i];
         return (
           <div
             key={i}
-            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
+            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
           >
             <span className="text-xs text-brand-400">{i + 1}</span>
-            {(["lengthFt", "widthIn", "thicknessIn"] as const).map((k) => (
-              <div key={k} className="min-w-0">
+            {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
+              <div
+                key={k}
+                className={`min-w-0${k === "count" ? " col-start-2 sm:col-auto" : ""}`}
+              >
                 <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
                   {COL_LABELS[k]}
                 </span>
@@ -188,7 +200,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
                   // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
                   onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
                   onKeyDown={
-                    k === "thicknessIn"
+                    k === "count"
                       ? (e) => {
                           if (e.key === "Enter" && i === rows.length - 1) {
                             e.preventDefault();
@@ -201,14 +213,14 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
                 />
               </div>
             ))}
-            <div className="col-start-2 justify-self-center sm:col-auto">
+            <div className="justify-self-center">
               {info ? (
                 <Badge tone={SIZE_GROUP_TONE[info.size.group]}>{info.size.code}</Badge>
               ) : (
                 <span className="text-center text-xs text-brand-300">—</span>
               )}
             </div>
-            <span className="col-span-2 text-right text-base tabular-nums text-brand-700 sm:col-auto">
+            <span className="text-right text-base tabular-nums text-brand-700">
               <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
               {info ? info.volume.toFixed(3) : "—"}
             </span>
@@ -314,8 +326,19 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
           onClick={save}
           disabled={saving || valid.length === 0}
         >
-          {saving ? "Enregistrement…" : `Valider la session (${valid.length} lignes)`}
+          {saving
+            ? online
+              ? "Enregistrement…"
+              : "En attente du réseau…"
+            : `Valider la session (${valid.length} ligne${valid.length > 1 ? "s" : ""})`}
         </Button>
+        {/* Hors ligne : l'envoi est en file, il repart seul. Sans ce mot, le
+            pointeur retape Valider et crée une session en double. */}
+        {saving && !online && (
+          <p className="mt-2 text-center text-sm text-amber-800">
+            Réseau coupé — l'envoi partira au retour. Garder cette page ouverte.
+          </p>
+        )}
       </div>
     </div>
   );

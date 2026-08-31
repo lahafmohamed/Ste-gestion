@@ -65,6 +65,13 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         onSubmit={submit}
         className="w-full max-w-sm rounded-2xl border border-brand-200 bg-white p-6 shadow-sm motion-safe:animate-rise-in"
       >
+        {/* Logo complet ici seulement : assez de place pour que la tagline soit lisible. */}
+        <img
+          src="/logo-ste.png"
+          alt=""
+          aria-hidden="true"
+          className="mx-auto mb-5 w-full max-w-[280px]"
+        />
         <h1 className="text-xl font-semibold text-brand-900">{APP_NAME}</h1>
         <p className="mt-1 text-sm text-brand-500">Connexion à la gestion scierie.</p>
 

@@ -12,6 +12,7 @@ import {
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
 import { ensureContractOpen, ensureTruckContractOpen } from "../contract-lock.js";
+import { resolveVehicle } from "../vehicles.js";
 
 const truckInclude = {
   measurements: {
@@ -58,8 +59,39 @@ export async function truckRoutes(app: FastifyInstance) {
     }
     if (!(await ensureContractOpen(reply, parsed.data.contractId))) return;
 
+    // Le camion physique : choisi dans le parc, ou déduit de l'immatriculation
+    // tapée (et ajouté au parc au passage). L'immat retenue est celle de la
+    // fiche camion — le portail ne réintroduit pas ses variantes d'écriture.
+    const { vehicleId, ...truckData } = parsed.data;
+    const vehicle = vehicleId
+      ? await prisma.vehicle.findUnique({ where: { id: vehicleId } })
+      : await resolveVehicle(truckData.registration);
+    if (vehicleId && !vehicle) {
+      return reply.code(400).send({ error: "Camion introuvable dans le parc" });
+    }
+
+    // Parcelle et origine viennent du contrat : la réception ne les saisit plus.
+    // Recopiées (et non lues par jointure) pour figer la provenance du voyage —
+    // le contrat peut changer de parcelle plus tard sans réécrire l'historique.
+    const contract = await prisma.contract.findUnique({
+      where: { id: parsed.data.contractId },
+      select: { parcel: true, origin: true },
+    });
     const t = await prisma.truck.create({
-      data: parsed.data,
+      data: {
+        ...truckData,
+        vehicleId: vehicle?.id ?? null,
+        registration: vehicle?.registration ?? truckData.registration,
+        // Attelage habituel du camion, recopié s'il n'est pas donné — reste
+        // corrigeable voyage par voyage sur le bordereau. Même règle que la
+        // provenance : `null` explicite détache, seule l'absence hérite.
+        driver: truckData.driver === undefined ? vehicle?.driver : truckData.driver,
+        trailer: truckData.trailer === undefined ? vehicle?.trailer : truckData.trailer,
+        // `null` explicite = provenance détachée volontairement ; seul l'absence
+        // de champ déclenche l'héritage.
+        parcel: truckData.parcel === undefined ? contract?.parcel : truckData.parcel,
+        origin: truckData.origin === undefined ? contract?.origin : truckData.origin,
+      },
       include: truckInclude,
     });
     return reply.code(201).send(serializeTruck(t));
@@ -71,10 +103,18 @@ export async function truckRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
+    // Immat corrigée sur le bordereau : le voyage change de camion (ou en crée
+    // un), sinon la fiche parc et l'historique divergeraient en silence.
+    const vehicle = parsed.data.registration
+      ? await resolveVehicle(parsed.data.registration)
+      : null;
     try {
       const t = await prisma.truck.update({
         where: { id: req.params.id },
-        data: parsed.data,
+        data: {
+          ...parsed.data,
+          ...(vehicle ? { vehicleId: vehicle.id, registration: vehicle.registration } : {}),
+        },
         include: truckInclude,
       });
       return serializeTruck(t);

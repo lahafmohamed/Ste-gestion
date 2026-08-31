@@ -4,6 +4,7 @@ import { fmtNum, normalizeDecimal } from "../lib/format";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
 import { inputQuietCls } from "./ui/Input";
+import { useOnline } from "../lib/online";
 
 type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
 const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
@@ -35,6 +36,7 @@ export default function EmpotageEntry({
   onSave: (items: Item[]) => void;
   saving: boolean;
 }) {
+  const online = useOnline();
   const [rows, setRows] = useState<RowState[]>([emptyRow()]);
   const infos = rows.map(rowInfo);
   const valid = infos.filter((x) => x !== null);
@@ -138,7 +140,7 @@ export default function EmpotageEntry({
 
       {/* Récap sticky : + Ligne, total et validation restent sous le pouce
           même quand la saisie fait défiler la page. */}
-      <div className="sticky bottom-0 z-10 border-t border-brand-200 bg-white pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] pt-2">
+      <div className="sticky bottom-0 z-10 mt-3 rounded-lg border border-brand-200 bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_-6px_16px_-8px_rgba(15,23,42,0.35)]">
         <div className="flex items-center justify-between">
           <Button variant="secondary" size="xs" onClick={() => setRows((p) => [...p, emptyRow()])}>
             + Ligne
@@ -156,8 +158,17 @@ export default function EmpotageEntry({
           disabled={saving || valid.length === 0}
           className="mt-2 w-full"
         >
-          {saving ? "Enregistrement…" : `Ajouter ${valid.length} ligne(s)`}
+          {saving
+            ? online
+              ? "Enregistrement…"
+              : "En attente du réseau…"
+            : `Ajouter ${valid.length} ligne${valid.length > 1 ? "s" : ""}`}
         </Button>
+        {saving && !online && (
+          <p className="mt-2 text-center text-sm text-amber-800">
+            Réseau coupé — l'envoi partira au retour. Garder cette page ouverte.
+          </p>
+        )}
       </div>
     </div>
   );

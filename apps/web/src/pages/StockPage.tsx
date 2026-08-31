@@ -15,7 +15,6 @@ export default function StockPage() {
     <StepLayout
       title="Stock"
       subtitle="Parc (billons non sciés) & produits par taille."
-      step="stock"
       wide
     >
       {(c) => <StockInner contractId={c.id} />}

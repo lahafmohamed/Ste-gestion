@@ -1,9 +1,5 @@
 import { forwardRef } from "react";
-import type {
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-} from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 
 // Champs de formulaire unifiés.
 // text-base (16px) : sous ce seuil iOS zoome la page au focus.
@@ -38,19 +34,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 });
 
 export default Input;
-
-export const Select = forwardRef<
-  HTMLSelectElement,
-  SelectHTMLAttributes<HTMLSelectElement>
->(function Select({ className = "", ...rest }, ref) {
-  return (
-    <select
-      ref={ref}
-      className={`${inputCls}${className ? ` ${className}` : ""}`}
-      {...rest}
-    />
-  );
-});
 
 /** Libellé + champ empilés — la structure `<label>` répétée de tous les formulaires. */
 export function Field({

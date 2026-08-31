@@ -6,57 +6,28 @@ import ContractPicker from "./ContractPicker";
 import { PageHeader } from "./Layout";
 import { SkeletonList } from "./ui/Skeleton";
 
-// Chaîne de travail visible : chaque page d'étape sait où elle se situe dans le
-// flux Réception → Étalage → Débitage → Stock, et saute à l'étape voisine d'un
-// tap (le poste change, le contrat sélectionné reste).
-const STEPS = [
-  { key: "reception", to: "/reception", label: "Réception" },
-  { key: "etalage", to: "/etalage", label: "Étalage" },
-  { key: "debitage", to: "/debitage", label: "Débitage" },
-  { key: "stock", to: "/stock", label: "Stock" },
-] as const;
-
-export type StepKey = (typeof STEPS)[number]["key"];
-
-function StepChain({ current }: { current: StepKey }) {
-  return (
-    <nav
-      aria-label="Étapes du flux"
-      className="-mx-4 mb-4 flex items-center gap-1 overflow-x-auto px-4 scrollbar-none short:mb-2"
-    >
-      {STEPS.map((s, i) => (
-        <span key={s.key} className="flex shrink-0 items-center gap-1">
-          {i > 0 && <span className="text-brand-300">→</span>}
-          <Link
-            to={s.to}
-            aria-current={s.key === current ? "page" : undefined}
-            className={`inline-flex min-h-touch items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${
-              s.key === current
-                ? "bg-accent-500 text-white"
-                : "bg-white text-brand-500 ring-1 ring-brand-200 hover:ring-brand-400 active:bg-brand-100"
-            }`}
-          >
-            <span className="tabular-nums opacity-60">{i + 1}</span>
-            {s.label}
-          </Link>
-        </span>
-      ))}
-    </nav>
-  );
-}
-
 type Props = {
   title: string;
   subtitle?: string;
-  /** Étape du flux parc — affiche la chaîne 1→4 en tête de page. */
-  step?: StepKey;
   /** Colonne large (72rem) : pages de consultation faites de tables/cartes.
       Les pages de saisie gardent la colonne 48rem (lignes courtes, lisibles). */
   wide?: boolean;
+  /**
+   * Rendu quand aucun contrat n'est choisi — vue « tous contrats confondus ».
+   * Les pages qui calculent par contrat (étalage, débitage, stock) l'omettent :
+   * elles demandent alors de choisir.
+   */
+  renderAllContracts?: () => ReactNode;
   children: (contract: ContractDTO) => ReactNode;
 };
 
-export default function StepLayout({ title, subtitle, step, wide = false, children }: Props) {
+export default function StepLayout({
+  title,
+  subtitle,
+  wide = false,
+  renderAllContracts,
+  children,
+}: Props) {
   const { contracts, selectedId, setSelectedId, selected, isLoading } = useSelectedContract();
 
   return (
@@ -65,16 +36,20 @@ export default function StepLayout({ title, subtitle, step, wide = false, childr
         title={title}
         subtitle={subtitle}
         right={
-          <ContractPicker contracts={contracts} value={selectedId} onChange={setSelectedId} />
+          <ContractPicker
+            contracts={contracts}
+            value={selectedId}
+            onChange={setSelectedId}
+            emptyLabel={renderAllContracts ? "Tous les contrats" : "— Choisir —"}
+          />
         }
       />
       <div
         className={`mx-auto px-4 py-6 short:py-3 ${wide ? "max-w-page-wide" : "max-w-page"}`}
       >
-        {step && <StepChain current={step} />}
         {isLoading ? (
           <SkeletonList count={2} />
-        ) : !selected ? (
+        ) : contracts.length === 0 ? (
           <p className="text-sm text-brand-500">
             Aucun contrat.{" "}
             <Link to="/contracts" className="underline">
@@ -82,6 +57,32 @@ export default function StepLayout({ title, subtitle, step, wide = false, childr
             </Link>{" "}
             d'abord.
           </p>
+        ) : !selected && renderAllContracts ? (
+          renderAllContracts()
+        ) : !selected ? (
+          // Aucun contrat par défaut : un relevé, un débitage, un stock
+          // appartiennent à un contrat précis — le choix ne se devine pas.
+          <div className="rounded-xl border border-accent-200 bg-accent-50 px-4 py-6 text-center">
+            <p className="text-sm font-medium text-accent-900">Choisir un contrat</p>
+            <p className="mt-1 text-sm text-accent-800">
+              Sélectionner le contrat en haut à droite pour travailler dessus.
+            </p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {contracts
+                .filter((c) => c.status === "OPEN")
+                .slice(0, 6)
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedId(c.id)}
+                    className="min-h-touch rounded-lg border border-accent-300 bg-white px-3 text-sm font-medium text-accent-800 hover:border-accent-500 active:bg-accent-100"
+                  >
+                    {c.code}
+                  </button>
+                ))}
+            </div>
+          </div>
         ) : (
           <>
             {/* Contrat clôturé : l'API refuse toute opération métier (409). Le

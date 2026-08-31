@@ -4,13 +4,14 @@ import { Link } from "react-router-dom";
 import type { MeasurementCreateInput, TruckDTO } from "@ste/shared";
 import { measurementTotalM3, truckBillCount, truckBillNos } from "@ste/shared";
 import { trucksApi } from "../lib/api";
-import { fmtM3, fmtNum, fmtPct } from "../lib/format";
+import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
 import { declaredOf, diaOf, girthOf, invalidateTrucks, parcStage, truckMatches } from "../lib/trucks";
 import TallyEntry from "./TallyEntry";
 import { clearTallyDraft } from "../lib/tallyDraft";
 import TruckCard from "./TruckCard";
+import Badge from "./ui/Badge";
 import Button from "./ui/Button";
-import Chip from "./ui/Chip";
+import { Kpi, SectionHeading } from "./ui/Card";
 import { EmptyState, QueryError } from "./ui/Feedback";
 import { SearchInput } from "./ui/Input";
 import { SkeletonList } from "./ui/Skeleton";
@@ -22,14 +23,26 @@ import { SkeletonList } from "./ui/Skeleton";
 //   propre longueur et circonférence (girth).
 // La réception du bordereau se fait ailleurs (ReceptionSection, au portail).
 
-type ParcFilter = "ALL" | "A_ETALER" | "A_BILLONNER" | "TERMINES";
-
-const FILTERS: { key: ParcFilter; label: string; match: (t: TruckDTO) => boolean }[] = [
-  { key: "A_ETALER", label: "À étaler", match: (t) => parcStage(t) === "A_ETALER" },
-  { key: "A_BILLONNER", label: "À billonner", match: (t) => parcStage(t) === "A_BILLONNER" },
-  { key: "TERMINES", label: "Billonnés", match: (t) => parcStage(t) === "TERMINE" },
-  { key: "ALL", label: "Tous", match: () => true },
-];
+// Deux files côte à côte plutôt qu'une liste et des filtres : au parc la
+// question est « qu'est-ce qui reste à mesurer » et « qu'est-ce qui est déjà
+// passé » — avec un jeu de chips, la deuxième moitié de la réponse coûtait un
+// clic et faisait disparaître la première.
+// Le billonnage vit dans la colonne « Étalés » : un camion à billonner EST
+// étalé. Sa carte y garde son bouton, la file de billonnage ne se perd pas.
+const COLUMNS = [
+  {
+    key: "A_ETALER",
+    title: "À étaler",
+    match: (t: TruckDTO) => parcStage(t) === "A_ETALER",
+    empty: "Rien en attente d'étalage.",
+  },
+  {
+    key: "ETALES",
+    title: "Étalés",
+    match: (t: TruckDTO) => parcStage(t) !== "A_ETALER",
+    empty: "Aucune bille étalée pour l'instant.",
+  },
+] as const;
 
 export default function EtalageSection({
   contractId,
@@ -46,8 +59,6 @@ export default function EtalageSection({
   onOpened?: () => void;
 }) {
   const qc = useQueryClient();
-  // File d'attente par défaut : ce qui reste à étaler.
-  const [filter, setFilter] = useState<ParcFilter>("A_ETALER");
   const [q, setQ] = useState("");
   // Camion en cours d'étalage ou de billonnage.
   const [parcTruck, setParcTruck] = useState<TruckDTO | null>(null);
@@ -99,12 +110,26 @@ export default function EtalageSection({
     }
   }, [parcTruck, parcStep]);
 
-  // Liste affichée : étape du parc + recherche libre (immat, B/L, parcelle).
+  // Recherche libre (immat, B/L, parcelle) — appliquée aux deux files.
   const needle = q.trim().toLowerCase();
-  const activeFilter = FILTERS.find((f) => f.key === filter)!;
-  const shownTrucks = (trucks.data ?? [])
-    .filter(activeFilter.match)
-    .filter((t) => truckMatches(t, needle));
+  const allTrucks = trucks.data ?? [];
+
+  // Ce que les deux files ne disent pas : ce que le parc a réellement mesuré,
+  // et si ça colle au bordereau. Les compteurs « à étaler / étalés » sont déjà
+  // en tête de colonne, les répéter ici ne servirait à rien.
+  const stats = (() => {
+    const etales = allTrucks
+      .map((t) => ({ t, dia: diaOf(t) }))
+      .filter((x): x is { t: TruckDTO; dia: NonNullable<ReturnType<typeof diaOf>> } => !!x.dia);
+    const bills = etales.reduce((n, x) => n + x.dia.logs.length, 0);
+    const m3 = etales.reduce((sum, x) => sum + measurementTotalM3(x.dia), 0);
+    // Écart calculé sur les SEULS camions étalés : y mêler l'annoncé de ceux
+    // qui attendent encore la mesure donnerait un déficit qui ne veut rien dire.
+    const declared = etales.reduce((sum, x) => sum + Number(x.t.declaredFieldM3 ?? 0), 0);
+    return { bills, m3, declared, gap: declared > 0 ? m3 - declared : null };
+  })();
+  // Même seuil que le récap d'un camion : au-delà de 5 %, l'écart se regarde.
+  const gapOff = stats.gap != null && Math.abs(stats.gap) / stats.declared > 0.05;
 
   const parcDia = parcTruck ? diaOf(parcTruck) : undefined;
   const parcGirth = parcTruck ? girthOf(parcTruck) : undefined;
@@ -117,6 +142,30 @@ export default function EtalageSection({
     // cohabitent sur une même page (onglet Parc de la fiche contrat).
     // scroll-mt : le header fixe (h-14) mangeait le haut de la section au scroll.
     <section id="etalage" className="mt-5 scroll-mt-[4.5rem]">
+      {/* Chiffres du parc — « … » tant que la liste n'est pas là, jamais un
+          zéro qui se lirait comme « rien de mesuré ». */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Kpi label="Billes étalées" value={trucks.data ? fmtInt(stats.bills) : "…"} />
+        <Kpi label="Volume étalé" value={trucks.data ? fmtM3(stats.m3.toFixed(3)) : "…"} />
+        <Kpi
+          label="Écart vs brousse"
+          value={
+            !trucks.data ? (
+              "…"
+            ) : stats.gap == null ? (
+              // Aucun volume annoncé sur les camions étalés : il n'y a rien à
+              // comparer, et « 0 » se lirait comme « compte juste ».
+              "—"
+            ) : (
+              <span className={gapOff ? "text-amber-700" : "text-parc-700"}>
+                {stats.gap >= 0 ? "+" : ""}
+                {fmtNum(stats.gap.toFixed(3))} m³
+              </span>
+            )
+          }
+        />
+      </div>
+
       {/* ── Étapes 2/3 · Étalage des billes puis billonnage ── */}
       {parcTruck && (
         <div
@@ -296,82 +345,100 @@ export default function EtalageSection({
         </div>
       )}
 
-      {/* ── File d'attente du parc : filtres par étape + recherche ── */}
-      <div className="mb-2 space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-brand-400">
-          File du parc
-        </h2>
-        <div className="flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => {
-            const n = (trucks.data ?? []).filter(f.match).length;
+      {/* ── Deux files : ce qui attend la mesure, ce qui est déjà mesuré ── */}
+      {allTrucks.length > 3 && (
+        <SearchInput
+          value={q}
+          onChange={setQ}
+          placeholder="Immatriculation, B/L, parcelle…"
+          aria-label="Chercher un camion"
+          className="mb-3"
+        />
+      )}
+
+      {trucks.isLoading && <SkeletonList count={3} lines={1} />}
+      {trucks.isError && (
+        <QueryError error={trucks.error} onRetry={() => trucks.refetch()}>
+          Impossible de charger les camions
+        </QueryError>
+      )}
+      {trucks.data?.length === 0 && (
+        <EmptyState>
+          Aucun camion.{" "}
+          <Link to="/reception" className="underline">
+            Réceptionner
+          </Link>{" "}
+          un camion d'abord.
+        </EmptyState>
+      )}
+
+      {allTrucks.length > 0 && (
+        // items-start : les deux files ont rarement la même longueur, elles ne
+        // doivent pas s'étirer l'une sur l'autre.
+        <div className="grid gap-x-4 gap-y-5 lg:grid-cols-2 lg:items-start">
+          {COLUMNS.map((col) => {
+            const inColumn = allTrucks.filter(col.match);
+            const shown = inColumn.filter((t) => truckMatches(t, needle));
+            // La file de billonnage se cache dans « Étalés » : l'annoncer en
+            // tête de colonne, sinon le poste suivant passe inaperçu.
+            const aBillonner = inColumn.filter((t) => parcStage(t) === "A_BILLONNER").length;
             return (
-              <Chip key={f.key} selected={filter === f.key} onClick={() => setFilter(f.key)}>
-                {f.label} ({n})
-              </Chip>
+              <section key={col.key}>
+                <SectionHeading
+                  right={
+                    col.key === "ETALES" && aBillonner > 0 ? (
+                      <Badge tone="info">{aBillonner} à billonner</Badge>
+                    ) : undefined
+                  }
+                >
+                  {col.title} ({inColumn.length})
+                </SectionHeading>
+                <div className="space-y-2">
+                  {shown.length === 0 && (
+                    <EmptyState>
+                      {needle !== "" ? "Aucun camion ne correspond." : col.empty}
+                    </EmptyState>
+                  )}
+                  {shown.map((t) => {
+                    const stage = parcStage(t);
+                    return (
+                      <TruckCard
+                        key={t.id}
+                        truck={t}
+                        action={
+                          stage !== "TERMINE" && !closed ? (
+                            <Button
+                              variant="parc"
+                              // md (44px) et non lg : `lg` est réservé aux
+                              // validations de saisie (enregistrer un relevé) ;
+                              // ceci ouvre un poste, ça ne valide rien.
+                              size="md"
+                              // Pleine largeur tant que les files sont empilées
+                              // (téléphone, tablette au parc — le pouce vise la
+                              // carte entière) ; largeur naturelle dès que les
+                              // deux colonnes s'affichent côte à côte.
+                              className="mt-3 w-full lg:w-auto"
+                              onClick={() => {
+                                setParcTruck(t);
+                                setParcStep(stage === "A_BILLONNER" ? "BILLONNAGE" : "ETALAGE");
+                              }}
+                            >
+                              {stage === "A_BILLONNER"
+                                ? "Billonner (266 → 266A, 266B…) →"
+                                : "Étaler les billes →"}
+                            </Button>
+                          ) : undefined
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              </section>
             );
           })}
         </div>
-        {(trucks.data?.length ?? 0) > 3 && (
-          <SearchInput
-            value={q}
-            onChange={setQ}
-            placeholder="Immatriculation, B/L, parcelle…"
-            aria-label="Chercher un camion"
-          />
-        )}
-      </div>
+      )}
 
-      {/* ── Cartes camions : annoncé vs étalé/billonné en un coup d'œil ── */}
-      <div className="space-y-2">
-        {trucks.isLoading && <SkeletonList count={3} lines={1} />}
-        {trucks.isError && (
-          <QueryError error={trucks.error} onRetry={() => trucks.refetch()}>
-            Impossible de charger les camions
-          </QueryError>
-        )}
-        {trucks.data?.length === 0 && (
-          <EmptyState>
-            Aucun camion.{" "}
-            <Link to="/reception" className="underline">
-              Réceptionner
-            </Link>{" "}
-            un camion d'abord.
-          </EmptyState>
-        )}
-        {(trucks.data?.length ?? 0) > 0 && shownTrucks.length === 0 && (
-          <EmptyState>
-            {needle !== ""
-              ? "Aucun camion ne correspond."
-              : `Rien dans « ${activeFilter.label} » — voir « Tous ».`}
-          </EmptyState>
-        )}
-        {shownTrucks.map((t) => {
-          const stage = parcStage(t);
-          return (
-            <TruckCard
-              key={t.id}
-              truck={t}
-              action={
-                stage !== "TERMINE" && !closed ? (
-                  <Button
-                    variant="parc"
-                    size="lg"
-                    className="mt-3 w-full"
-                    onClick={() => {
-                      setParcTruck(t);
-                      setParcStep(stage === "A_BILLONNER" ? "BILLONNAGE" : "ETALAGE");
-                    }}
-                  >
-                    {stage === "A_BILLONNER"
-                      ? "Billonner (266 → 266A, 266B…) →"
-                      : "Étaler les billes →"}
-                  </Button>
-                ) : undefined
-              }
-            />
-          );
-        })}
-      </div>
     </section>
   );
 }

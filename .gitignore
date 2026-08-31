@@ -9,3 +9,12 @@ apps/api/prisma/*.db
 apps/web/dev-dist/
 .vite/
 coverage/
+
+# Dumps de la base VPS — données de production, jamais dans un dépôt public
+backups/
+# Outillage local qui porte l'adresse du VPS
+scripts/pull-db-from-vps.bat
+# Skills Claude Code vendorisées (installées, pas du code projet)
+.agents/
+.claude/skills/
+skills-lock.json

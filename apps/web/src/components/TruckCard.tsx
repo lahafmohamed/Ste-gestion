@@ -11,7 +11,16 @@ import Badge from "./ui/Badge";
  * étalé / billonné, écarts en un coup d'œil. `action` = bouton de l'étape
  * suivante, rendu hors du lien vers la fiche.
  */
-export default function TruckCard({ truck: t, action }: { truck: TruckDTO; action?: ReactNode }) {
+export default function TruckCard({
+  truck: t,
+  action,
+  contractCode,
+}: {
+  truck: TruckDTO;
+  action?: ReactNode;
+  /** Renseigné seulement dans les vues multi-contrats (réception « tous »). */
+  contractCode?: string;
+}) {
   const dia = diaOf(t);
   const girth = girthOf(t);
   const d = declaredOf(t);
@@ -32,6 +41,7 @@ export default function TruckCard({ truck: t, action }: { truck: TruckDTO; actio
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="font-medium text-brand-900">{t.registration}</span>
+            {contractCode && <Badge>{contractCode}</Badge>}
             {!dia && !girth && <Badge tone="amber">À étaler</Badge>}
             {dia && !girth && <Badge tone="info">À billonner</Badge>}
           </div>

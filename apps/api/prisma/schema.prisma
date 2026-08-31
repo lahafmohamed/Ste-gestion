@@ -53,6 +53,10 @@ model Contract {
   exploitationStartAt DateTime? @map("exploitation_start_at")
   forest              String?
   managementCenter    String?   @map("management_center")
+  // Provenance du bois : posée une fois ici, recopiée sur chaque camion à la
+  // réception (le chauffeur ne la saisit plus — c'est le contrat qui la porte).
+  parcel              String?
+  origin              String?
 
   // Paramètres de prix (F7/F9)
   sodeforPrice    Decimal @default(0) @map("sodefor_price") @db.Decimal(18, 2)
@@ -149,10 +153,44 @@ enum MeasurementContext {
   YARD_DIAMETER
 }
 
+// Camions du parc — référentiel. Les mêmes camions reviennent voyage après
+// voyage : l'immatriculation se choisit à la réception au lieu d'être retapée
+// (et refautée) sur chaque bordereau.
+model Vehicle {
+  id           String @id @default(cuid())
+  registration String // tel qu'affiché : « 3201 GS 01 »
+  // Clé de comparaison : majuscules, séparateurs retirés. Sans elle
+  // « 3201 GS 01 » et « 3201GS01 » créeraient deux fiches pour un seul camion.
+  plateKey     String @unique @map("plate_key")
+  // Code interne du parc (« STE-01 ») : le nom sous lequel le camion circule
+  // ici, plus court à dire qu'une plaque. Optionnel — un camion né d'une
+  // réception n'en a pas encore.
+  code         String? @unique
+
+  // Attelage habituel — prérempli à la réception, surchargeable au bordereau.
+  driver      String?
+  trailer     String?
+
+  // Camion sorti du parc : retiré du choix, gardé pour l'historique.
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  trucks Truck[]
+
+  @@map("vehicle")
+}
+
 model Truck {
   id           String   @id @default(cuid())
   contractId   String   @map("contract_id")
   contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  // Camion du référentiel (parc). Optionnel : un voyage saisi avant le
+  // référentiel garde son immatriculation sans fiche camion.
+  vehicleId    String?  @map("vehicle_id")
+  vehicle      Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  // Recopiée du camion à la réception : le voyage garde l'immat telle qu'elle
+  // était, même si la fiche camion est corrigée plus tard.
   registration String
   deliveryNote String?  @map("delivery_note") // B/L — clé pivot du suivi par camion
   parcel       String?

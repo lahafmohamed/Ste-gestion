@@ -47,4 +47,9 @@ export function setSession(token: string, user: UserDTO) {
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // Le service worker garde les réponses d'API en cache pour le mode hors
+  // ligne. Sur une tablette partagée au parc, le pointeur suivant ne doit pas
+  // pouvoir en ressortir les données du précédent : le cache part avec la
+  // session. (Best-effort : `caches` n'existe pas hors contexte sécurisé.)
+  void caches?.delete("ste-api").catch(() => {});
 }

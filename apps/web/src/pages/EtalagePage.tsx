@@ -7,11 +7,7 @@ export default function EtalagePage() {
   const [params, setParams] = useSearchParams();
 
   return (
-    <StepLayout
-      title="Étalage"
-      subtitle="Billes étalées et mesurées une par une, puis billonnage (266 → 266A, 266B…)."
-      step="etalage"
-    >
+    <StepLayout title="Étalage">
       {(c) => (
         <EtalageSection
           contractId={c.id}

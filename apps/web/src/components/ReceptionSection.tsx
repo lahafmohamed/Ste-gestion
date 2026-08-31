@@ -1,48 +1,61 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TruckDTO } from "@ste/shared";
-import { trucksApi } from "../lib/api";
-import { normalizeDecimal, todayISO } from "../lib/format";
+import { contractsApi, trucksApi, vehiclesApi } from "../lib/api";
+import { fmtInt, normalizeDecimal, todayISO } from "../lib/format";
 import { invalidateTrucks, parcStage, truckMatches } from "../lib/trucks";
 import TruckCard from "./TruckCard";
+import VehiclePicker, { VEHICLE_NEW } from "./VehiclePicker";
 import Button from "./ui/Button";
-import { SectionHeading } from "./ui/Card";
+import { Kpi, SectionHeading } from "./ui/Card";
+import DateField from "./ui/DateField";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 import Input, { Field, SearchInput } from "./ui/Input";
+import SelectField from "./ui/SelectField";
 import { SkeletonList } from "./ui/Skeleton";
+
+/** Formulaire vierge — recréé à chaque camion enregistré (« camion suivant »). */
+const emptyForm = () => ({
+  // Camion du parc : id, `VEHICLE_NEW` en saisie libre, "" tant que rien n'est
+  // choisi. L'immat suit le choix — c'est elle qui part sur le bordereau.
+  vehicleId: "",
+  registration: "",
+  deliveryNote: "",
+  declaredFieldM3: "",
+  declaredLogCount: "",
+  arrivedAt: todayISO(),
+});
 
 /**
  * Étape 1 · Réception au portail : uniquement l'en-tête recopié du bordereau
  * SODEFOR. La mesure du bois (étalage puis billonnage) est un autre poste, sur
  * la tablette au parc — voir EtalageSection.
+ *
+ * `contractId = null` : vue portail, tous contrats confondus. Le contrat reste
+ * obligatoire pour enregistrer un camion — il se choisit dans le formulaire.
  */
 export default function ReceptionSection({
   contractId,
   closed = false,
   onEtaler,
 }: {
-  contractId: string;
+  contractId: string | null;
   /** Contrat clôturé → lecture seule (l'API refuse de toute façon). */
   closed?: boolean;
   /**
-   * Passe la main à l'étalage : un camion précis, ou `null` pour la file
-   * complète. L'hôte décide (naviguer vers /etalage, ou ouvrir la section
-   * étalage plus bas sur la fiche contrat).
+   * Passe la main à l'étalage sur un camion précis, au moment où il vient
+   * d'être réceptionné. L'hôte décide du geste (naviguer vers /etalage, ou
+   * ouvrir la section étalage plus bas sur la fiche contrat).
    */
-  onEtaler?: (truckId: string | null) => void;
+  onEtaler?: (truckId: string) => void;
 }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [q, setQ] = useState("");
-  const [v, setV] = useState({
-    registration: "",
-    deliveryNote: "",
-    parcel: "",
-    origin: "",
-    declaredFieldM3: "",
-    declaredLogCount: "",
-    arrivedAt: todayISO(),
-  });
+  // Contrat du camion en cours de saisie — jamais deviné : vide tant que
+  // l'opérateur n'a pas choisi (prérempli seulement si la page en filtre un).
+  const [formContractId, setFormContractId] = useState(contractId ?? "");
+  const [v, setV] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   // « Enregistrer et camion suivant » : le bouton cliqué décide de la suite.
   // Ref et non state — lu dans onSuccess, juste après le clic.
@@ -50,25 +63,31 @@ export default function ReceptionSection({
   const [justReceived, setJustReceived] = useState<TruckDTO | null>(null);
   const regRef = useRef<HTMLInputElement>(null);
 
+  const contracts = useQuery({ queryKey: ["contracts"], queryFn: contractsApi.list });
+  // Le parc du portail : les mêmes camions reviennent, l'immat se choisit.
+  const vehicles = useQuery({ queryKey: ["vehicles"], queryFn: vehiclesApi.list });
   const trucks = useQuery({
-    queryKey: ["trucks", contractId],
-    queryFn: () => trucksApi.listByContract(contractId),
+    queryKey: ["trucks", contractId ?? "all"],
+    queryFn: () => (contractId ? trucksApi.listByContract(contractId) : trucksApi.list()),
   });
+
+  // Le filtre de la page change → le formulaire suit.
+  useEffect(() => setFormContractId(contractId ?? ""), [contractId]);
+
+  const contractOf = (id: string | null) =>
+    id ? (contracts.data?.find((c) => c.id === id) ?? null) : null;
+  const formContract = contractOf(formContractId || null);
+  // Contrat clôturé : refusé par l'API (409) — le dire avant la saisie.
+  const formClosed = formContract?.status === "CLOSED";
 
   const create = useMutation({
     mutationFn: (data: Parameters<typeof trucksApi.create>[0]) => trucksApi.create(data),
     onSuccess: (t) => {
-      setV({
-        registration: "",
-        deliveryNote: "",
-        parcel: "",
-        origin: "",
-        declaredFieldM3: "",
-        declaredLogCount: "",
-        arrivedAt: todayISO(),
-      });
+      setV(emptyForm());
       setError(null);
-      invalidateTrucks(qc, contractId);
+      invalidateTrucks(qc, t.contractId);
+      // Voyages et fiches du parc bougent ensemble (camion créé à la volée).
+      qc.invalidateQueries({ queryKey: ["vehicles"] });
       if (chainRef.current) {
         // Les camions arrivent en file au portail : enchaîner les bordereaux et
         // étaler plus tard, quand le bois est descendu.
@@ -90,12 +109,22 @@ export default function ReceptionSection({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!formContractId) {
+      setError("Choisir le contrat du camion.");
+      return;
+    }
+    if (!v.registration.trim()) {
+      setError("Choisir le camion, ou saisir son immatriculation.");
+      return;
+    }
     create.mutate({
-      contractId,
+      contractId: formContractId,
+      // Camion du parc quand il en vient un ; sinon le serveur le retrouve (ou
+      // le crée) à partir de l'immatriculation saisie.
+      vehicleId: v.vehicleId && v.vehicleId !== VEHICLE_NEW ? v.vehicleId : undefined,
       registration: v.registration.trim(),
       deliveryNote: v.deliveryNote.trim() || undefined,
-      parcel: v.parcel.trim() || undefined,
-      origin: v.origin.trim() || undefined,
+      // parcel / origin : héritées du contrat côté serveur.
       declaredFieldM3: v.declaredFieldM3.trim() || undefined,
       declaredLogCount: v.declaredLogCount.trim() ? Number(v.declaredLogCount) : undefined,
       // Midi local : la date seule ne doit pas glisser d'un jour en UTC.
@@ -107,16 +136,43 @@ export default function ReceptionSection({
   // revient plusieurs fois, mais chaque voyage a son propre bordereau — un
   // doublon est presque toujours une faute de frappe.
   const blDup =
-    v.deliveryNote.trim() !== ""
-      ? trucks.data?.find((t) => t.deliveryNote === v.deliveryNote.trim())
+    v.deliveryNote.trim() !== "" && formContractId
+      ? trucks.data?.find(
+          (t) => t.contractId === formContractId && t.deliveryNote === v.deliveryNote.trim()
+        )
       : undefined;
 
+  // Trois angles sur la même liste : le cumul (ce qui est entré sur le périmètre
+  // affiché), le flux du jour (ce que le portail a vu passer depuis ce matin) et
+  // le reste à faire (les camions dont le bois n'est pas encore mesuré).
+  const stats = (() => {
+    const list = trucks.data ?? [];
+    // toDateString : comparaison en date LOCALE. `arrivedAt` est stocké en UTC,
+    // découper la chaîne ISO ferait basculer un camion de la veille ou du
+    // lendemain selon le fuseau.
+    const today = new Date().toDateString();
+    return {
+      total: list.length,
+      today: list.filter((t) => new Date(t.arrivedAt).toDateString() === today).length,
+      aEtaler: list.filter((t) => parcStage(t) === "A_ETALER").length,
+    };
+  })();
+
   const needle = q.trim().toLowerCase();
-  const shownTrucks = (trucks.data ?? []).filter((t) => truckMatches(t, needle));
-  const aEtaler = (trucks.data ?? []).filter((t) => parcStage(t) === "A_ETALER").length;
+  const shownTrucks = (trucks.data ?? []).filter(
+    (t) => truckMatches(t, needle) || contractOf(t.contractId)?.code.toLowerCase().includes(needle)
+  );
 
   return (
     <section className="mt-5">
+      {/* Chiffres du portail — « … » tant que la liste n'est pas là, jamais un
+          zéro qui se lirait comme « aucun camion ». */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Kpi label="Camions reçus" value={trucks.data ? fmtInt(stats.total) : "…"} />
+        <Kpi label="Arrivés aujourd'hui" value={trucks.data ? fmtInt(stats.today) : "…"} />
+        <Kpi label="En attente d'étalage" value={trucks.data ? fmtInt(stats.aEtaler) : "…"} />
+      </div>
+
       <SectionHeading
         right={
           !closed && (
@@ -133,6 +189,7 @@ export default function ReceptionSection({
         }
       >
         Camions reçus ({trucks.data?.length ?? 0})
+        {contractId ? "" : " — tous contrats"}
       </SectionHeading>
 
       {/* ── Réception : uniquement l'en-tête recopié du bordereau ── */}
@@ -165,16 +222,67 @@ export default function ReceptionSection({
             </div>
           )}
 
+          {/* Un camion appartient à un contrat, et à un seul : le choix est
+              explicite ici même quand la liste montre tous les contrats. */}
+          <div className="mb-3">
+            <Field label="Contrat du camion">
+              <SelectField
+                value={formContractId}
+                onChange={setFormContractId}
+                placeholder="— Choisir le contrat —"
+                aria-label="Contrat du camion"
+                options={(contracts.data ?? [])
+                  .filter((c) => c.status === "OPEN" || c.id === formContractId)
+                  .map((c) => ({
+                    value: c.id,
+                    label: c.code,
+                    hint: c.status === "CLOSED" ? "clôturé" : undefined,
+                  }))}
+              />
+            </Field>
+            {/* La provenance est un terme du contrat, pas une saisie de portail :
+                rappelée ici pour que l'opérateur voie ce que le camion hérite. */}
+            <p className="mt-1.5 text-sm text-brand-500">
+              Provenance :{" "}
+              {!formContract ? (
+                <span>—</span>
+              ) : formContract.parcel || formContract.origin ? (
+                <span className="font-medium text-brand-900">
+                  {[
+                    formContract.parcel && `parcelle ${formContract.parcel}`,
+                    formContract.origin,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              ) : (
+                <span className="text-amber-700">
+                  non renseignée — à saisir dans les termes du contrat (Administratif)
+                </span>
+              )}
+            </p>
+          </div>
+
+          {/* Le camion d'abord : au portail ce sont toujours les mêmes, les
+              retaper n'apporte que des variantes d'écriture et des doublons. */}
+          <div className="mb-3">
+            <VehiclePicker
+              vehicles={vehicles.data ?? []}
+              loading={vehicles.isLoading}
+              vehicleId={v.vehicleId}
+              registration={v.registration}
+              onChange={(next) => setV((p) => ({ ...p, ...next }))}
+              disabled={formClosed}
+              inputRef={regRef}
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {(
               [
-                ["registration", "Immatriculation", "3201 GS 01", true],
                 ["deliveryNote", "B/L", "176530", false],
-                ["parcel", "Parcelle origine", "146-99/04", false],
-                ["origin", "Origine", "SANGOUE", false],
                 ["declaredFieldM3", "Vol brousse (m³)", "33.171", false],
                 ["declaredLogCount", "Nombre de billes", "58", false],
-                ["arrivedAt", "Arrivé le", "", false],
               ] as const
             ).map(([key, label, ph, required]) => {
               // Champs chiffrés : la virgule du clavier FR doit devenir un point,
@@ -183,11 +291,7 @@ export default function ReceptionSection({
               return (
                 <Field key={key} label={label}>
                   <Input
-                    ref={key === "registration" ? regRef : undefined}
                     required={required}
-                    type={key === "arrivedAt" ? "date" : "text"}
-                    // Un camion n'arrive pas dans le futur — évite le 2026 → 2062.
-                    max={key === "arrivedAt" ? todayISO() : undefined}
                     inputMode={isNum ? "decimal" : undefined}
                     value={v[key]}
                     onChange={(e) =>
@@ -201,6 +305,14 @@ export default function ReceptionSection({
                 </Field>
               );
             })}
+            <Field label="Arrivé le">
+              <DateField
+                value={v.arrivedAt}
+                onChange={(iso) => setV((p) => ({ ...p, arrivedAt: iso }))}
+                // Un camion n'arrive pas dans le futur — évite le 2026 → 2062.
+                max={todayISO()}
+              />
+            </Field>
           </div>
 
           {/* B/L déjà vu sur ce contrat → probable faute de frappe (non bloquant). */}
@@ -213,6 +325,11 @@ export default function ReceptionSection({
           )}
 
           <div className="mt-3 border-t border-brand-100 pt-3">
+            {formClosed && (
+              <p className="mb-2 rounded-lg bg-brand-100 px-3 py-2 text-sm text-brand-600">
+                🔒 Contrat {formContract?.code} clôturé — le rouvrir avant d'y ajouter un camion.
+              </p>
+            )}
             {error && (
               <div className="mb-2">
                 <FormError>{error}</FormError>
@@ -228,7 +345,7 @@ export default function ReceptionSection({
                 type="submit"
                 variant="primary"
                 onClick={() => (chainRef.current = false)}
-                disabled={create.isPending}
+                disabled={create.isPending || formClosed}
                 className="order-2"
               >
                 {create.isPending
@@ -240,7 +357,7 @@ export default function ReceptionSection({
               <Button
                 type="submit"
                 onClick={() => (chainRef.current = true)}
-                disabled={create.isPending}
+                disabled={create.isPending || formClosed}
                 className="order-1"
               >
                 Enregistrer et camion suivant
@@ -248,21 +365,6 @@ export default function ReceptionSection({
             </div>
           </div>
         </form>
-      )}
-
-      {/* Le bois mesuré est un autre poste : la file d'attente vit sur Étalage. */}
-      {onEtaler && aEtaler > 0 && !closed && (
-        <button
-          type="button"
-          onClick={() => onEtaler(null)}
-          className="mb-3 flex w-full items-center justify-between gap-2 rounded-xl border border-parc-200 bg-parc-50/60 px-3 py-2.5 text-left text-sm text-parc-800 hover:bg-parc-50"
-        >
-          <span>
-            <span className="font-medium tabular-nums">{aEtaler}</span> camion
-            {aEtaler > 1 ? "s" : ""} en attente d'étalage
-          </span>
-          <span className="shrink-0 font-medium underline">Aller à l'étalage →</span>
-        </button>
       )}
 
       {/* ── Recherche — dès que la liste des bordereaux s'allonge ── */}
@@ -289,7 +391,13 @@ export default function ReceptionSection({
           <EmptyState>Aucun camion ne correspond.</EmptyState>
         )}
         {shownTrucks.map((t) => (
-          <TruckCard key={t.id} truck={t} />
+          <TruckCard
+            key={t.id}
+            truck={t}
+            // Vue tous contrats : sans le code, deux camions de contrats
+            // différents se ressemblent trait pour trait.
+            contractCode={contractId ? undefined : contractOf(t.contractId)?.code}
+          />
         ))}
       </div>
     </section>

@@ -6,8 +6,10 @@ import { fmtFcfa } from "../lib/format";
 import Button from "./ui/Button";
 import { SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
+import DateField from "./ui/DateField";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
-import Input, { Field, Select } from "./ui/Input";
+import Input, { Field } from "./ui/Input";
+import SelectField from "./ui/SelectField";
 import { TableWrap } from "./ui/Table";
 
 function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => void }) {
@@ -74,10 +76,15 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
       </Field>
 
       <Field label="Type">
-        <Select value={kind} onChange={(e) => setKind(e.target.value as EntryKind)}>
-          <option value="DUE">Devoir (dû)</option>
-          <option value="PAID">Payé</option>
-        </Select>
+        <SelectField
+          value={kind}
+          onChange={(v) => setKind(v as EntryKind)}
+          aria-label="Type d'écriture"
+          options={[
+            { value: "DUE", label: "Devoir (dû)" },
+            { value: "PAID", label: "Payé" },
+          ]}
+        />
       </Field>
 
       <Field label="Montant (FCFA)">
@@ -99,7 +106,7 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
       </Field>
 
       <Field label="Date">
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateField value={date} onChange={setDate} />
       </Field>
 
       <div className="col-span-2 flex items-end justify-between sm:col-span-1">

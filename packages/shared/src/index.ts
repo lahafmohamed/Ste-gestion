@@ -84,6 +84,9 @@ export const contractCreateSchema = z.object({
   exploitationStartAt: z.coerce.date().nullable().optional(),
   forest: z.string().trim().max(100).nullable().optional(),
   managementCenter: z.string().trim().max(100).nullable().optional(),
+  // Provenance du bois — recopiée sur chaque camion à la réception.
+  parcel: z.string().trim().max(50).nullable().optional(),
+  origin: z.string().trim().max(100).nullable().optional(),
 
   // Paramètres de prix
   sodeforPrice: decimalString.optional(),
@@ -133,6 +136,8 @@ export type ContractDTO = {
   exploitationStartAt: string | null;
   forest: string | null;
   managementCenter: string | null;
+  parcel: string | null;
+  origin: string | null;
 
   sodeforPrice: string;
   ibrahimPrice: string;
@@ -267,6 +272,62 @@ export const MEASUREMENT_CONTEXT_LABELS: Record<MeasurementContext, string> = {
   YARD_DIAMETER: "Cubage billes (diamètre)",
 };
 
+// ── Camions du parc (référentiel) ─────────────────────────────────────
+// Les mêmes camions reviennent voyage après voyage : le parc est saisi une
+// fois, la réception y choisit l'immatriculation au lieu de la retaper.
+
+/**
+ * Clé de comparaison d'une immatriculation : majuscules, séparateurs retirés.
+ * « 3201 GS 01 », « 3201-gs-01 » et « 3201GS01 » sont le même camion — sans
+ * cette clé, chaque façon de l'écrire ouvrirait une fiche de plus.
+ */
+export function plateKey(registration: string): string {
+  return registration.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/**
+ * Fiche du camion : son code interne (« STE-01 »), sur lequel le parc l'appelle
+ * au quotidien, et son attelage habituel — recopié sur le bordereau à la
+ * réception.
+ */
+const vehicleFields = {
+  code: z.string().trim().max(20).nullable().optional(),
+  driver: z.string().trim().max(100).nullable().optional(),
+  trailer: z.string().trim().max(50).nullable().optional(),
+};
+
+export const vehicleCreateSchema = z.object({
+  registration: z.string().trim().min(1, "Immatriculation requise").max(50),
+  ...vehicleFields,
+});
+export type VehicleCreateInput = z.infer<typeof vehicleCreateSchema>;
+
+export const vehicleUpdateSchema = z.object({
+  registration: z.string().trim().min(1, "Immatriculation requise").max(50).optional(),
+  // Camion sorti du parc : retiré du choix de la réception, jamais supprimé —
+  // ses voyages passés doivent rester lisibles.
+  active: z.boolean().optional(),
+  ...vehicleFields,
+});
+export type VehicleUpdateInput = z.infer<typeof vehicleUpdateSchema>;
+
+export type VehicleDTO = {
+  id: string;
+  registration: string;
+  plateKey: string;
+  /** Code interne du parc (« STE-01 ») — `null` tant qu'il n'est pas attribué. */
+  code: string | null;
+  driver: string | null;
+  trailer: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** Voyages réceptionnés sous ce camion (tous contrats). */
+  tripCount: number;
+  /** Dernière arrivée au parc — `null` si le camion n'a jamais servi. */
+  lastTripAt: string | null;
+};
+
 // Champs bordereau — édités progressivement, tous optionnels et « nullable »
 // (vidé → détaché). Partagés entre création et mise à jour.
 const truckBordereauFields = {
@@ -290,6 +351,9 @@ const truckBordereauFields = {
 
 export const truckCreateSchema = z.object({
   contractId: z.string().min(1),
+  // Camion choisi dans le parc. Absent = immatriculation tapée à la main : le
+  // serveur retrouve (ou crée) la fiche camion à partir d'elle.
+  vehicleId: z.string().min(1).optional(),
   registration: z.string().trim().min(1, "Immatriculation requise").max(50),
   ...truckBordereauFields,
 });
@@ -380,6 +444,7 @@ export type MeasurementDTO = {
 export type TruckDTO = {
   id: string;
   contractId: string;
+  vehicleId: string | null;
   registration: string;
   deliveryNote: string | null;
   parcel: string | null;
@@ -619,15 +684,21 @@ export type ContractAccountDTO = {
 };
 
 // ── Vue liste (GET /contracts/overview) ───────────────────────────────
-// Ce que les cartes de la page Contrats affichent, pour TOUS les contrats en
-// une seule requête. Le résumé complet coûte 7 requêtes SQL par contrat :
-// le demander carte par carte faisait un aller-retour par contrat.
+// Ce que les cartes des pages Contrats et Tableau de bord affichent, pour TOUS
+// les contrats en une seule requête. Le résumé complet coûte 7 requêtes SQL par
+// contrat : le demander carte par carte faisait un aller-retour par contrat.
+// Les champs sont calculés exactement comme dans ContractSummaryDTO.
 export type ContractOverviewDTO = {
   contractId: string;
   trucksEntered: number;
   trucksSawn: number; // camions avec au moins un débitage saisi
   brousseM3: string; // même règle que le résumé : étalage brousse > packing > déclaré
   estTrucksTotal: number | null;
+  debitedM3: string;
+  outputPct: string; // débité / girth (rendement scierie)
+  stockProductsM3: string; // débité + rescié entrant − vendu − rescié sortant
+  salesRevenueCfa: string;
+  balance: string; // dû − payé (positif = reste à payer)
 };
 
 // ── Résumé dérivé du contrat (GET /contracts/:id/summary) ─────────────

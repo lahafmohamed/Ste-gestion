@@ -36,6 +36,9 @@ import type {
   SaleDTO,
   TruckCreateInput,
   TruckDTO,
+  VehicleCreateInput,
+  VehicleDTO,
+  VehicleUpdateInput,
 } from "@ste/shared";
 
 import { clearSession, getToken } from "./auth";
@@ -138,6 +141,8 @@ export const contractsApi = {
 };
 
 export const trucksApi = {
+  /** Tous contrats confondus — vue « parc entier » de la réception. */
+  list: () => req<TruckDTO[]>("/trucks"),
   listByContract: (contractId: string) =>
     req<TruckDTO[]>(`/trucks?contractId=${encodeURIComponent(contractId)}`),
   get: (id: string) => req<TruckDTO>(`/trucks/${id}`),
@@ -168,6 +173,16 @@ export const trucksApi = {
     }),
   clearPacking: (truckId: string) =>
     req<void>(`/trucks/${truckId}/packing`, { method: "DELETE" }),
+};
+
+/** Parc de camions — le référentiel où la réception choisit l'immatriculation. */
+export const vehiclesApi = {
+  list: () => req<VehicleDTO[]>("/vehicles"),
+  create: (data: VehicleCreateInput) =>
+    req<VehicleDTO>("/vehicles", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: VehicleUpdateInput) =>
+    req<VehicleDTO>(`/vehicles/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  remove: (id: string) => req<void>(`/vehicles/${id}`, { method: "DELETE" }),
 };
 
 export const accountsApi = {

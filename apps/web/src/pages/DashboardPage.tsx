@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import type { ContractDTO } from "@ste/shared";
+import type { ContractDTO, ContractOverviewDTO } from "@ste/shared";
 import { contractsApi } from "../lib/api";
 import { fmtFcfa, fmtM3, fmtPct } from "../lib/format";
 import { SHOW_MONEY } from "../lib/features";
@@ -11,13 +12,7 @@ import { EmptyState, QueryError } from "../components/ui/Feedback";
 import { buttonCls } from "../components/ui/Button";
 import { SkeletonLine, SkeletonList } from "../components/ui/Skeleton";
 
-function ContractCard({ c }: { c: ContractDTO }) {
-  const summary = useQuery({
-    queryKey: ["summary", c.id],
-    queryFn: () => contractsApi.summary(c.id),
-  });
-  const s = summary.data;
-
+function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
   return (
     <Link
       to={`/contracts/${c.id}`}
@@ -30,28 +25,28 @@ function ContractCard({ c }: { c: ContractDTO }) {
         </Badge>
       </div>
 
-      {s ? (
+      {o ? (
         <div className="mt-3 space-y-2">
           <div>
             <div className="mb-1 text-sm text-brand-500">
-              Camions {s.trucksEntered}
+              Camions {o.trucksEntered}
               {/* Total projeté depuis la moyenne des arrivées ; à défaut le prévu saisi. */}
-              {s.estTrucksTotal != null
-                ? `/≈${s.estTrucksTotal}`
+              {o.estTrucksTotal != null
+                ? `/≈${o.estTrucksTotal}`
                 : c.trucksPlanned > 0
                   ? `/${c.trucksPlanned}`
                   : ""}{" "}
-              · {s.trucksSawn} sciés
+              · {o.trucksSawn} sciés
             </div>
-            <QuotaBar brousseM3={s.brousseM3} quotaM3={c.quotaM3} />
+            <QuotaBar brousseM3={o.brousseM3} quotaM3={c.quotaM3} />
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-brand-600">
-            <span>Débité : {fmtM3(s.debitedM3)} ({fmtPct(Number(s.outputPct))})</span>
-            <span>Stock : {fmtM3(s.stockProductsM3)}</span>
+            <span>Débité : {fmtM3(o.debitedM3)} ({fmtPct(Number(o.outputPct))})</span>
+            <span>Stock : {fmtM3(o.stockProductsM3)}</span>
             {SHOW_MONEY && (
               <>
-                <span>CA : {fmtFcfa(s.salesRevenueCfa)}</span>
-                <span>Solde : {fmtFcfa(s.balance)}</span>
+                <span>CA : {fmtFcfa(o.salesRevenueCfa)}</span>
+                <span>Solde : {fmtFcfa(o.balance)}</span>
               </>
             )}
           </div>
@@ -69,6 +64,19 @@ function ContractCard({ c }: { c: ContractDTO }) {
 
 export default function DashboardPage() {
   const contracts = useQuery({ queryKey: ["contracts"], queryFn: contractsApi.list });
+  // Une requête pour toutes les cartes (voir /contracts/overview côté API) :
+  // une carte par contrat qui demandait son propre résumé faisait un
+  // aller-retour par contrat sur l'écran d'accueil.
+  // Clé sous « contracts » : les invalidations existantes la rafraîchissent aussi.
+  const overview = useQuery({
+    queryKey: ["contracts", "overview"],
+    queryFn: contractsApi.overview,
+  });
+
+  const ovById = useMemo(
+    () => new Map((overview.data ?? []).map((o) => [o.contractId, o])),
+    [overview.data]
+  );
 
   return (
     <>
@@ -93,7 +101,7 @@ export default function DashboardPage() {
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {contracts.data?.map((c) => (
-            <ContractCard key={c.id} c={c} />
+            <ContractCard key={c.id} c={c} o={ovById.get(c.id)} />
           ))}
         </div>
       </div>

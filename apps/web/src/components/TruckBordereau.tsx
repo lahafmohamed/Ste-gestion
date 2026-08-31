@@ -5,6 +5,7 @@ import { trucksApi } from "../lib/api";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Card, { SectionHeading } from "./ui/Card";
+import DateField from "./ui/DateField";
 import { FormError } from "./ui/Feedback";
 import Input, { Field } from "./ui/Input";
 
@@ -126,14 +127,20 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {FIELDS.map((f) => (
                 <Field key={f.key as string} label={f.label}>
-                  <Input
-                    required={f.key === "registration"}
-                    type={f.kind === "date" ? "date" : "text"}
-                    inputMode={f.kind === "int" || f.kind === "decimal" ? "decimal" : undefined}
-                    value={v[f.key as string]}
-                    onChange={(e) => setV((p) => ({ ...p, [f.key as string]: e.target.value }))}
-                    placeholder={f.ph}
-                  />
+                  {f.kind === "date" ? (
+                    <DateField
+                      value={v[f.key as string]}
+                      onChange={(iso) => setV((p) => ({ ...p, [f.key as string]: iso }))}
+                    />
+                  ) : (
+                    <Input
+                      required={f.key === "registration"}
+                      inputMode={f.kind === "int" || f.kind === "decimal" ? "decimal" : undefined}
+                      value={v[f.key as string]}
+                      onChange={(e) => setV((p) => ({ ...p, [f.key as string]: e.target.value }))}
+                      placeholder={f.ph}
+                    />
+                  )}
                 </Field>
               ))}
             </div>

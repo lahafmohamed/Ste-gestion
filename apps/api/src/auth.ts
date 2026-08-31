@@ -21,6 +21,9 @@ const PUBLIC: { method?: string; path: string }[] = [
 const WRITE_RULES: { pattern: RegExp; roles: UserRole[] }[] = [
   { pattern: /^\/contracts/, roles: ["BUREAU"] },
   { pattern: /^\/trucks|^\/measurements/, roles: ["PARC"] },
+  // Le parc de camions se tient au portail (PARC) et au bureau (transporteur,
+  // chauffeur habituel).
+  { pattern: /^\/vehicles/, roles: ["PARC", "BUREAU"] },
   { pattern: /^\/production-runs/, roles: ["SCIERIE"] },
   { pattern: /^\/sales/, roles: ["EXPORT"] },
   { pattern: /^\/containers|^\/container-items/, roles: ["EXPORT", "PARC"] },

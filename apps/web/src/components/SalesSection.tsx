@@ -14,8 +14,10 @@ import { fmtFcfa, fmtNum } from "../lib/format";
 import Button from "./ui/Button";
 import { SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
+import DateField from "./ui/DateField";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
-import Input, { Field, Select, inputQuietCls } from "./ui/Input";
+import Input, { Field, inputQuietCls } from "./ui/Input";
+import SelectField from "./ui/SelectField";
 
 type Mode = "USD" | "CFA";
 type RowState = { sizeCode: string; volumeM3: string; mode: Mode; priceUsd: string; rate: string; priceCfa: string };
@@ -123,17 +125,16 @@ function SaleForm({
     <form onSubmit={submit} className="mb-3 rounded-xl border border-brand-200 bg-white p-4">
       <div className="mb-3 grid grid-cols-2 gap-3 sm:w-96">
         <Field label="Date">
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </Field>
         <Field label="Client">
-          <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-            <option value="">— aucun —</option>
-            {parties.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
+          <SelectField
+            value={clientId}
+            onChange={setClientId}
+            placeholder="— aucun —"
+            aria-label="Client"
+            options={(parties.data ?? []).map((p) => ({ value: p.id, label: p.name }))}
+          />
         </Field>
       </div>
 
@@ -174,10 +175,15 @@ function SaleForm({
                 />
               </Field>
               <Field label="Mode">
-                <Select value={r.mode} onChange={(e) => setRow(i, { mode: e.target.value as Mode })}>
-                  <option value="USD">USD × taux</option>
-                  <option value="CFA">CFA direct</option>
-                </Select>
+                <SelectField
+                  value={r.mode}
+                  onChange={(v) => setRow(i, { mode: v as Mode })}
+                  aria-label={`Mode de prix, ligne ${i + 1}`}
+                  options={[
+                    { value: "USD", label: "USD × taux" },
+                    { value: "CFA", label: "CFA direct" },
+                  ]}
+                />
               </Field>
               <div className="flex items-end text-sm">
                 <span className="text-brand-500">

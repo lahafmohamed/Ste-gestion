@@ -34,6 +34,17 @@
     display: none;
   }
 
+  /* Élévation d'un calque flottant (calendrier, menus) : trois couches
+     transparentes — un anneau 1px qui remplace la bordure, puis deux ombres
+     de portée. Transparent plutôt qu'une bordure pleine : le calque passe
+     au-dessus de fonds variés (cartes, bandeaux) sans jamais jurer. */
+  .shadow-popover {
+    box-shadow:
+      0 0 0 1px oklch(0 0 0 / 0.06),
+      0 4px 8px -2px oklch(0 0 0 / 0.08),
+      0 12px 24px -6px oklch(0 0 0 / 0.1);
+  }
+
   /* Ombres de débordement horizontal : signalent qu'un tableau continue hors
      écran (sur téléphone, un tableau coupé net semble complet). Astuce
      background-attachment local/scroll — zéro JS. */

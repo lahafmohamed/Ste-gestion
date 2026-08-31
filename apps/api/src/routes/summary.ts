@@ -10,32 +10,94 @@ import {
 import { prisma } from "../prisma.js";
 
 export async function summaryRoutes(app: FastifyInstance) {
-  // Vue liste — ce dont les cartes de la page Contrats ont besoin, pour tous
-  // les contrats d'un coup : 3 requêtes au total, au lieu du résumé complet
-  // (7 requêtes) répété une fois par contrat.
+  // Vue liste — ce dont les cartes des pages Contrats et Tableau de bord ont
+  // besoin, pour tous les contrats d'un coup : 7 requêtes au total, au lieu du
+  // résumé complet (7 requêtes) répété une fois par contrat.
   // Route statique : elle passe avant `/contracts/:id` côté routeur Fastify.
   app.get("/contracts/overview", async () => {
-    const [contracts, trucks, fieldLogs] = await Promise.all([
-      prisma.contract.findMany({ select: { id: true, quotaM3: true } }),
-      prisma.truck.findMany({
-        select: {
-          id: true,
-          contractId: true,
-          declaredFieldM3: true,
-          packingLogs: { select: { volumeM3: true } },
-          _count: { select: { productionRuns: true } },
-        },
-      }),
-      prisma.log.findMany({
-        where: { measurement: { context: "FIELD" } },
-        select: { volumeM3: true, measurement: { select: { truckId: true } } },
-      }),
-    ]);
+    const [contracts, trucks, logs, sawnLines, saleLines, resawLines, entries] =
+      await Promise.all([
+        prisma.contract.findMany({ select: { id: true, quotaM3: true } }),
+        prisma.truck.findMany({
+          select: {
+            id: true,
+            contractId: true,
+            declaredFieldM3: true,
+            packingLogs: { select: { volumeM3: true } },
+            _count: { select: { productionRuns: true } },
+          },
+        }),
+        // FIELD (brousse) et YARD_GIRTH (dénominateur du rendement) en une passe.
+        prisma.log.findMany({
+          where: { measurement: { context: { in: ["FIELD", "YARD_GIRTH"] } } },
+          select: {
+            volumeM3: true,
+            measurement: { select: { context: true, truckId: true } },
+          },
+        }),
+        prisma.sawnLine.findMany({
+          select: { volumeM3: true, run: { select: { contractId: true } } },
+        }),
+        prisma.saleLine.findMany({
+          select: {
+            volumeM3: true,
+            amountCfa: true,
+            sale: { select: { contractId: true } },
+          },
+        }),
+        prisma.resawLine.findMany({
+          select: { kind: true, volumeM3: true, op: { select: { contractId: true } } },
+        }),
+        prisma.accountEntry.groupBy({
+          by: ["contractId", "kind"],
+          _sum: { amount: true },
+        }),
+      ]);
+
+    // Camion → contrat : les lignes de relevé ne portent que le camion.
+    const contractByTruck = new Map(trucks.map((t) => [t.id, t.contractId]));
 
     const fieldByTruck = new Map<string, number>();
-    for (const l of fieldLogs) {
+    const girthByContract = new Map<string, number>();
+    for (const l of logs) {
       const tid = l.measurement.truckId;
-      fieldByTruck.set(tid, (fieldByTruck.get(tid) ?? 0) + Number(l.volumeM3));
+      if (l.measurement.context === "FIELD") {
+        fieldByTruck.set(tid, (fieldByTruck.get(tid) ?? 0) + Number(l.volumeM3));
+      } else {
+        const cid = contractByTruck.get(tid);
+        if (cid) girthByContract.set(cid, (girthByContract.get(cid) ?? 0) + Number(l.volumeM3));
+      }
+    }
+
+    // ── Agrégats production / ventes / resciage / compta, par contrat ──
+    const money = new Map<
+      string,
+      { debited: number; sold: number; revenue: number; resawIn: number; resawOut: number; due: number; paid: number }
+    >();
+    const bucket = (cid: string) => {
+      let b = money.get(cid);
+      if (!b) {
+        b = { debited: 0, sold: 0, revenue: 0, resawIn: 0, resawOut: 0, due: 0, paid: 0 };
+        money.set(cid, b);
+      }
+      return b;
+    };
+    for (const l of sawnLines) bucket(l.run.contractId).debited += Number(l.volumeM3);
+    for (const l of saleLines) {
+      const b = bucket(l.sale.contractId);
+      b.sold += Number(l.volumeM3);
+      b.revenue += Number(l.amountCfa);
+    }
+    for (const l of resawLines) {
+      const b = bucket(l.op.contractId);
+      if (l.kind === "PRODUCED") b.resawIn += Number(l.volumeM3);
+      else b.resawOut += Number(l.volumeM3);
+    }
+    for (const e of entries) {
+      const b = bucket(e.contractId);
+      const amount = Number(e._sum.amount ?? 0);
+      if (e.kind === "DUE") b.due += amount;
+      else b.paid += amount;
     }
 
     // Brousse par camion : même ordre de préférence que le résumé complet
@@ -62,12 +124,21 @@ export async function summaryRoutes(app: FastifyInstance) {
       const avg = a.measured > 0 ? a.brousse / a.measured : 0;
       const remainingQuota = Math.max(Number(c.quotaM3) - a.brousse, 0);
       const estTrucksRemaining = avg > 0 ? Math.ceil(remainingQuota / avg) : null;
+      const b = money.get(c.id);
+      const debited = b?.debited ?? 0;
+      const girth = girthByContract.get(c.id) ?? 0;
+      const stockProducts = debited + (b?.resawIn ?? 0) - (b?.sold ?? 0) - (b?.resawOut ?? 0);
       return {
         contractId: c.id,
         trucksEntered: a.trucks,
         trucksSawn: a.sawn,
         brousseM3: a.brousse.toFixed(6),
         estTrucksTotal: estTrucksRemaining !== null ? a.trucks + estTrucksRemaining : null,
+        debitedM3: debited.toFixed(6),
+        outputPct: (girth > 0 ? (debited / girth) * 100 : 0).toFixed(4),
+        stockProductsM3: stockProducts.toFixed(6),
+        salesRevenueCfa: (b?.revenue ?? 0).toFixed(2),
+        balance: ((b?.due ?? 0) - (b?.paid ?? 0)).toFixed(2),
       };
     });
   });

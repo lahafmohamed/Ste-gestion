@@ -11,6 +11,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ContractsPage from "./pages/ContractsPage";
 import ContractDetailPage from "./pages/ContractDetailPage";
 import ReceptionPage from "./pages/ReceptionPage";
+import CamionsPage from "./pages/CamionsPage";
 import EtalagePage from "./pages/EtalagePage";
 import DebitagePage from "./pages/DebitagePage";
 import StockPage from "./pages/StockPage";
@@ -21,7 +22,31 @@ import RapportPage from "./pages/RapportPage";
 import TruckDetailPage from "./pages/TruckDetailPage";
 import ProductionRunPage from "./pages/ProductionRunPage";
 
-const queryClient = new QueryClient();
+// Réglages pensés pour le terrain : tablette au parc, réseau lent et coupé.
+// - staleTime 30 s : revenir sur une page déjà vue ne refait pas la requête et
+//   ne reflashe pas les squelettes ; le retour sur l'onglet ne déclenche un
+//   rafraîchissement que si la donnée a plus de 30 s.
+// - retry 2 (backoff) : une coupure brève se rattrape seule.
+// - mutations : AUCUN retry. Un POST de relevé rejoué en aveugle crée des
+//   doublons de billons ; l'échec remonte au pointeur, le brouillon est gardé.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // offlineFirst : hors réseau, react-query lance quand même la requête —
+      // le service worker y répond depuis son cache (NetworkFirst). Avec le
+      // mode par défaut, la requête serait mise en pause sans jamais partir et
+      // l'app rouverte au parc n'afficherait que des squelettes.
+      networkMode: "offlineFirst",
+      staleTime: 30_000,
+      gcTime: 10 * 60_000,
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    },
+    // Mutations en mode « online » (défaut, explicite ici) : hors réseau elles
+    // sont mises en attente et repartent seules au retour de la connexion.
+    mutations: { networkMode: "online", retry: 0 },
+  },
+});
 
 export default function App() {
   const [authed, setAuthed] = useState(() => isSessionValid());
@@ -57,6 +82,7 @@ export default function App() {
             <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/contracts/:id" element={<ContractDetailPage />} />
             <Route path="/reception" element={<ReceptionPage />} />
+            <Route path="/camions" element={<CamionsPage />} />
             <Route path="/etalage" element={<EtalagePage />} />
             <Route path="/debitage" element={<DebitagePage />} />
             <Route path="/stock" element={<StockPage />} />

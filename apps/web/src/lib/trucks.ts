@@ -56,7 +56,8 @@ export function truckMatches(t: TruckDTO, needle: string) {
  * estimés — dérivées des camions).
  */
 export function invalidateTrucks(qc: QueryClient, contractId: string) {
-  qc.invalidateQueries({ queryKey: ["trucks", contractId] });
+  // Préfixe : la réception a aussi une vue tous contrats (`["trucks", "all"]`).
+  qc.invalidateQueries({ queryKey: ["trucks"] });
   qc.invalidateQueries({ queryKey: ["truck-stats", contractId] });
   qc.invalidateQueries({ queryKey: ["summary", contractId] });
   qc.invalidateQueries({ queryKey: ["suggestions", contractId] });

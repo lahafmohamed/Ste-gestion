@@ -24,6 +24,7 @@ import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import { FormError } from "./ui/Feedback";
 import { inputQuietCls } from "./ui/Input";
+import { useOnline } from "../lib/online";
 
 export { clearTallyDraft } from "../lib/tallyDraft";
 
@@ -96,6 +97,7 @@ export default function TallyEntry({
 }: Props) {
   const kind = kindOf(context);
   const isGirth = kind === "girth";
+  const online = useOnline();
   // Priorité : brouillon interrompu > n° préremplis > une ligne vierge.
   const [rows, setRows] = useState<RowState[]>(
     () =>
@@ -419,7 +421,7 @@ export default function TallyEntry({
       <button
         type="button"
         onClick={() => addRow()}
-        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2.5 text-base font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
+        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
       >
         + {isGirth ? "Billon" : "Bille"}
       </button>
@@ -559,19 +561,31 @@ export default function TallyEntry({
       )}
 
       {!embedded && (
-        <Button
-          variant="primary"
-          size="lg"
-          className="mt-3 w-full"
-          onClick={save}
-          disabled={saving || validCount === 0}
-        >
-          {saving
-            ? "Enregistrement…"
-            : error
-              ? `Réessayer (${validCount})`
-              : `Valider ${isGirth ? "le billonnage" : "l'étalage"} (${validCount})`}
-        </Button>
+        <>
+          <Button
+            variant="primary"
+            size="lg"
+            className="mt-3 w-full"
+            onClick={save}
+            disabled={saving || validCount === 0}
+          >
+            {saving
+              ? online
+                ? "Enregistrement…"
+                : "En attente du réseau…"
+              : error
+                ? `Réessayer (${validCount})`
+                : `Valider ${isGirth ? "le billonnage" : "l'étalage"} (${validCount})`}
+          </Button>
+          {/* Hors ligne, l'envoi est mis en file par react-query et repart tout
+              seul. Sans ce mot, le bouton semble tourner dans le vide et le
+              pointeur retape Valider — d'où des relevés en double. */}
+          {saving && !online && (
+            <p className="mt-2 text-center text-sm text-amber-800">
+              Réseau coupé — l'envoi partira au retour. Garder cette page ouverte.
+            </p>
+          )}
+        </>
       )}
       </div>
     </div>

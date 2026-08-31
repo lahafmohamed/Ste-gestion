@@ -1,48 +1,29 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ReceptionSection from "../components/ReceptionSection";
 import StepLayout from "../components/StepLayout";
-import {
-  BordereauVariant,
-  GuichetVariant,
-  VariantPicker,
-  type ReceptionVariantKey,
-} from "../variants/ReceptionVariants";
 
 /** Étape 1 · au portail : le bordereau SODEFOR, rien de plus. */
 export default function ReceptionPage() {
   const navigate = useNavigate();
-  // HARNAIS DE VARIANTES (temporaire) : ?variant=guichet|bordereau — fiche
-  // (l'actuel) par défaut. À retirer avec src/variants/ après promotion.
-  const [params] = useSearchParams();
-  const variant = (params.get("variant") ?? "fiche") as ReceptionVariantKey;
+  // La mesure du bois est un autre poste : on passe la main à l'Étalage, sur le
+  // camion qui vient d'être réceptionné.
+  const onEtaler = (truckId: string) => navigate(`/etalage?truck=${truckId}`);
+
   return (
     <StepLayout
       title="Réception"
-      subtitle="Le camion arrive : bordereau SODEFOR (immat, B/L, parcelle, vol brousse, billes annoncées)."
-      step="reception"
+      // Le portail voit passer tous les camions : par défaut aucun contrat
+      // n'est choisi et la liste les montre tous. Le contrat redevient
+      // obligatoire au moment d'enregistrer un camion (dans le formulaire).
+      renderAllContracts={() => <ReceptionSection contractId={null} onEtaler={onEtaler} />}
     >
-      {(c) => {
-        const props = {
-          contractId: c.id,
-          closed: c.status === "CLOSED",
-          // La mesure du bois est un autre poste : on passe la main à l'Étalage,
-          // avec le camion à ouvrir quand il vient d'être réceptionné.
-          onEtaler: (truckId: string | null) =>
-            navigate(truckId ? `/etalage?truck=${truckId}` : "/etalage"),
-        };
-        return (
-          <>
-            {variant === "guichet" ? (
-              <GuichetVariant {...props} />
-            ) : variant === "bordereau" ? (
-              <BordereauVariant {...props} />
-            ) : (
-              <ReceptionSection {...props} />
-            )}
-            <VariantPicker />
-          </>
-        );
-      }}
+      {(c) => (
+        <ReceptionSection
+          contractId={c.id}
+          closed={c.status === "CLOSED"}
+          onEtaler={onEtaler}
+        />
+      )}
     </StepLayout>
   );
 }

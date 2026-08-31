@@ -22,20 +22,24 @@ function Base({ children, ...props }: SVGProps<SVGSVGElement>) {
 
 export type IconProps = SVGProps<SVGSVGElement>;
 
+// Jauge de quota — ce que le tableau de bord montre vraiment : combien du
+// quota SODEFOR est consommé. La grille « bento » générique n'en disait rien.
 export const IconDashboard = (p: IconProps) => (
   <Base {...p}>
-    <rect x="3" y="3" width="7" height="9" rx="1" />
-    <rect x="14" y="3" width="7" height="5" rx="1" />
-    <rect x="14" y="12" width="7" height="9" rx="1" />
-    <rect x="3" y="16" width="7" height="5" rx="1" />
+    <path d="M3.5 17.5a8.5 8.5 0 0 1 17 0" />
+    <path d="M12 17.5l4.5-4.5" />
+    <circle cx="12" cy="17.5" r="1.25" />
   </Base>
 );
 
+// Document + tampon : un contrat SODEFOR ne vaut que tamponné, et le cachet
+// distingue l'icône des autres papiers du jeu (Rapport, Comptabilité).
 export const IconContract = (p: IconProps) => (
   <Base {...p}>
     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
     <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" />
-    <path d="M9 9h1M9 13h6M9 17h6" />
+    <path d="M9 9h1M9 12.5h6" />
+    <circle cx="14" cy="16.5" r="2.5" />
   </Base>
 );
 
@@ -45,6 +49,17 @@ export const IconTruck = (p: IconProps) => (
     <path d="M13 8h4l4 4v4h-8" />
     <circle cx="7" cy="18" r="2" />
     <circle cx="17" cy="18" r="2" />
+  </Base>
+);
+
+// Camion vu de face — le parc (référentiel), là où IconTruck (de profil) est
+// l'arrivée d'un camion au portail.
+export const IconFleet = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M6 3h12a1 1 0 0 1 1 1v4H5V4a1 1 0 0 1 1-1Z" />
+    <rect x="3" y="8" width="18" height="8" rx="1.5" />
+    <path d="M7 12h2M15 12h2" />
+    <path d="M6 16v2M18 16v2" />
   </Base>
 );
 
@@ -60,20 +75,24 @@ export const IconLogs = (p: IconProps) => (
   </Base>
 );
 
+// Ruban de scie + billon vu en bout (même vocabulaire que IconLogs : cercle
+// + cœur). L'ancien dessin était une scie à main, pas une scierie.
 export const IconSaw = (p: IconProps) => (
   <Base {...p}>
-    <path d="M3 7l6 6" />
-    <path d="M4 4l4 1-1 4-4-1z" />
-    <path d="M9 13l7-7 5 5-7 7" />
-    <path d="M14 18l3 3" />
+    <circle cx="8" cy="12" r="5.5" />
+    <circle cx="8" cy="12" r="1" />
+    <path d="M17.5 3v18" />
+    <path d="M17.5 6l2 1.5-2 1.5M17.5 12l2 1.5-2 1.5" />
   </Base>
 );
 
+// Pile d'avivés — le stock est du bois débité, empilé. Largeurs inégales pour
+// que trois barres ne se lisent pas comme un menu.
 export const IconBox = (p: IconProps) => (
   <Base {...p}>
-    <path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" />
-    <path d="M3 8l9 5 9-5" />
-    <path d="M12 13v8" />
+    <rect x="4" y="4.5" width="16" height="4" rx="1" />
+    <rect x="2.5" y="10" width="19" height="4" rx="1" />
+    <rect x="6" y="15.5" width="12" height="4" rx="1" />
   </Base>
 );
 

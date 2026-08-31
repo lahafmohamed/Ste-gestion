@@ -391,13 +391,7 @@ export default function ContractDetailPage() {
           <ReceptionSection
             contractId={c.id}
             closed={c.status === "CLOSED"}
-            onEtaler={(truckId) => {
-              if (truckId) setEtalerId(truckId);
-              else
-                document
-                  .getElementById("etalage")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
+            onEtaler={(truckId) => setEtalerId(truckId)}
           />
           <EtalageSection
             contractId={c.id}

@@ -7,7 +7,6 @@ export default function DebitagePage() {
     <StepLayout
       title="Débitage"
       subtitle="Billons sciés → avivés par taille, rendement auto (débité ÷ billons)."
-      step="debitage"
     >
       {(c) => (
         <>

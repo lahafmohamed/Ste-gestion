@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { USER_ROLE_LABELS } from "@ste/shared";
 import { clearSession, getUser } from "../lib/auth";
 import { FEATURES } from "../lib/features";
 import { buttonCls } from "./ui/Button";
+import { OfflineBanner, UpdateBanner } from "./AppBanners";
 import {
   IconBox,
   IconContainer,
   IconContract,
   IconDashboard,
+  IconFleet,
   IconLedger,
   IconLogout,
   IconLogs,
@@ -34,6 +37,8 @@ const NAV: NavItem[] = (
     { to: "/stock", label: "Stock", Icon: IconBox, end: false },
     { to: "/ventes", label: "Ventes", Icon: IconSales, end: false, enabled: FEATURES.sales },
     { to: "/empotage", label: "Empotage", Icon: IconContainer, end: false },
+    // Référentiel, hors chaîne de production : rangé après les postes.
+    { to: "/camions", label: "Camions", Icon: IconFleet, end: false },
     {
       to: "/compta",
       label: "Comptabilité",
@@ -52,6 +57,20 @@ const ADMIN_NAV: NavItem[] = [
 function logout() {
   clearSession();
   window.location.href = "/";
+}
+
+/**
+ * Pastille derrière l'icône de navigation : c'est l'aplat qui porte l'emphase,
+ * pas l'épaisseur du trait. Les classes viennent de l'appelant parce que la
+ * surface d'accueil change — blanc dans l'en-tête, aplat teck dans le drawer,
+ * où une pastille teck serait invisible et se creuse donc en blanc translucide.
+ */
+function IconPill({ tone, children }: { tone: string; children: ReactNode }) {
+  return (
+    <span className={`flex shrink-0 items-center justify-center rounded-full p-1.5 ${tone}`}>
+      {children}
+    </span>
+  );
 }
 
 function NavList({
@@ -81,8 +100,14 @@ function NavList({
               }`
             }
           >
-            <n.Icon className="shrink-0" />
-            {n.label}
+            {({ isActive }) => (
+              <>
+                <IconPill tone={isActive ? "bg-white/20 text-white" : "bg-brand-100"}>
+                  <n.Icon />
+                </IconPill>
+                {n.label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -100,6 +125,129 @@ function NavList({
         </div>
       )}
     </>
+  );
+}
+
+// Onglets de navigation principaux — dans l'en-tête, sur la ligne du logo, à
+// partir de lg. En dessous c'est le drawer qui porte la navigation : les neuf
+// postes ne tiennent pas à côté de la marque et des actions sans défiler.
+// `className` porte le display : deux utilitaires de display dans la même
+// classe ne se départageraient pas de façon fiable.
+function NavTabs({ nav, className }: { nav: NavItem[]; className: string }) {
+  return (
+    <nav className={`overflow-x-auto ${className}`} aria-label="Navigation principale">
+      {nav.map((n) => (
+        <NavLink
+          key={n.to}
+          to={n.to}
+          end={n.end}
+          className={({ isActive }) =>
+            `flex min-h-touch shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-900 ${
+              isActive
+                ? "border-accent-500 font-medium text-accent-700"
+                : "border-transparent text-brand-600 hover:bg-brand-100 active:bg-brand-200"
+            }`
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <IconPill tone={isActive ? "bg-accent-500 text-white" : "bg-brand-100"}>
+                <n.Icon width={18} height={18} />
+              </IconPill>
+              {n.label}
+            </>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+// Actions du compte repliées derrière un seul déclencheur — c'est ce qui rend
+// à la navigation la largeur qu'elles occupaient sur la ligne du logo.
+// « + Contrat » reste dehors : c'est l'action que le bureau répète, l'enterrer
+// d'un cran la punirait.
+function ActionsMenu({ user }: { user: ReturnType<typeof getUser> }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Échap et clic dehors referment ; le focus revient au déclencheur, sinon il
+  // repart au début du document et la tabulation recommence tout l'en-tête.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    const onDown = (e: PointerEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [open]);
+
+  const itemCls =
+    "flex min-h-touch w-full items-center gap-2 rounded-lg px-3 text-left text-sm text-brand-700 hover:bg-brand-100 active:bg-brand-200";
+
+  return (
+    <div ref={wrapRef} className="relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        // Le nom disparaît sous md : le libellé accessible doit rester, lui.
+        aria-label={user ? `Menu de ${user.name}` : "Menu"}
+        className="flex min-h-touch items-center gap-1.5 rounded-lg px-2 text-sm text-brand-600 hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900 active:bg-brand-200"
+      >
+        <span className="hidden max-w-[8rem] truncate md:inline">{user?.name ?? "Compte"}</span>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.75}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`h-5 w-5 shrink-0 text-brand-400 transition-transform duration-150 ease-out ${
+            open ? "-rotate-180" : ""
+          }`}
+          aria-hidden
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Actions du compte"
+          className="absolute right-0 top-full z-overlay mt-2 w-56 rounded-2xl border border-brand-200 bg-white p-2 shadow-popover"
+        >
+          <Link to="/contracts" role="menuitem" onClick={() => setOpen(false)} className={itemCls}>
+            <IconContract width={16} height={16} />
+            Contrats
+          </Link>
+          {user && (
+            <>
+              <div className="mt-1 border-t border-brand-100 px-3 pb-1 pt-2 text-xs text-brand-400">
+                {user.name} · {USER_ROLE_LABELS[user.role]}
+              </div>
+              <button type="button" role="menuitem" onClick={logout} className={itemCls}>
+                <IconLogout width={16} height={16} />
+                Déconnexion
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -126,15 +274,17 @@ export default function Layout() {
   }, [menuOpen]);
   return (
     <div className="min-h-dvh bg-brand-50 text-brand-900">
-      {/* Header STE — permanent, toutes tailles d'écran */}
-      <header className="fixed inset-x-0 top-0 z-header flex h-header items-center justify-between border-b border-brand-200 bg-white px-4 short:h-header-sm">
-        <div className="flex items-center gap-1">
+      {/* En-tête STE — une seule rangée, à toutes les tailles d'écran :
+          marque, navigation des postes (à partir de lg), actions. */}
+      <header className="fixed inset-x-0 top-0 z-header flex h-header items-center gap-2 border-b border-brand-200 bg-white px-4 short:h-header-sm">
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Sous lg, la navigation vit dans le drawer : c'est ce bouton qui l'ouvre. */}
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             aria-label="Ouvrir le menu"
             aria-expanded={menuOpen}
-            className="-ml-2.5 rounded-lg p-2.5 text-brand-600 hover:bg-brand-100 active:bg-brand-200 md:hidden"
+            className="-ml-2.5 rounded-lg p-2.5 text-brand-600 hover:bg-brand-100 active:bg-brand-200 lg:hidden"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="4" y1="7" x2="20" y2="7" />
@@ -142,39 +292,31 @@ export default function Layout() {
               <line x1="4" y1="17" x2="20" y2="17" />
             </svg>
           </button>
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/logo-ste.png" alt="STE — Sustainable Teck Exports" className="h-8 w-auto" />
-            <span className="hidden text-sm text-brand-500 sm:inline">Gestion scierie</span>
+          {/* Marque compacte : le logo complet (filets + tagline) est illisible
+              à 32px. Sans mot-repère à côté — la largeur qu'il prenait revient
+              à la navigation, et le logo dit déjà STE. */}
+          <Link to="/" className="flex items-center">
+            <img src="/logo-ste-mark.png" alt="STE — Sustainable Teck Exports" className="h-6 w-auto" />
           </Link>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Icône seule sur mobile → le nom doit rester lisible au lecteur d'écran. */}
-          <Link to="/contracts" aria-label="Contrats" className={buttonCls("secondary", "sm")}>
-            <IconContract width={16} height={16} />
-            <span className="hidden sm:inline">Contrats</span>
-          </Link>
+
+        {/* self-stretch : les onglets montent sur toute la hauteur de l'en-tête,
+            pour que le soulignement de l'onglet actif tombe pile sur sa bordure
+            basse. flex-1 + min-w-0 : la nav prend la place restante et défile
+            plutôt que de pousser les actions hors de l'écran. */}
+        <NavTabs nav={nav} className="ml-2 hidden min-w-0 flex-1 self-stretch lg:flex" />
+
+        {/* ml-auto sous lg : sans la nav pour occuper le milieu, les actions
+            doivent être poussées à droite elles-mêmes. */}
+        <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
           {!onContracts && (
             <Link to="/contracts?nouveau=1" className={buttonCls("primary", "sm")}>
               + Contrat
             </Link>
           )}
-          {user && (
-            <button
-              onClick={logout}
-              aria-label="Déconnexion"
-              className="ml-1 hidden items-center gap-1.5 text-xs text-brand-500 hover:text-brand-900 md:flex"
-            >
-              {user.name}
-              <IconLogout width={16} height={16} />
-            </button>
-          )}
+          <ActionsMenu user={user} />
         </div>
       </header>
-
-      {/* Sidebar desktop */}
-      <aside className="fixed bottom-0 left-0 top-header hidden w-56 flex-col border-r border-brand-200 bg-white px-3 py-4 md:flex">
-        <NavList nav={nav} user={user} />
-      </aside>
 
       {/* Drawer mobile */}
       {/* aria-hidden fermé : le drawer hors écran reste dans le DOM (transition),
@@ -196,7 +338,7 @@ export default function Layout() {
           }`}
         >
           <div className="mb-3 flex items-center justify-between px-1">
-            <img src="/logo-ste.png" alt="STE — Sustainable Teck Exports" className="h-7 w-auto" />
+            <img src="/logo-ste-mark.png" alt="STE — Sustainable Teck Exports" className="h-5 w-auto" />
             <button
               type="button"
               onClick={() => setMenuOpen(false)}
@@ -214,7 +356,11 @@ export default function Layout() {
       </div>
 
       {/* Contenu */}
-      <div className="pt-header short:pt-header-sm md:pl-56">
+      <div className="pt-header short:pt-header-sm">
+        {/* État réseau et mise à jour : sous l'en-tête fixe, au-dessus de la
+            page — jamais par-dessus la zone de saisie. */}
+        <UpdateBanner />
+        <OfflineBanner />
         <main className="pb-[calc(1.5rem_+_env(safe-area-inset-bottom))]">
           <Outlet />
         </main>

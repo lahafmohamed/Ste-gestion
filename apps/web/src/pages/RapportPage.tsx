@@ -6,7 +6,9 @@ import StepLayout from "../components/StepLayout";
 import { contractsApi } from "../lib/api";
 import { fmtNum, fmtPct } from "../lib/format";
 import Button from "../components/ui/Button";
+import DateField from "../components/ui/DateField";
 import { QueryError } from "../components/ui/Feedback";
+import { Field } from "../components/ui/Input";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -155,15 +157,9 @@ function RapportInner({
   return (
     <>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-brand-600">Date</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="min-h-touch rounded-lg border border-brand-300 px-3 py-2 text-base outline-none focus:border-brand-900"
-          />
-        </label>
+        <Field label="Date" className="w-48">
+          <DateField value={date} onChange={setDate} />
+        </Field>
         <div className="flex flex-wrap gap-2">
           <Button onClick={printReport} disabled={!text}>
             Imprimer / PDF

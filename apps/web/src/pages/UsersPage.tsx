@@ -6,7 +6,8 @@ import { PageHeader } from "../components/Layout";
 import { getUser } from "../lib/auth";
 import Button from "../components/ui/Button";
 import { FormError, QueryError } from "../components/ui/Feedback";
-import Input, { Field, Select } from "../components/ui/Input";
+import Input, { Field } from "../components/ui/Input";
+import SelectField from "../components/ui/SelectField";
 import { SkeletonList } from "../components/ui/Skeleton";
 
 const ROLES = UserRole.options;
@@ -88,16 +89,12 @@ export default function UsersPage() {
               />
             </Field>
             <Field label="Rôle">
-              <Select
+              <SelectField
                 value={v.role}
-                onChange={(e) => setV((p) => ({ ...p, role: e.target.value }))}
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {USER_ROLE_LABELS[r]}
-                  </option>
-                ))}
-              </Select>
+                onChange={(role) => setV((p) => ({ ...p, role }))}
+                aria-label="Rôle du nouvel utilisateur"
+                options={ROLES.map((r) => ({ value: r, label: USER_ROLE_LABELS[r] }))}
+              />
             </Field>
             <div className="col-span-2 flex items-center justify-between sm:col-span-4">
               {error && <FormError>{error}</FormError>}
@@ -130,20 +127,14 @@ export default function UsersPage() {
                 <div className="text-xs text-brand-500">{u.email}</div>
               </div>
               <div className="flex items-center gap-2">
-                <Select
+                <SelectField
                   value={u.role}
                   disabled={me?.id === u.id}
-                  onChange={(e) =>
-                    update.mutate({ id: u.id, role: e.target.value as UserRole })
-                  }
-                  className="w-auto"
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {USER_ROLE_LABELS[r]}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={(role) => update.mutate({ id: u.id, role: role as UserRole })}
+                  width="auto"
+                  aria-label={`Rôle de ${u.name}`}
+                  options={ROLES.map((r) => ({ value: r, label: USER_ROLE_LABELS[r] }))}
+                />
                 <Button
                   size="xs"
                   disabled={me?.id === u.id}
