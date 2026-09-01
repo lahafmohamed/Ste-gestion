@@ -292,6 +292,7 @@ export function plateKey(registration: string): string {
  */
 const vehicleFields = {
   code: z.string().trim().max(20).nullable().optional(),
+  brand: z.string().trim().max(50).nullable().optional(),
   driver: z.string().trim().max(100).nullable().optional(),
   trailer: z.string().trim().max(50).nullable().optional(),
 };
@@ -317,6 +318,8 @@ export type VehicleDTO = {
   plateKey: string;
   /** Code interne du parc (« STE-01 ») — `null` tant qu'il n'est pas attribué. */
   code: string | null;
+  /** Marque (« RENAULT », « MERCEDES BENZ ») — texte libre. */
+  brand: string | null;
   driver: string | null;
   trailer: string | null;
   active: boolean;

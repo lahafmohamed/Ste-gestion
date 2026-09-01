@@ -20,13 +20,14 @@ import { SkeletonList } from "../components/ui/Skeleton";
 // crée sa fiche. Cette page sert alors à la compléter (code, chauffeur) et à
 // faire le ménage (doublons d'écriture, camions sortis du service).
 
-const EMPTY = { registration: "", code: "", driver: "", trailer: "" };
+const EMPTY = { registration: "", code: "", brand: "", driver: "", trailer: "" };
 type Form = typeof EMPTY;
 
 function toForm(v: VehicleDTO): Form {
   return {
     registration: v.registration,
     code: v.code ?? "",
+    brand: v.brand ?? "",
     driver: v.driver ?? "",
     trailer: v.trailer ?? "",
   };
@@ -37,6 +38,7 @@ function toPayload(f: Form) {
   return {
     registration: f.registration.trim(),
     code: f.code.trim() || null,
+    brand: f.brand.trim() || null,
     driver: f.driver.trim() || null,
     trailer: f.trailer.trim() || null,
   };
@@ -44,6 +46,7 @@ function toPayload(f: Form) {
 
 const FIELDS = [
   ["code", "Code", "STE-01"],
+  ["brand", "Marque", "RENAULT"],
   ["driver", "Chauffeur", "KONATE MADOU"],
   ["trailer", "Remorque", "7794 F3 01"],
 ] as const;
@@ -111,7 +114,7 @@ export default function CamionsPage() {
   const shown = (vehicles.data ?? []).filter((x) =>
     needle === ""
       ? true
-      : [x.registration, x.code, x.driver, x.trailer]
+      : [x.registration, x.code, x.brand, x.driver, x.trailer]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -307,7 +310,9 @@ export default function CamionsPage() {
                       )}
                     </div>
                     <div className="mt-1 text-sm text-brand-500">
-                      {x.driver || "Chauffeur non renseigné"}
+                      {[x.brand, x.driver || "Chauffeur non renseigné"]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </div>
                     {x.lastTripAt && (
                       <div className="mt-0.5 text-sm text-brand-400">

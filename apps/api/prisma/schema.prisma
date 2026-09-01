@@ -166,6 +166,8 @@ model Vehicle {
   // ici, plus court à dire qu'une plaque. Optionnel — un camion né d'une
   // réception n'en a pas encore.
   code         String? @unique
+  // Marque du camion (« RENAULT », « MERCEDES BENZ ») — descriptif, texte libre.
+  brand        String?
 
   // Attelage habituel — prérempli à la réception, surchargeable au bordereau.
   driver      String?
