@@ -33,7 +33,7 @@ export default function TruckCard({
   const volGap = d.m3 != null && d.m3 > 0 && total != null ? total - d.m3 : null;
 
   return (
-    <div className="rounded-xl border border-brand-200 bg-white p-3">
+    <div className="rounded-xl bg-white shadow-card p-3">
       <Link
         to={`/trucks/${t.id}`}
         className="block transition-opacity hover:opacity-80 active:opacity-60"

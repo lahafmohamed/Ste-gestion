@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 export function EmptyState({ action, children }: { action?: ReactNode; children: ReactNode }) {
   if (!action) return <p className="text-sm text-brand-500">{children}</p>;
   return (
-    <div className="rounded-xl border border-dashed border-brand-300 p-6 text-center">
+    <div className="rounded-xl border border-dashed border-brand-300 px-6 py-8 text-center">
       <p className="text-sm text-brand-500">{children}</p>
-      <div className="mt-3">{action}</div>
+      <div className="mt-4">{action}</div>
     </div>
   );
 }
@@ -22,7 +22,7 @@ export function QueryError({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+    <div className="rounded-xl bg-red-50 p-4 ring-1 ring-inset ring-red-200">
       <p className="text-sm text-red-700">
         {children}
         {error instanceof Error ? ` : ${error.message}` : "."}
@@ -30,7 +30,7 @@ export function QueryError({
       <button
         type="button"
         onClick={onRetry}
-        className="mt-2 min-h-touch rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 active:bg-red-200"
+        className="mt-2 min-h-touch rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 active:bg-red-200"
       >
         Réessayer
       </button>
@@ -41,7 +41,7 @@ export function QueryError({
 /** Échec d'enregistrement (mutation), affiché près du bouton qui a échoué. */
 export function FormError({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
-    <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+    <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200/70">
       {children}
       {hint && <div className="mt-0.5 text-xs text-red-600">{hint}</div>}
     </div>

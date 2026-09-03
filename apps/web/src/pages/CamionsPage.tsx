@@ -124,6 +124,7 @@ export default function CamionsPage() {
   return (
     <>
       <PageHeader
+        wide={false}
         title="Camions"
         right={
           <Button
@@ -145,7 +146,7 @@ export default function CamionsPage() {
               e.preventDefault();
               create.mutate();
             }}
-            className="mb-4 rounded-xl border border-brand-200 bg-white p-4"
+            className="mb-4 rounded-xl bg-white shadow-card p-4"
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Immatriculation">

@@ -260,7 +260,7 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
         )}
       </div>
 
-      <div className="rounded-xl border border-brand-200 bg-white p-4">
+      <div className="rounded-xl bg-white shadow-card p-4">
         {editing ? (
           <PackingEntry
             truckId={truck.id}

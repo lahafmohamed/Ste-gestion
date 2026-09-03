@@ -80,7 +80,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
         Débitage
       </SectionHeading>
 
-      <div className="rounded-xl border border-brand-200 bg-white p-4">
+      <div className="rounded-xl bg-white shadow-card p-4">
         {stats.isError || runs.isError ? (
           <QueryError
             error={stats.error ?? runs.error}
@@ -206,7 +206,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
                     <Link
                       key={r.id}
                       to={`/production-runs/${r.id}`}
-                      className="block rounded-lg border border-brand-200 p-2.5 transition-colors hover:border-brand-400 active:border-brand-500 active:bg-brand-50"
+                      className="block rounded-lg bg-white p-2.5 shadow-card transition-[box-shadow,transform] duration-200 ease-out hover:shadow-card-hover active:scale-[0.99] active:shadow-card"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm text-brand-900">

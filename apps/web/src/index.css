@@ -1,3 +1,7 @@
+/* Inter variable (latin + latin-ext), auto-hébergée : l'app doit s'ouvrir
+   hors ligne au parc — aucune police ne peut venir du réseau. */
+@import "@fontsource-variable/inter";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,6 +14,25 @@
     /* iOS paysage : ne pas gonfler les tailles de texte automatiquement. */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Rendu net des lettres fines d'Inter (macOS/iOS lissent trop). */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Application de chiffres : colonnes, totaux, cubages qui se recalculent
+       à chaque frappe — largeur fixe des chiffres, rien ne bouge. */
+    font-variant-numeric: tabular-nums;
+    /* Inter : « a » simple et chiffres ouverts — plus lisible en petit corps. */
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Titres équilibrés (pas de dernier mot orphelin), paragraphes sans veuve. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
 
   /* Saisie en rafale (étalage : + Bille, bille suivante…) : sans ça, deux taps
@@ -34,25 +57,14 @@
     display: none;
   }
 
-  /* Élévation d'un calque flottant (calendrier, menus) : trois couches
-     transparentes — un anneau 1px qui remplace la bordure, puis deux ombres
-     de portée. Transparent plutôt qu'une bordure pleine : le calque passe
-     au-dessus de fonds variés (cartes, bandeaux) sans jamais jurer. */
-  .shadow-popover {
-    box-shadow:
-      0 0 0 1px oklch(0 0 0 / 0.06),
-      0 4px 8px -2px oklch(0 0 0 / 0.08),
-      0 12px 24px -6px oklch(0 0 0 / 0.1);
-  }
-
   /* Ombres de débordement horizontal : signalent qu'un tableau continue hors
      écran (sur téléphone, un tableau coupé net semble complet). Astuce
      background-attachment local/scroll — zéro JS. */
   .scroll-shadow-x {
     background-image: linear-gradient(to right, white, transparent),
       linear-gradient(to left, white, transparent),
-      linear-gradient(to right, rgb(15 23 42 / 0.08), transparent),
-      linear-gradient(to left, rgb(15 23 42 / 0.08), transparent);
+      linear-gradient(to right, oklch(0 0 0 / 0.07), transparent),
+      linear-gradient(to left, oklch(0 0 0 / 0.07), transparent);
     background-position: left center, right center, left center, right center;
     background-repeat: no-repeat;
     background-size: 2.5rem 100%, 2.5rem 100%, 0.875rem 100%, 0.875rem 100%;

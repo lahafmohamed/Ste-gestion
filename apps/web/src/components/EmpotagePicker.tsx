@@ -122,7 +122,7 @@ export default function EmpotagePicker({
   }
 
   return (
-    <div className="rounded-xl border border-brand-200 bg-white p-3">
+    <div className="rounded-xl bg-white shadow-card p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <div className="min-w-[10rem] flex-1">
           <SearchInput
@@ -220,7 +220,7 @@ export default function EmpotagePicker({
                     placeholder="0"
                     onChange={(e) => setQty(r.key, e.target.value)}
                     aria-label={`Nombre de pièces ${dimsLabel(r)}`}
-                    className="min-h-touch w-16 rounded-lg border border-brand-200 bg-white text-center text-base tabular-nums text-brand-900 outline-none focus:border-brand-900"
+                    className="min-h-touch w-16 rounded-lg bg-white shadow-card text-center text-base tabular-nums text-brand-900 outline-none transition-[border-color,box-shadow] focus:border-accent-500 focus:ring-[3px] focus:ring-accent-500/20"
                   />
                   <button
                     type="button"

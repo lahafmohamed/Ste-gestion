@@ -354,7 +354,7 @@ export function ContractQuickCreate({
         setError(null);
         create.mutate();
       }}
-      className="rounded-xl border border-brand-200 bg-white p-4"
+      className="rounded-xl bg-white shadow-card p-4"
     >
       <h3 className="text-sm font-semibold text-brand-900">Nouveau contrat</h3>
       <p className="mt-1 text-xs text-brand-400">

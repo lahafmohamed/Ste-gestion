@@ -314,7 +314,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
       {/* Récap + validation collés en bas : sur une longue session, le total
           courant et le bouton Valider restent visibles pendant la saisie
           (même motif que TallyEntry). */}
-      <div className="sticky bottom-0 z-10 mt-3 rounded-lg border border-brand-200 bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_-6px_16px_-8px_rgba(15,23,42,0.35)]">
+      <div className="sticky bottom-0 z-10 mt-3 rounded-xl bg-white/95 p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_-8px_24px_-12px_oklch(0_0_0/0.25)] backdrop-blur-sm">
         <div className="flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm">
           <span className="text-brand-500">{fmtNum(pieces)} pièces</span>
           <span className="font-semibold text-brand-900">{fmtNum(total.toFixed(6))} m³</span>

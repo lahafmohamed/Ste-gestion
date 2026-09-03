@@ -58,7 +58,7 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
   return (
     <form
       onSubmit={submit}
-      className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-brand-200 bg-white p-4 sm:grid-cols-3"
+      className="mb-3 grid grid-cols-2 gap-3 rounded-xl bg-white shadow-card p-4 sm:grid-cols-3"
     >
       <Field label="Tiers">
         <Input
@@ -215,7 +215,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
           const balance = Number(a.balance);
           const isOpen = open === a.party.id;
           return (
-            <div key={a.party.id} className="rounded-xl border border-brand-200 bg-white">
+            <div key={a.party.id} className="rounded-xl bg-white shadow-card">
               <button
                 onClick={() => setOpen(isOpen ? null : a.party.id)}
                 className="flex min-h-touch w-full items-center justify-between gap-3 p-3 text-left hover:bg-brand-50 active:bg-brand-100"

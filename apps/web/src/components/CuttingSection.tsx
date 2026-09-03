@@ -31,7 +31,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
       {q.data && total <= 0 && <EmptyState>Aucun débit enregistré.</EmptyState>}
 
       {q.data && total > 0 && (
-        <div className="rounded-xl border border-brand-200 bg-white p-4">
+        <div className="rounded-xl bg-white shadow-card p-4">
           <CuttingCharts data={q.data} />
 
           {/* Table par taille */}

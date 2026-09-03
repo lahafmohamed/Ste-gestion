@@ -41,6 +41,7 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader
+        wide={false}
         title="Utilisateurs"
         subtitle="Comptes & rôles (réservé admin)."
         right={
@@ -62,7 +63,7 @@ export default function UsersPage() {
                 role: v.role as UserRole,
               });
             }}
-            className="mb-6 grid grid-cols-2 gap-3 rounded-xl border border-brand-200 bg-white p-4 sm:grid-cols-4"
+            className="mb-6 grid grid-cols-2 gap-3 rounded-xl bg-white shadow-card p-4 sm:grid-cols-4"
           >
             <Field label="Nom">
               <Input
@@ -115,7 +116,7 @@ export default function UsersPage() {
           {users.data?.map((u) => (
             <div
               key={u.id}
-              className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-white p-3 ${
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white shadow-card p-3 ${
                 u.active ? "" : "opacity-50"
               }`}
             >

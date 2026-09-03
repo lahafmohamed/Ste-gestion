@@ -36,8 +36,10 @@ function FlowStep({
 }) {
   return (
     <div
-      className={`min-w-[8.5rem] flex-1 rounded-lg border p-3 ${
-        muted ? "border-dashed border-brand-200 bg-brand-50" : "border-brand-200 bg-white"
+      className={`min-w-[8.5rem] flex-1 rounded-lg p-3 ${
+        muted
+          ? "border border-dashed border-brand-200 bg-brand-50/60"
+          : "bg-brand-50 ring-1 ring-inset ring-brand-100"
       }`}
     >
       <div className="flex items-baseline gap-1.5 text-xs text-brand-500">
@@ -249,7 +251,7 @@ export default function ContractDetailPage() {
       {/* overflow-x-auto force aussi overflow-y en auto (règle CSS) : le -mb-px des
           onglets déborde d'1px et Chrome affiche une barre de défilement verticale
           fantôme à droite. Barres masquées, le glissement tactile reste possible. */}
-      <div className="-mx-4 mt-4 overflow-x-auto border-b border-brand-200 px-4 scrollbar-none scroll-shadow-x">
+      <div className="-mx-4 mt-5 overflow-x-auto border-b border-brand-200 px-4 scrollbar-none">
         <div className="flex min-w-max gap-1">
           {TABS.map((t) => (
             <button
@@ -257,9 +259,9 @@ export default function ContractDetailPage() {
               type="button"
               onClick={() => setTab(t.key)}
               aria-current={tab === t.key ? "page" : undefined}
-              className={`-mb-px min-h-touch whitespace-nowrap border-b-2 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-900 ${
+              className={`-mb-px min-h-touch whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 ${
                 tab === t.key
-                  ? "border-brand-900 font-medium text-brand-900"
+                  ? "border-accent-500 text-accent-800"
                   : "border-transparent text-brand-500 hover:text-brand-900 active:bg-brand-100"
               }`}
             >
@@ -365,17 +367,17 @@ export default function ContractDetailPage() {
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-                <Kpi label="Stock produits" value={fmtM3(s.stockProductsM3)} />
-                <Kpi label="Stock parc (billons)" value={fmtM3(s.stockParcM3)} />
+                <Kpi inset label="Stock produits" value={fmtM3(s.stockProductsM3)} />
+                <Kpi inset label="Stock parc (billons)" value={fmtM3(s.stockParcM3)} />
                 {/* Argent : dépend des ventes et de la compta, en veille tous les deux. */}
                 {SHOW_MONEY && (
                   <>
-                    <Kpi label="Vendu" value={fmtM3(s.soldM3)} />
-                    <Kpi label="CA ventes" value={fmtFcfa(s.salesRevenueCfa)} />
-                    <Kpi label="Full cost" value={fmtFcfa(s.fullCost)} />
-                    <Kpi label="Payé" value={fmtFcfa(s.totalPaid)} />
-                    <Kpi label="Solde" value={fmtFcfa(s.balance)} />
-                    <Kpi label="Profit estimé" value={fmtFcfa(s.profitEstimate)} />
+                    <Kpi inset label="Vendu" value={fmtM3(s.soldM3)} />
+                    <Kpi inset label="CA ventes" value={fmtFcfa(s.salesRevenueCfa)} />
+                    <Kpi inset label="Full cost" value={fmtFcfa(s.fullCost)} />
+                    <Kpi inset label="Payé" value={fmtFcfa(s.totalPaid)} />
+                    <Kpi inset label="Solde" value={fmtFcfa(s.balance)} />
+                    <Kpi inset label="Profit estimé" value={fmtFcfa(s.profitEstimate)} />
                   </>
                 )}
               </div>

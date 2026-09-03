@@ -70,7 +70,7 @@ export default function ProductionSection({ contractId }: { contractId: string }
       </SectionHeading>
 
       {showForm && (
-        <div className="mb-3 rounded-xl border border-brand-200 bg-white p-4">
+        <div className="mb-3 rounded-xl bg-white shadow-card p-4">
           <SawnEntry
             saving={create.isPending}
             trucks={trucks.data}
@@ -85,7 +85,7 @@ export default function ProductionSection({ contractId }: { contractId: string }
       {/* Avancement par camion — la question du parc est « qu'est-ce qui reste
           à scier ? », pas « quelles sessions ont eu lieu ? ». */}
       {sortedProgress.length > 0 && (
-        <div className="mb-3 rounded-xl border border-brand-200 bg-white p-3">
+        <div className="mb-3 rounded-xl bg-white shadow-card p-3">
           <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-brand-400">
             Camions — avancement sciage
           </div>
@@ -157,7 +157,7 @@ export default function ProductionSection({ contractId }: { contractId: string }
             <Link
               key={r.id}
               to={`/production-runs/${r.id}`}
-              className="block rounded-xl border border-brand-200 bg-white p-3 transition-colors hover:border-brand-400 active:border-brand-500 active:bg-brand-50"
+              className="block rounded-xl bg-white p-3 shadow-card transition-[box-shadow,transform] duration-200 ease-out hover:shadow-card-hover active:scale-[0.99] active:shadow-card"
             >
               <div className="flex items-center justify-between">
                 <div className="font-medium text-brand-900">

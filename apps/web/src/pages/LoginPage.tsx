@@ -59,25 +59,35 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const passwordInvalid = Boolean(fieldErrors.password || error);
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-brand-50 px-4">
+    // Fond papier + deux halos très doux aux couleurs du logo (teck, sève) :
+    // l'écran d'accueil n'est pas un formulaire posé sur du gris.
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-ground px-4 py-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-32 -top-32 size-[28rem] rounded-full bg-accent-200/50 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 -right-24 size-[26rem] rounded-full bg-parc-200/40 blur-3xl"
+      />
       <form
         noValidate
         onSubmit={submit}
-        className="w-full max-w-sm rounded-2xl border border-brand-200 bg-white p-6 shadow-sm motion-safe:animate-rise-in"
+        className="relative w-full max-w-sm rounded-2xl bg-white p-7 shadow-dialog motion-safe:animate-rise-in"
       >
         {/* Logo complet ici seulement : assez de place pour que la tagline soit lisible. */}
         <img
           src="/logo-ste.png"
           alt=""
           aria-hidden="true"
-          className="mx-auto mb-5 w-full max-w-[280px]"
+          className="mx-auto mb-6 w-full max-w-[260px]"
         />
-        <h1 className="text-xl font-semibold text-brand-900">{APP_NAME}</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-brand-900">{APP_NAME}</h1>
         <p className="mt-1 text-sm text-brand-500">Connexion à la gestion scierie.</p>
 
         <Field
           label="Email"
-          className="mt-5"
+          className="mt-6"
           error={fieldErrors.email}
           errorId="login-email-error"
         >
@@ -90,7 +100,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
               setEmail(e.target.value);
               if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
             }}
-            placeholder="admin@local"
+            placeholder="prenom@ste.ci"
             className={fieldErrors.email ? inputErrorCls : ""}
             aria-invalid={emailInvalid || undefined}
             aria-describedby={
@@ -101,7 +111,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
 
         <Field
           label="Mot de passe"
-          className="mt-3"
+          className="mt-4"
           error={fieldErrors.password}
           errorId="login-password-error"
         >
@@ -125,7 +135,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         {/* Zone d'annonce stable : présente dès le rendu, le lecteur d'écran
             annonce le texte quand il apparaît (role="alert" inséré à la volée
             est ignoré par certains lecteurs). */}
-        <div role="alert" id="login-error" className="mt-3 empty:mt-0">
+        <div role="alert" id="login-error" className="mt-4 empty:mt-0">
           {error && (
             <div key={errorKey} className="motion-safe:animate-shake">
               <FormError>{error}</FormError>
@@ -133,7 +143,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
           )}
         </div>
 
-        <Button type="submit" variant="primary" size="lg" disabled={loading} className="mt-5 w-full">
+        <Button type="submit" variant="primary" size="lg" disabled={loading} className="mt-6 w-full">
           {loading && (
             <span
               aria-hidden="true"

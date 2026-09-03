@@ -10,6 +10,19 @@ export default {
         // paddings) se compacte pour laisser la place à la saisie.
         short: { raw: "(max-height: 480px)" },
       },
+      fontFamily: {
+        // Inter (variable, auto-hébergée via @fontsource — l'app tourne hors
+        // ligne au parc, pas de Google Fonts). Segoe/Roboto en secours.
+        sans: [
+          "'Inter Variable'",
+          "Inter",
+          "system-ui",
+          "-apple-system",
+          "'Segoe UI'",
+          "Roboto",
+          "sans-serif",
+        ],
+      },
       fontSize: {
         // Titres fluides : lisibles sur téléphone sans manger l'écran, plus
         // grands dès que la largeur le permet.
@@ -25,6 +38,9 @@ export default {
         //    billonner…). Jaune-vert : texte/boutons à partir du 700 (AA),
         //    le 500 reste pour aplats et jauges.
         brand: colors.stone,
+        // Fond de page : papier chaud, un cran sous brand-50 pour que les
+        // cartes blanches se détachent par l'ombre et non par une bordure.
+        ground: "#F5F3F0",
         accent: {
           50: "#FAF8F6",
           100: "#F1ECE7",
@@ -51,6 +67,25 @@ export default {
           900: "#3C551E",
           950: "#1E2D0C",
         },
+      },
+      boxShadow: {
+        // Élévation par ombres transparentes (pas de bordure pleine) : un
+        // anneau 1px très léger tient lieu de contour, puis une ombre de
+        // portée courte. Les surfaces gardent leur relief sur tout fond.
+        card:
+          "0 0 0 1px oklch(0 0 0 / 0.05), 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 2px 6px -2px oklch(0 0 0 / 0.06)",
+        "card-hover":
+          "0 0 0 1px oklch(0 0 0 / 0.08), 0 2px 4px 0 oklch(0 0 0 / 0.05), 0 8px 20px -6px oklch(0 0 0 / 0.12)",
+        // Bouton plein : liseré clair en haut (relief) + ombre courte.
+        btn: "inset 0 1px 0 0 oklch(1 0 0 / 0.14), 0 1px 2px 0 oklch(0 0 0 / 0.12)",
+        // Calque flottant (calendrier, menus) : anneau + deux ombres de portée.
+        popover:
+          "0 0 0 1px oklch(0 0 0 / 0.06), 0 4px 8px -2px oklch(0 0 0 / 0.08), 0 12px 24px -6px oklch(0 0 0 / 0.1)",
+        // Boîte de dialogue : portée longue, le fond est voilé derrière.
+        dialog:
+          "0 0 0 1px oklch(0 0 0 / 0.06), 0 8px 16px -4px oklch(0 0 0 / 0.1), 0 24px 48px -12px oklch(0 0 0 / 0.18)",
+        // En-tête fixe : trait bas très léger, sans bordure dure.
+        header: "0 1px 0 0 oklch(0 0 0 / 0.06), 0 1px 8px 0 oklch(0 0 0 / 0.03)",
       },
       minHeight: {
         // Planchers tactiles : touch = 44px (saisie, nav), touch-lg = 48px
@@ -82,6 +117,15 @@ export default {
           from: { opacity: "0", transform: "translateY(12px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        // Calque flottant (menu, dialogue) : fondu + léger zoom depuis 0.96.
+        "pop-in": {
+          from: { opacity: "0", transform: "scale(0.96) translateY(-4px)" },
+          to: { opacity: "1", transform: "scale(1) translateY(0)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
         // Secousse horizontale d'erreur de formulaire.
         shake: {
           "0%, 100%": { transform: "translateX(0)" },
@@ -92,6 +136,8 @@ export default {
       animation: {
         // Toujours utiliser via motion-safe: (prefers-reduced-motion).
         "rise-in": "rise-in 0.3s ease-out both",
+        "pop-in": "pop-in 0.15s cubic-bezier(0.2, 0, 0, 1) both",
+        "fade-in": "fade-in 0.2s ease-out both",
         shake: "shake 0.25s ease-in-out",
       },
     },

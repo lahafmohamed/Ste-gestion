@@ -6,7 +6,7 @@ import { fmtFcfa } from "../lib/format";
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-brand-200 bg-white p-3">
+    <div className="rounded-lg bg-white shadow-card p-3">
       <div className="text-xs text-brand-500">{label}</div>
       <div className="mt-1 text-lg font-semibold text-brand-900">{value}</div>
     </div>

@@ -9,6 +9,7 @@ import { ContractQuickCreate } from "../components/ContractSections";
 import { QuotaBar } from "../components/QuotaGauge";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
+import { cardInteractiveCls } from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
 import { EmptyState, QueryError } from "../components/ui/Feedback";
 import { SearchInput } from "../components/ui/Input";
@@ -18,7 +19,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
   return (
     <Link
       to={`/contracts/${c.id}`}
-      className="block rounded-xl border border-brand-200 bg-white p-4 transition-colors hover:border-brand-400 active:border-brand-500 active:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900"
+      className={`${cardInteractiveCls} block p-4`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

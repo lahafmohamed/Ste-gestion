@@ -178,7 +178,7 @@ function RapportInner({
       )}
 
       {q.data && (
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-brand-200 bg-white p-4 font-mono text-sm leading-6 text-brand-800">
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl bg-white shadow-card p-4 font-mono text-sm leading-6 text-brand-800">
           {text}
         </pre>
       )}

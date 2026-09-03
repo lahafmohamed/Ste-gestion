@@ -53,17 +53,17 @@ export default function ConfirmDialog({
       <div
         onClick={onCancel}
         aria-hidden="true"
-        className="absolute inset-0 bg-brand-900/40"
+        className="absolute inset-0 bg-brand-950/50 backdrop-blur-[2px] motion-safe:animate-fade-in"
       />
       <div
         role="alertdialog"
         aria-modal="true"
         aria-label={title}
-        className="relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-brand-200 bg-white p-4 shadow-xl pb-[calc(1rem_+_env(safe-area-inset-bottom))] sm:pb-4"
+        className="relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-dialog pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] motion-safe:animate-pop-in sm:pb-5"
       >
-        <div className="text-sm font-semibold text-brand-900">{title}</div>
-        {children && <div className="mt-1 text-sm text-brand-600">{children}</div>}
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <div className="text-base font-semibold text-brand-900">{title}</div>
+        {children && <div className="mt-1.5 text-sm text-brand-600">{children}</div>}
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
           <Button ref={cancelRef} onClick={onCancel}>
             Annuler
           </Button>

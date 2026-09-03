@@ -4,19 +4,19 @@ import type { InputHTMLAttributes, ReactNode } from "react";
 // Champs de formulaire unifiés.
 // text-base (16px) : sous ce seuil iOS zoome la page au focus.
 // min-h-touch : plancher tactile 44px — la saisie se fait au pouce sur tablette.
-// focus : bordure + ring 1px = périmètre 2px effectif (plancher WCAG d'un
-// indicateur visible), transition douce.
+// focus : bordure teck + halo 3px translucide — périmètre visible ≥ 2px
+// (plancher WCAG), et la couleur d'accent signale « c'est ici qu'on tape ».
 export const inputCls =
   "w-full min-w-0 min-h-touch rounded-lg border border-brand-300 bg-white px-3 py-2 " +
   "text-base text-brand-900 outline-none transition-[border-color,box-shadow] " +
-  "focus:border-brand-900 focus:ring-1 focus:ring-brand-900 " +
+  "hover:border-brand-400 focus:border-accent-500 focus:ring-[3px] focus:ring-accent-500/20 " +
   "disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Variante discrète pour les grilles de saisie en rafale (TallyEntry, SawnEntry). */
 export const inputQuietCls =
   "w-full min-w-0 min-h-touch rounded-lg border border-brand-200 bg-white px-2.5 py-2 " +
   "text-base text-brand-900 outline-none transition-[border-color,box-shadow] " +
-  "focus:border-brand-900 focus:ring-1 focus:ring-brand-900";
+  "focus:border-accent-500 focus:ring-[3px] focus:ring-accent-500/20";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   /** quiet : bordure plus légère (grilles de relevé). */
@@ -53,7 +53,7 @@ export function Field({
 }) {
   return (
     <label className={`flex flex-col gap-1 text-sm${className ? ` ${className}` : ""}`}>
-      <span className="text-brand-600">{label}</span>
+      <span className="font-medium text-brand-600">{label}</span>
       {children}
       {error && (
         <span id={errorId} className="text-xs text-red-600 motion-safe:animate-rise-in">
@@ -67,7 +67,7 @@ export function Field({
 /** Classes à ajouter à un champ en erreur (bordure + ring rouges). Les `!`
  * garantissent la priorité sur les couleurs de base d'inputCls. */
 export const inputErrorCls =
-  "!border-red-400 focus:!border-red-600 focus:!ring-red-600";
+  "!border-red-400 focus:!border-red-600 focus:!ring-red-600/20";
 
 type SearchInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> & {
   value: string;

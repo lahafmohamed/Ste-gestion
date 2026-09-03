@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { ContractDTO } from "@ste/shared";
 import { useSelectedContract } from "../hooks/useSelectedContract";
 import ContractPicker from "./ContractPicker";
+import { IconContract } from "./icons";
 import { PageHeader } from "./Layout";
 import { SkeletonList } from "./ui/Skeleton";
 
@@ -35,6 +36,7 @@ export default function StepLayout({
       <PageHeader
         title={title}
         subtitle={subtitle}
+        wide={wide}
         right={
           <ContractPicker
             contracts={contracts}
@@ -62,12 +64,15 @@ export default function StepLayout({
         ) : !selected ? (
           // Aucun contrat par défaut : un relevé, un débitage, un stock
           // appartiennent à un contrat précis — le choix ne se devine pas.
-          <div className="rounded-xl border border-accent-200 bg-accent-50 px-4 py-6 text-center">
-            <p className="text-sm font-medium text-accent-900">Choisir un contrat</p>
-            <p className="mt-1 text-sm text-accent-800">
-              Sélectionner le contrat en haut à droite pour travailler dessus.
+          <div className="mx-auto max-w-lg rounded-2xl bg-white px-6 py-8 text-center shadow-card">
+            <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent-100 text-accent-600">
+              <IconContract width={24} height={24} />
+            </span>
+            <p className="mt-4 text-base font-semibold text-brand-900">Choisir un contrat</p>
+            <p className="mt-1 text-sm text-brand-500">
+              Le contrat courant se choisit en haut de page, ou directement ici.
             </p>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
               {contracts
                 .filter((c) => c.status === "OPEN")
                 .slice(0, 6)
@@ -76,7 +81,7 @@ export default function StepLayout({
                     key={c.id}
                     type="button"
                     onClick={() => setSelectedId(c.id)}
-                    className="min-h-touch rounded-lg border border-accent-300 bg-white px-3 text-sm font-medium text-accent-800 hover:border-accent-500 active:bg-accent-100"
+                    className="min-h-touch rounded-lg bg-white px-4 text-sm font-medium text-brand-800 shadow-card transition-[box-shadow,transform,background-color] duration-150 ease-out hover:shadow-card-hover active:scale-[0.96] active:bg-brand-50"
                   >
                     {c.code}
                   </button>

@@ -267,7 +267,7 @@ export default function DateField({
             setOpen(false);
           }
         }}
-        className="w-full min-w-0 min-h-touch rounded-lg border border-brand-300 bg-white py-2 pl-3 pr-11 text-base text-brand-900 outline-none transition-[border-color,box-shadow] focus:border-brand-900 focus:ring-1 focus:ring-brand-900 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full min-w-0 min-h-touch rounded-lg border border-brand-300 bg-white py-2 pl-3 pr-11 text-base text-brand-900 outline-none transition-[border-color,box-shadow] hover:border-brand-400 focus:border-accent-500 focus:ring-[3px] focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50"
         {...aria}
       />
 

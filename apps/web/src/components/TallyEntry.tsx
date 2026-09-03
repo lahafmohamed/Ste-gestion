@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import {
   GIRTH_SPLIT_CM,
   M3_TO_CFT,
@@ -77,6 +77,9 @@ type Props = {
   draftKey?: string;
   /** N° préremplis (ex depuis la packing list) — une ligne par n°, mesures à saisir. */
   initialIds?: string[];
+  /** Nb annoncé (bordereau) → autant de lignes vierges d'emblée : le pointeur
+   *  descend la liste sans taper + Bille 64 fois. Ignoré si initialIds. */
+  initialCount?: number | null;
   /** Échec du dernier enregistrement — affiché contre le bouton Valider, là où
    *  se trouve le pointeur quand ça casse (le brouillon, lui, est conservé). */
   error?: string | null;
@@ -93,17 +96,20 @@ export default function TallyEntry({
   existingIds,
   draftKey,
   initialIds,
+  initialCount,
   error,
 }: Props) {
   const kind = kindOf(context);
   const isGirth = kind === "girth";
   const online = useOnline();
-  // Priorité : brouillon interrompu > n° préremplis > une ligne vierge.
-  const [rows, setRows] = useState<RowState[]>(
-    () =>
-      loadDraft(draftKey) ??
-      (initialIds?.length ? initialIds.map((id) => emptyRow(id)) : [emptyRow()])
-  );
+  // Priorité : brouillon interrompu > n° préremplis > nb annoncé > une ligne vierge.
+  const [rows, setRows] = useState<RowState[]>(() => {
+    const draft = loadDraft(draftKey);
+    if (draft) return draft;
+    if (initialIds?.length) return initialIds.map((id) => emptyRow(id));
+    const n = Math.min(Math.max(Math.floor(initialCount ?? 0), 0), 500);
+    return Array.from({ length: n || 1 }, () => emptyRow());
+  });
   const restored = useRef(loadDraft(draftKey) !== null);
   const [undo, setUndo] = useState<{ row: RowState; index: number } | null>(null);
 
@@ -145,6 +151,9 @@ export default function TallyEntry({
   // Refs sur le champ L de chaque ligne → focus auto sur la nouvelle ligne
   // (saisie au parc, au pouce : + Bille enchaîne sans viser le champ).
   const aRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const bRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const idRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const footRef = useRef<HTMLDivElement | null>(null);
   const focusIdx = useRef<number | null>(null);
 
   const volumes = rows.map((r) => rowVolume(kind, r));
@@ -265,6 +274,125 @@ export default function TallyEntry({
     });
   }
 
+  // Saisie clavier (bureau, pavé numérique) — le pointeur ne quitte jamais
+  // le pavé numérique :
+  //   Entrée      champ suivant (N° → L → Ø → L de la ligne suivante)
+  //   Tab (Ø)     L de la ligne suivante (saute N° auto-numéroté et la croix)
+  //   +           nouvelle ligne / billon suivant de la même bille (girth)
+  //   *           recopie la valeur de la ligne du dessus (longueurs répétées)
+  //   -           champ vide : même colonne, ligne précédente
+  //   ↑ ↓         même colonne, ligne dessus / dessous
+  //   Ctrl+Entrée enregistrer · Ctrl+Suppr supprimer la ligne · Échap annuler
+  type Col = "id" | "a" | "b";
+  const colRefs = { id: idRefs, a: aRefs, b: bRefs };
+
+  function focusCell(i: number, col: Col) {
+    colRefs[col].current[i]?.focus();
+  }
+
+  function goNextRow(i: number, r: RowState) {
+    if (i === rows.length - 1) {
+      // Girth : enchaîner sur le billon suivant de la même bille.
+      addRow(isGirth && r.externalId ? nextBillonId(r.externalId, knownIds) : undefined);
+    } else {
+      focusCell(i + 1, "a");
+    }
+  }
+
+  function onKey(e: KeyboardEvent<HTMLInputElement>, i: number, col: Col) {
+    const r = rows[i];
+    const last = i === rows.length - 1;
+    const next: Record<Col, () => void> = {
+      id: () => focusCell(i, "a"),
+      a: () => focusCell(i, "b"),
+      b: () => goNextRow(i, r),
+    };
+    switch (e.key) {
+      case "Enter":
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          if (!embedded && !saving && validCount > 0) save();
+        } else {
+          next[col]();
+        }
+        return;
+      case "Tab":
+        // Depuis Ø : L de la ligne suivante. En fin de liste, sort de la grille.
+        if (col === "b" && !e.shiftKey && !last) {
+          e.preventDefault();
+          focusCell(i + 1, "a");
+        }
+        return;
+      case "+":
+        e.preventDefault();
+        if (last) {
+          addRow(isGirth && r.externalId ? nextBillonId(r.externalId, knownIds) : undefined);
+        } else {
+          focusCell(i + 1, "a");
+        }
+        return;
+      case "*": {
+        e.preventDefault();
+        if (i === 0) return;
+        const above = rows[i - 1];
+        const patch: Partial<RowState> =
+          col === "id" ? { externalId: above.externalId } : col === "a" ? { a: above.a } : { b: above.b };
+        setRow(i, patch);
+        // Valeur recopiée = valeur acquise → champ suivant directement.
+        next[col]();
+        return;
+      }
+      case "-":
+        if (e.currentTarget.value === "" && i > 0) {
+          e.preventDefault();
+          focusCell(i - 1, col);
+        }
+        return;
+      case "ArrowUp":
+        if (i > 0) {
+          e.preventDefault();
+          focusCell(i - 1, col);
+        }
+        return;
+      case "ArrowDown":
+        if (!last) {
+          e.preventDefault();
+          focusCell(i + 1, col);
+        }
+        return;
+      case "Delete":
+        if (e.ctrlKey && rows.length > 1) {
+          e.preventDefault();
+          removeRow(i);
+          // Ligne retirée : rester dans la même colonne, sur la ligne qui prend sa place.
+          focusIdx.current = Math.min(i, rows.length - 2);
+        }
+        return;
+      case "Escape":
+        if (undo) {
+          e.preventDefault();
+          restoreRow();
+        }
+        return;
+    }
+  }
+
+  // Champ rempli : le focus sélectionne tout → retaper écrase, sans Backspace.
+  // Et si le champ est masqué par le pied collant (Total/Valider) ou par le
+  // header, on le recentre : à l'Entrée-chaînage la nouvelle ligne naissait
+  // sous le pied, invisible.
+  function onFieldFocus(e: FocusEvent<HTMLInputElement>) {
+    const el = e.target;
+    el.select();
+    const r = el.getBoundingClientRect();
+    const footTop = footRef.current?.getBoundingClientRect().top ?? window.innerHeight;
+    // Header fixe (3.5rem) + en-tête de colonnes collant (~2rem).
+    const headBottom = 88;
+    if (r.bottom > footTop - 4 || r.top < headBottom) {
+      el.scrollIntoView({ block: "center" });
+    }
+  }
+
   /** Bille tronçonnée : ajoute le billon suivant (266 → 266A, puis 266B…). */
   function addBillon(bill: string) {
     addRow(nextBillonId(bill, knownIds));
@@ -356,10 +484,15 @@ export default function TallyEntry({
               {KIND[kind].idLabel}
             </span>
             <input
+              ref={(el) => {
+                idRefs.current[i] = el;
+              }}
               value={r.externalId}
               onChange={(e) => setRow(i, { externalId: e.target.value })}
               placeholder={isGirth ? "266A (opt.)" : "N° (opt.)"}
               aria-label={`${KIND[kind].idLabel} ligne ${i + 1}`}
+              onFocus={onFieldFocus}
+              onKeyDown={(e) => onKey(e, i, "id")}
               className={`${inputCls} ${
                 isDup(r.externalId) ? "border-amber-400 bg-amber-50 text-amber-900" : ""
               }`}
@@ -377,6 +510,8 @@ export default function TallyEntry({
               value={r.a}
               onChange={(e) => setRow(i, { a: normalizeDecimal(e.target.value) })}
               aria-label={`${KIND[kind].aLabel} ligne ${i + 1}`}
+              onFocus={onFieldFocus}
+              onKeyDown={(e) => onKey(e, i, "a")}
               className={inputCls}
             />
           </div>
@@ -385,19 +520,15 @@ export default function TallyEntry({
               {KIND[kind].bLabel}
             </span>
             <input
+              ref={(el) => {
+                bRefs.current[i] = el;
+              }}
               inputMode="decimal"
               value={r.b}
               onChange={(e) => setRow(i, { b: normalizeDecimal(e.target.value) })}
               aria-label={`${KIND[kind].bLabel} ligne ${i + 1}`}
-              onKeyDown={(e) => {
-                // Desktop : Entrée sur la dernière ligne = nouvelle ligne.
-                // (Clavier numérique mobile n'a pas de Entrée → bouton + Bille ci-dessous.)
-                if (e.key === "Enter" && i === rows.length - 1) {
-                  e.preventDefault();
-                  // Girth : enchaîner sur le billon suivant de la même bille.
-                  addRow(isGirth && r.externalId ? nextBillonId(r.externalId, knownIds) : undefined);
-                }
-              }}
+              onFocus={onFieldFocus}
+              onKeyDown={(e) => onKey(e, i, "b")}
               className={inputCls}
             />
           </div>
@@ -408,6 +539,7 @@ export default function TallyEntry({
           <button
             type="button"
             onClick={() => removeRow(i)}
+            tabIndex={-1}
             className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
             aria-label={`Supprimer la ligne ${i + 1}`}
           >
@@ -426,14 +558,23 @@ export default function TallyEntry({
         + {isGirth ? "Billon" : "Bille"}
       </button>
 
+      {/* Aide-mémoire clavier : bureau seulement (pas de pavé sur tablette).
+          Raccourci oublié = raccourci inutilisé. */}
+      <p className="mt-2 hidden text-xs text-brand-400 sm:block" aria-hidden="true">
+        <kbd>⏎</kbd> suivant · <kbd>+</kbd> {isGirth ? "billon suivant" : "nouvelle ligne"} ·{" "}
+        <kbd>*</kbd> = ligne du dessus · <kbd>↑</kbd><kbd>↓</kbd> lignes ·{" "}
+        <kbd>Ctrl+⏎</kbd> enregistrer · <kbd>Ctrl+Suppr</kbd> supprimer
+      </p>
+
       {/* Récap + validation collés en bas de l'écran : à la ligne 200 d'un
           relevé, le total courant et le bouton Valider étaient 200 lignes plus
           bas. En mode embarqué le parent gère sa propre validation. */}
       <div
+        ref={footRef}
         className={
           embedded
             ? "mt-3"
-            : "sticky bottom-0 z-10 mt-3 rounded-lg border border-brand-200 bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_-6px_16px_-8px_rgba(15,23,42,0.35)]"
+            : "sticky bottom-0 z-10 mt-3 rounded-xl bg-white/95 p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_-8px_24px_-12px_oklch(0_0_0/0.25)] backdrop-blur-sm"
         }
       >
       {/* Ligne supprimée par erreur → un tap pour la remettre à sa place. */}

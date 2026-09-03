@@ -46,6 +46,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,woff2}"],
+        // Inter est découpée par alphabet (unicode-range) : seuls latin et
+        // latin-ext servent au français, inutile de précacher les autres.
+        globIgnores: ["**/inter-cyrillic*", "**/inter-greek*", "**/inter-vietnamese*"],
         navigateFallback: "/index.html",
         // L'API n'est jamais servie depuis le cache de navigation : elle a sa
         // propre règle ci-dessous.

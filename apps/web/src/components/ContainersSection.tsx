@@ -97,7 +97,7 @@ function CreateForm({
           truckIds: truckIds.length ? truckIds : undefined,
         });
       }}
-      className="mb-3 rounded-xl border border-brand-200 bg-white p-4"
+      className="mb-3 rounded-xl bg-white shadow-card p-4"
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(
@@ -201,7 +201,7 @@ function ContainerCard({
   const remove = useMutation({ mutationFn: () => containersApi.remove(c.id), onSuccess: invalidate });
 
   return (
-    <div className="rounded-xl border border-brand-200 bg-white">
+    <div className="rounded-xl bg-white shadow-card">
       <button
         onClick={() => setOpen((o) => !o)}
         className="flex min-h-touch w-full items-center justify-between gap-2 p-3 text-left hover:bg-brand-50 active:bg-brand-100"

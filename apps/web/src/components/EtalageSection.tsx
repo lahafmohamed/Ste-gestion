@@ -324,6 +324,7 @@ export default function EtalageSection({
             <TallyEntry
               context={parcStep === "ETALAGE" ? "YARD_DIAMETER" : "YARD_GIRTH"}
               declared={parcStep === "ETALAGE" ? (parcDeclared ?? undefined) : undefined}
+              initialCount={parcStep === "ETALAGE" ? parcDeclared?.count : undefined}
               bills={parcStep === "BILLONNAGE" ? truckBillNos(parcTruck) : undefined}
               saving={addMeasurement.isPending}
               error={measError}

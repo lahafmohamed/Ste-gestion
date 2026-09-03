@@ -122,7 +122,7 @@ function SaleForm({
   }
 
   return (
-    <form onSubmit={submit} className="mb-3 rounded-xl border border-brand-200 bg-white p-4">
+    <form onSubmit={submit} className="mb-3 rounded-xl bg-white shadow-card p-4">
       <div className="mb-3 grid grid-cols-2 gap-3 sm:w-96">
         <Field label="Date">
           <DateField value={date} onChange={setDate} />
@@ -339,7 +339,7 @@ export default function SalesSection({
         )}
         {sales.data?.length === 0 && !showForm && <EmptyState>Aucune vente.</EmptyState>}
         {sales.data?.map((s) => (
-          <div key={s.id} className="rounded-xl border border-brand-200 bg-white p-3">
+          <div key={s.id} className="rounded-xl bg-white shadow-card p-3">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium text-brand-900">
                 {new Date(s.saleDate).toLocaleDateString("fr-FR")}

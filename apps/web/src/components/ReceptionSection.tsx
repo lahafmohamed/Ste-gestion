@@ -194,7 +194,7 @@ export default function ReceptionSection({
 
       {/* ── Réception : uniquement l'en-tête recopié du bordereau ── */}
       {showForm && (
-        <form onSubmit={submit} className="mb-3 rounded-xl border border-brand-200 bg-white p-4">
+        <form onSubmit={submit} className="mb-3 rounded-xl bg-white shadow-card p-4">
           <div className="mb-3 text-sm font-medium text-brand-900">
             Étape 1 · Réception du camion
           </div>

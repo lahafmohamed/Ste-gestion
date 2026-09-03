@@ -3,14 +3,16 @@
 
 export function SkeletonLine({ className = "" }: { className?: string }) {
   return (
-    <div className={`h-4 animate-pulse rounded bg-brand-100${className ? ` ${className}` : ""}`} />
+    <div
+      className={`h-3.5 animate-pulse rounded-md bg-brand-100${className ? ` ${className}` : ""}`}
+    />
   );
 }
 
 /** Carte fantôme (liste de camions, contrats…). */
 export function SkeletonCard({ lines = 2 }: { lines?: number }) {
   return (
-    <div className="rounded-xl border border-brand-200 bg-white p-4">
+    <div className="rounded-xl bg-white p-4 shadow-card">
       <SkeletonLine className="w-1/3" />
       <div className="mt-3 space-y-2">
         {Array.from({ length: lines }, (_, i) => (

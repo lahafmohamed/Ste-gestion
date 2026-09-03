@@ -58,7 +58,7 @@ export function QuotaGauge({
   const remaining = Math.max(quota - Number(brousseM3), 0);
   const avg = Number(avgBrousseM3PerTruck ?? 0);
   return (
-    <div className="rounded-xl border border-brand-200 bg-white p-4">
+    <div className="rounded-xl bg-white shadow-card p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-brand-400">

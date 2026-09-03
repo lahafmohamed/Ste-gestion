@@ -196,7 +196,7 @@ export default function SelectField({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-haspopup="listbox"
-        className={`flex min-h-touch items-center justify-between gap-2 rounded-lg border border-brand-300 bg-white py-2 pl-3 pr-2.5 text-left text-base outline-none transition-[border-color,box-shadow] focus-visible:border-brand-900 focus-visible:ring-1 focus-visible:ring-brand-900 disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`flex min-h-touch items-center justify-between gap-2 rounded-lg border border-brand-300 bg-white py-2 pl-3 pr-2.5 text-left text-base outline-none transition-[border-color,box-shadow] hover:border-brand-400 focus-visible:border-accent-500 focus-visible:ring-[3px] focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50 ${
           width === "full" ? "w-full min-w-0" : ""
         } ${open ? "border-brand-900 ring-1 ring-brand-900" : ""} ${
           // Rien de choisi : le libellé reste un appel à choisir, pas une valeur.
