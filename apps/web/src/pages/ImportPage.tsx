@@ -207,7 +207,7 @@ function ImportFlow({ contract }: { contract: ContractDTO }) {
           </div>
         )}
         <p className="mt-4 text-xs text-brand-400">
-          Gabarits vierges : <FileLinks files={TEMPLATES} />
+          Classeurs vides : <FileLinks files={TEMPLATES} />
         </p>
         <p className="mt-1 text-xs text-brand-400">
           Exemples remplis : <FileLinks files={EXAMPLES} />
