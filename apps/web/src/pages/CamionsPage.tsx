@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { VehicleDTO, VehicleUpdateInput } from "@ste/shared";
 import { plateKey } from "@ste/shared";
 import { vehiclesApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { PageHeader } from "../components/Layout";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -53,6 +54,7 @@ const FIELDS = [
 
 export default function CamionsPage() {
   const qc = useQueryClient();
+  const can = useCan();
   const [showForm, setShowForm] = useState(false);
   const [v, setV] = useState<Form>(EMPTY);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +129,7 @@ export default function CamionsPage() {
         wide={false}
         title="Camions"
         right={
+          can("camions.create") && (
           <Button
             variant="primary"
             onClick={() => {
@@ -136,6 +139,7 @@ export default function CamionsPage() {
           >
             {showForm ? "Fermer" : "+ Camion"}
           </Button>
+          )
         }
       />
 
@@ -210,9 +214,11 @@ export default function CamionsPage() {
           {vehicles.data?.length === 0 && !showForm && (
             <EmptyState
               action={
-                <Button variant="primary" onClick={() => setShowForm(true)}>
-                  + Camion
-                </Button>
+                can("camions.create") && (
+                  <Button variant="primary" onClick={() => setShowForm(true)}>
+                    + Camion
+                  </Button>
+                )
               }
             >
               Aucun camion au parc. Les camions saisis à la réception s'ajoutent aussi
@@ -281,9 +287,11 @@ export default function CamionsPage() {
                         {x.active ? "Retirer du parc" : "Remettre au parc"}
                       </Button>
                     ) : (
-                      <Button size="xs" variant="ghost-danger" onClick={() => setToDelete(x)}>
-                        Supprimer
-                      </Button>
+                      can("camions.delete") && (
+                        <Button size="xs" variant="ghost-danger" onClick={() => setToDelete(x)}>
+                          Supprimer
+                        </Button>
+                      )
                     )}
                     <Button className="ml-auto" onClick={() => setEditingId(null)}>
                       Annuler
@@ -322,17 +330,19 @@ export default function CamionsPage() {
                     )}
                   </div>
 
-                  <Button
-                    size="xs"
-                    className="shrink-0"
-                    onClick={() => {
-                      setEditError(null);
-                      setEdit(toForm(x));
-                      setEditingId(x.id);
-                    }}
-                  >
-                    Modifier
-                  </Button>
+                  {can("camions.edit") && (
+                    <Button
+                      size="xs"
+                      className="shrink-0"
+                      onClick={() => {
+                        setEditError(null);
+                        setEdit(toForm(x));
+                        setEditingId(x.id);
+                      }}
+                    >
+                      Modifier
+                    </Button>
+                  )}
                 </div>
               </Card>
             )

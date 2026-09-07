@@ -12,6 +12,7 @@ import {
   type TruckSawnProgress,
 } from "@ste/shared";
 import { productionApi, trucksApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtInt, fmtM3, fmtNum } from "../lib/format";
 import SawnEntry from "./SawnEntry";
 import Badge from "./ui/Badge";
@@ -22,6 +23,7 @@ import { SkeletonList } from "./ui/Skeleton";
 
 export default function ProductionSection({ contractId }: { contractId: string }) {
   const qc = useQueryClient();
+  const can = useCan();
   const [showForm, setShowForm] = useState(false);
 
   const runs = useQuery({
@@ -61,9 +63,11 @@ export default function ProductionSection({ contractId }: { contractId: string }
     <section className="mt-5">
       <SectionHeading
         right={
-          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? "Fermer" : "+ Session"}
-          </Button>
+          can("debitage.create") && (
+            <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+              {showForm ? "Fermer" : "+ Session"}
+            </Button>
+          )
         }
       >
         Débitage ({runs.data?.length ?? 0} sessions)

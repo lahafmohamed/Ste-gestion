@@ -9,7 +9,8 @@ import {
   type ContainerStatus,
   type TruckDTO,
 } from "@ste/shared";
-import { containersApi, contractsApi, trucksApi } from "../lib/api";
+import { containersApi, contractsApi, downloadFile, trucksApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtM3, fmtNum } from "../lib/format";
 import { printContainerPackingList } from "../lib/printPacking";
 import EmpotagePicker from "./EmpotagePicker";
@@ -160,6 +161,8 @@ function ContainerCard({
   contractCode?: string;
 }) {
   const qc = useQueryClient();
+  const can = useCan();
+  const canEdit = can("empotage.edit");
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editTrucks, setEditTrucks] = useState(false);
@@ -241,7 +244,12 @@ function ContainerCard({
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="text-xs text-brand-500">Statut :</span>
             {STATUSES.map((st) => (
-              <Chip key={st} selected={c.status === st} onClick={() => setStatus.mutate(st)}>
+              <Chip
+                key={st}
+                selected={c.status === st}
+                disabled={!canEdit}
+                onClick={() => setStatus.mutate(st)}
+              >
                 {CONTAINER_STATUS_LABELS[st]}
               </Chip>
             ))}
@@ -257,12 +265,28 @@ function ContainerCard({
             >
               Imprimer packing list
             </Button>
-            <button
-              onClick={() => setDelOpen(true)}
-              className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
-            >
-              Supprimer conteneur
-            </button>
+            {can("contracts.export") && (
+              <Button
+                size="xs"
+                onClick={() =>
+                  downloadFile(
+                    `/containers/${c.id}/export.xlsx`,
+                    `empotage-${c.containerNo.replace(/[\s/]+/g, "-")}.xlsx`,
+                  )
+                }
+                disabled={c.items.length === 0}
+              >
+                Exporter Excel
+              </Button>
+            )}
+            {can("empotage.delete") && (
+              <button
+                onClick={() => setDelOpen(true)}
+                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+              >
+                Supprimer conteneur
+              </button>
+            )}
             <ConfirmDialog
               open={delOpen}
               title={`Supprimer le conteneur ${c.containerNo} ?`}
@@ -308,7 +332,7 @@ function ContainerCard({
                 ) : (
                   <span className="text-brand-400">aucun</span>
                 )}
-                {trucks.length > 0 && (
+                {trucks.length > 0 && canEdit && (
                   <button
                     onClick={() => setEditTrucks(true)}
                     className="min-h-touch rounded-lg px-2 text-brand-500 underline hover:text-brand-900 active:bg-brand-100"
@@ -360,6 +384,7 @@ function ContainerCard({
                         <td className="py-1 text-right tabular-nums">{it.count}</td>
                         <td className="py-1 text-right tabular-nums">{fmtNum(it.volumeM3)}</td>
                         <td className="py-1 text-right">
+                          {can("empotage.delete") && (
                           <button
                             onClick={() => removeItem.mutate(it.id)}
                             aria-label="Retirer la ligne"
@@ -367,6 +392,7 @@ function ContainerCard({
                           >
                             ×
                           </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -397,9 +423,11 @@ function ContainerCard({
                 onSave={(items) => addItems.mutate(items)}
               />
             ) : (
-              <Button size="xs" onClick={() => setAdding(true)}>
-                + Lignes d'empotage
-              </Button>
+              can("empotage.create") && (
+                <Button size="xs" onClick={() => setAdding(true)}>
+                  + Lignes d'empotage
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -409,6 +437,7 @@ function ContainerCard({
 }
 
 export default function ContainersSection({ contractId }: { contractId: string }) {
+  const can = useCan();
   const [showForm, setShowForm] = useState(false);
 
   const containers = useQuery({
@@ -429,9 +458,11 @@ export default function ContainersSection({ contractId }: { contractId: string }
     <section className="mt-5">
       <SectionHeading
         right={
-          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? "Fermer" : "+ Conteneur"}
-          </Button>
+          can("empotage.create") && (
+            <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+              {showForm ? "Fermer" : "+ Conteneur"}
+            </Button>
+          )
         }
       >
         Conteneurs / Empotage ({containers.data?.length ?? 0})

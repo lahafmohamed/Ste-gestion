@@ -9,6 +9,7 @@ import {
   truckBillNos,
 } from "@ste/shared";
 import { downloadFile, trucksApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { clearTallyDraft } from "../lib/tallyDraft";
 import { fmtM3, fmtNum } from "../lib/format";
 import { useTruckMutations } from "../hooks/useTruckMutations";
@@ -29,6 +30,7 @@ const CONTEXTS: MeasurementContext[] = ["FIELD", "YARD_GIRTH", "YARD_DIAMETER"];
 
 export default function TruckDetailPage() {
   const { id = "" } = useParams();
+  const can = useCan();
   const nav = useNavigate();
 
   const q = useQuery({ queryKey: ["trucks", "detail", id], queryFn: () => trucksApi.get(id) });
@@ -134,20 +136,24 @@ export default function TruckDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            onClick={() =>
-              downloadFile(
-                `/trucks/${t.id}/export.xlsx`,
-                `etalage-${t.registration.replace(/\s+/g, "-")}.xlsx`
-              )
-            }
-          >
-            Exporter Excel
-          </Button>
-          <Button variant="ghost-danger" size="sm" onClick={() => setDelTruckOpen(true)}>
-            Supprimer
-          </Button>
+          {can("contracts.export") && (
+            <Button
+              size="sm"
+              onClick={() =>
+                downloadFile(
+                  `/trucks/${t.id}/export.xlsx`,
+                  `etalage-${t.registration.replace(/\s+/g, "-")}.xlsx`
+                )
+              }
+            >
+              Exporter Excel
+            </Button>
+          )}
+          {can("reception.delete") && (
+            <Button variant="ghost-danger" size="sm" onClick={() => setDelTruckOpen(true)}>
+              Supprimer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -175,7 +181,7 @@ export default function TruckDetailPage() {
                 <button
                   type="button"
                   onClick={() => confirmGap.mutate(false)}
-                  disabled={confirmGap.isPending}
+                  disabled={confirmGap.isPending || !can("etalage.edit")}
                   className="min-h-touch rounded-lg px-2 text-brand-400 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200 disabled:opacity-50"
                 >
                   annuler
@@ -191,7 +197,7 @@ export default function TruckDetailPage() {
                 <button
                   type="button"
                   onClick={() => confirmGap.mutate(true)}
-                  disabled={confirmGap.isPending}
+                  disabled={confirmGap.isPending || !can("etalage.edit")}
                   className="min-h-touch rounded-full border border-amber-300 px-3 py-1 font-medium text-amber-700 hover:bg-amber-100 active:bg-amber-200 disabled:opacity-50"
                 >
                   Confirmer l'écart
@@ -222,8 +228,12 @@ export default function TruckDetailPage() {
             <MeasurementTable
               m={measurement}
               onDelete={() => setDelMeas(measurement)}
-              onAppend={(data) =>
-                appendMeasurement.mutate({ measurementId: measurement.id, data })
+              canEdit={can("etalage.edit")}
+              canDelete={can("etalage.delete")}
+              onAppend={
+                can("etalage.create")
+                  ? (data) => appendMeasurement.mutate({ measurementId: measurement.id, data })
+                  : undefined
               }
               appending={appendMeasurement.isPending}
               billNos={activeCtx === "YARD_GIRTH" ? billNos : undefined}
@@ -233,6 +243,8 @@ export default function TruckDetailPage() {
               onDeleteLog={setDelLogTarget}
               logPending={updateLog.isPending || delLog.isPending}
             />
+          ) : !can("etalage.create") ? (
+            <p className="text-sm text-brand-500">Aucun relevé — saisie réservée au parc.</p>
           ) : (
             <>
               {/* Étalage Ø : reprendre les n° de billes déjà saisis en packing list. */}

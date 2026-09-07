@@ -464,7 +464,7 @@ export default function TallyEntry({
       <div className="sm:min-w-[460px]">
       {/* En-tête de colonnes : inutile sous sm (mini-libellés dans les cartes),
           collant sous le header fixe pendant les longs relevés dès sm. */}
-      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:sticky sm:top-header sm:z-10 sm:grid sm:grid-cols-[1.6rem_1fr_1fr_1fr_4.5rem_2.75rem] sm:rounded-lg sm:bg-white sm:py-1">
+      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:sticky sm:top-header short:sm:top-header-sm sm:z-10 sm:grid sm:grid-cols-[1.6rem_1fr_1fr_1fr_4.5rem_2.75rem] sm:rounded-lg sm:bg-white sm:py-1">
         <span>#</span>
         <span>{KIND[kind].idLabel}</span>
         <span>{KIND[kind].aLabel}</span>

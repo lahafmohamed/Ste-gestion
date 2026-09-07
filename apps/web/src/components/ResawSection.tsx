@@ -8,6 +8,7 @@ import {
   type SawnLineDTO,
 } from "@ste/shared";
 import { resawApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtNum, fmtPct, normalizeDecimal, todayISO } from "../lib/format";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
@@ -171,6 +172,7 @@ export default function ResawSection({
   contractId: string;
   summary: ContractSummaryDTO;
 }) {
+  const can = useCan();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
@@ -246,9 +248,11 @@ export default function ResawSection({
       <SectionHeading
         className="mt-6"
         right={
-          <Button size="sm" onClick={() => setOpen((v) => !v)}>
-            {open ? "Fermer" : "+ Resciage"}
-          </Button>
+          can("stock.create") && (
+            <Button size="sm" onClick={() => setOpen((v) => !v)}>
+              {open ? "Fermer" : "+ Resciage"}
+            </Button>
+          )
         }
       >
         Resciage (stock → sections plus petites)
@@ -353,9 +357,11 @@ export default function ResawSection({
                       {linesSummary(o.produced)}
                     </div>
                   </div>
-                  <Button size="sm" variant="ghost-danger" onClick={() => setToDelete(o)}>
-                    Suppr.
-                  </Button>
+                  {can("stock.delete") && (
+                    <Button size="sm" variant="ghost-danger" onClick={() => setToDelete(o)}>
+                      Suppr.
+                    </Button>
+                  )}
                 </li>
               );
             })}

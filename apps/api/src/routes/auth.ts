@@ -2,24 +2,7 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@ste/shared";
 import { prisma } from "../prisma.js";
-
-function toDTO(u: {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  active: boolean;
-  createdAt: Date;
-}) {
-  return {
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    active: u.active,
-    createdAt: u.createdAt,
-  };
-}
+import { toUserDTO, userSelect } from "../permissions.js";
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/login", async (req, reply) => {
@@ -37,12 +20,13 @@ export async function authRoutes(app: FastifyInstance) {
     if (!ok) return reply.code(401).send({ error: "Identifiants incorrects" });
 
     const token = app.jwt.sign({ sub: user.id, role: user.role as never });
-    return { token, user: toDTO(user) };
+    const { passwordHash: _h, updatedAt: _u, ...row } = user;
+    return { token, user: await toUserDTO(row) };
   });
 
   app.get("/auth/me", async (req, reply) => {
-    const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub }, select: userSelect });
     if (!user || !user.active) return reply.code(401).send({ error: "Session invalide" });
-    return toDTO(user);
+    return toUserDTO(user);
   });
 }

@@ -4,11 +4,14 @@
 import { z } from "zod";
 import { decimalString, signedDecimalString, count } from "./primitives.js";
 import { SizeGroup } from "./sizes.js";
+import { isPermission, type Permission } from "./permissions.js";
 
 // Modules leaf réexportés (API publique inchangée).
 export * from "./primitives.js";
 export * from "./formulas.js";
 export * from "./sizes.js";
+export * from "./permissions.js";
+export * from "./imports.js";
 
 export const APP_NAME = "Ste-gestion";
 
@@ -49,11 +52,19 @@ export const userCreateSchema = z.object({
 });
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 
+const permissionList = z
+  .array(z.string().refine(isPermission, "Permission inconnue"))
+  .max(200)
+  .transform((l) => Array.from(new Set(l)) as Permission[]);
+
 export const userUpdateSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   role: UserRole.optional(),
   active: z.boolean().optional(),
   password: z.string().min(6).optional(),
+  /** Surcharges par rapport au rôle (ADMIN : ignorées, il a tout). */
+  permissionsGranted: permissionList.optional(),
+  permissionsRevoked: permissionList.optional(),
 });
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
@@ -64,7 +75,20 @@ export type UserDTO = {
   role: UserRole;
   active: boolean;
   createdAt: string;
+  /** Surcharges individuelles (vides par défaut). */
+  permissionsGranted: Permission[];
+  permissionsRevoked: Permission[];
+  /** Permissions effectives (rôle ∪ ajouts − retraits) — ce que l'UI consulte. */
+  permissions: Permission[];
 };
+
+/** Matrice rôle → permissions (hors ADMIN), telle qu'en base. */
+export type RolePermissionsDTO = Record<Exclude<UserRole, "ADMIN">, Permission[]>;
+
+export const rolePermissionsUpdateSchema = z.object({
+  permissions: permissionList,
+});
+export type RolePermissionsUpdateInput = z.infer<typeof rolePermissionsUpdateSchema>;
 
 export type LoginResponse = { token: string; user: UserDTO };
 

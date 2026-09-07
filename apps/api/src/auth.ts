@@ -3,6 +3,7 @@ import jwt from "@fastify/jwt";
 import bcrypt from "bcryptjs";
 import type { UserRole } from "@ste/shared";
 import { prisma } from "./prisma.js";
+import { getCachedUser, permissionsFor, requiredPermission } from "./permissions.js";
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
@@ -15,20 +16,6 @@ declare module "@fastify/jwt" {
 const PUBLIC: { method?: string; path: string }[] = [
   { path: "/health" },
   { method: "POST", path: "/auth/login" },
-];
-
-// Écritures par module → rôles autorisés (matrice PLAN §7). ADMIN passe partout.
-const WRITE_RULES: { pattern: RegExp; roles: UserRole[] }[] = [
-  { pattern: /^\/contracts/, roles: ["BUREAU"] },
-  { pattern: /^\/trucks|^\/measurements/, roles: ["PARC"] },
-  // Le parc de camions se tient au portail (PARC) et au bureau (transporteur,
-  // chauffeur habituel).
-  { pattern: /^\/vehicles/, roles: ["PARC", "BUREAU"] },
-  { pattern: /^\/production-runs/, roles: ["SCIERIE"] },
-  { pattern: /^\/sales/, roles: ["EXPORT"] },
-  { pattern: /^\/containers|^\/container-items/, roles: ["EXPORT", "PARC"] },
-  { pattern: /^\/account-entries|^\/parties/, roles: ["BUREAU"] },
-  { pattern: /^\/users/, roles: [] }, // ADMIN uniquement
 ];
 
 function urlPath(req: FastifyRequest): string {
@@ -62,17 +49,29 @@ export async function registerAuth(app: FastifyInstance) {
       return reply.code(401).send({ error: "Authentification requise" });
     }
 
-    // Lectures libres pour tout utilisateur connecté ; /users réservé ADMIN.
-    const role = req.user.role;
-    if (role === "ADMIN") return;
-    if (path.startsWith("/users")) {
-      return reply.code(403).send({ error: "Réservé à l'administrateur" });
+    // Permissions effectives (rôle ∪ ajouts − retraits) relues au plus toutes
+    // les 30 s : un compte désactivé ou dégradé sort sans attendre l'expiration
+    // du JWT. Le rôle porté par le token ne fait plus foi, la base si.
+    const u = await getCachedUser(req.user.sub);
+    if (!u || !u.active) {
+      return reply.code(401).send({ error: "Session invalide" });
     }
-    if (req.method === "GET") return;
+    req.user.role = u.role;
+    if (u.role === "ADMIN") return;
 
-    const rule = WRITE_RULES.find((r) => r.pattern.test(path));
-    if (rule && !rule.roles.includes(role)) {
-      return reply.code(403).send({ error: "Rôle insuffisant pour cette action" });
+    const needed = requiredPermission(req.method, path);
+    if (needed === null) {
+      // Aucune règle : lecture partagée. Une écriture sans règle est refusée
+      // par défaut — un oubli dans la table ne doit pas ouvrir la porte.
+      if (req.method === "GET" || req.method === "HEAD") return;
+      return reply.code(403).send({ error: "Action non autorisée" });
+    }
+    const perms = await permissionsFor(u);
+    if (!perms.includes(needed)) {
+      return reply.code(403).send({
+        error: needed === "users.manage" ? "Réservé à l'administrateur" : "Permission insuffisante pour cette action",
+        permission: needed,
+      });
     }
   });
 }

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { USER_ROLE_LABELS } from "@ste/shared";
-import { clearSession, getUser } from "../lib/auth";
+import { USER_ROLE_LABELS, type Permission } from "@ste/shared";
+import { clearSession, getUser, useCan, useUser } from "../lib/auth";
 import { FEATURES } from "../lib/features";
 import { buttonCls } from "./ui/Button";
 import { OfflineBanner, UpdateBanner } from "./AppBanners";
@@ -12,6 +12,7 @@ import {
   IconContract,
   IconDashboard,
   IconFleet,
+  IconImport,
   IconLedger,
   IconLogout,
   IconLogs,
@@ -23,35 +24,69 @@ import {
   type IconProps,
 } from "./icons";
 
-type NavItem = { to: string; label: string; Icon: (p: IconProps) => JSX.Element; end: boolean };
+type NavItem = {
+  to: string;
+  label: string;
+  Icon: (p: IconProps) => JSX.Element;
+  end: boolean;
+  /** Permission « Voir » du module ; absente = visible pour tout connecté. */
+  perm?: Permission;
+  /** Variante : visible si l'utilisateur a AU MOINS UNE de ces permissions. */
+  anyPerm?: Permission[];
+};
 
 type NavEntry = NavItem & { enabled?: boolean };
 
+// Entrées gardées par le « Voir » de chaque module : un compte sans la
+// permission ne voit pas le poste (la route redirige aussi, l'API refuse).
 const NAV: NavItem[] = (
   [
     { to: "/", label: "Tableau de bord", Icon: IconDashboard, end: true },
-    { to: "/contracts", label: "Contrats", Icon: IconContract, end: false },
-    { to: "/reception", label: "Réception", Icon: IconTruck, end: false },
-    { to: "/etalage", label: "Étalage", Icon: IconLogs, end: false },
-    { to: "/debitage", label: "Débitage", Icon: IconSaw, end: false },
-    { to: "/stock", label: "Stock", Icon: IconBox, end: false },
-    { to: "/ventes", label: "Ventes", Icon: IconSales, end: false, enabled: FEATURES.sales },
-    { to: "/empotage", label: "Empotage", Icon: IconContainer, end: false },
+    { to: "/contracts", label: "Contrats", Icon: IconContract, end: false, perm: "contracts.view" },
+    { to: "/reception", label: "Réception", Icon: IconTruck, end: false, perm: "reception.view" },
+    { to: "/etalage", label: "Étalage", Icon: IconLogs, end: false, perm: "etalage.view" },
+    { to: "/debitage", label: "Débitage", Icon: IconSaw, end: false, perm: "debitage.view" },
+    { to: "/stock", label: "Stock", Icon: IconBox, end: false, perm: "stock.view" },
+    {
+      to: "/ventes",
+      label: "Ventes",
+      Icon: IconSales,
+      end: false,
+      enabled: FEATURES.sales,
+      perm: "ventes.view",
+    },
+    { to: "/empotage", label: "Empotage", Icon: IconContainer, end: false, perm: "empotage.view" },
     // Référentiel, hors chaîne de production : rangé après les postes.
-    { to: "/camions", label: "Camions", Icon: IconFleet, end: false },
+    { to: "/camions", label: "Camions", Icon: IconFleet, end: false, perm: "camions.view" },
+    // Repli terrain : classeurs Excel saisis sans réseau, importés en une fois.
+    {
+      to: "/import",
+      label: "Import",
+      Icon: IconImport,
+      end: false,
+      anyPerm: ["etalage.create", "debitage.create", "empotage.create"],
+    },
     {
       to: "/compta",
       label: "Comptabilité",
       Icon: IconLedger,
       end: false,
       enabled: FEATURES.accounting,
+      perm: "compta.view",
     },
-    { to: "/rapport", label: "Rapport", Icon: IconReport, end: false, enabled: FEATURES.report },
+    {
+      to: "/rapport",
+      label: "Rapport",
+      Icon: IconReport,
+      end: false,
+      enabled: FEATURES.report,
+      perm: "rapport.view",
+    },
   ] satisfies NavEntry[]
 ).filter((n) => n.enabled !== false);
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/utilisateurs", label: "Utilisateurs", Icon: IconUsers, end: false },
+  { to: "/admin", label: "Admin", Icon: IconUsers, end: false, perm: "users.manage" },
 ];
 
 function logout() {
@@ -154,7 +189,10 @@ function NavList({
 function NavTabs({ nav, className }: { nav: NavItem[]; className: string }) {
   return (
     <nav
-      className={`scrollbar-none items-center gap-0.5 overflow-x-auto ${className}`}
+      // scroll-shadow-x : quand la rangée déborde (petit portable, modules en
+      // plus), le bord droit s'estompe au lieu de couper un libellé net — on
+      // voit qu'il reste des onglets derrière.
+      className={`scrollbar-none scroll-shadow-x items-center gap-0.5 overflow-x-auto ${className}`}
       aria-label="Navigation principale"
     >
       {nav.map((n) => (
@@ -164,7 +202,7 @@ function NavTabs({ nav, className }: { nav: NavItem[]; className: string }) {
           end={n.end}
           title={n.label}
           className={({ isActive }) =>
-            `flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
+            `flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 2xl:px-2.5 ${
               isActive
                 ? "bg-accent-100/70 text-accent-800"
                 : "text-brand-600 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
@@ -192,6 +230,7 @@ function NavTabs({ nav, className }: { nav: NavItem[]; className: string }) {
 // « + Contrat » reste dehors : c'est l'action que le bureau répète, l'enterrer
 // d'un cran la punirait.
 function ActionsMenu({ user }: { user: ReturnType<typeof getUser> }) {
+  const can = useCan();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -234,7 +273,10 @@ function ActionsMenu({ user }: { user: ReturnType<typeof getUser> }) {
         }`}
       >
         {user ? <Avatar name={user.name} /> : null}
-        <span className="hidden max-w-[8rem] truncate md:inline">{user?.name ?? "Compte"}</span>
+        {/* Le nom réapparaît à partir de 2xl : entre lg et 2xl, ces 110px
+            manquent à la rangée d'onglets (petit portable 1366px). Il reste
+            dans l'en-tête du menu déroulé et dans le libellé accessible. */}
+        <span className="hidden max-w-[8rem] truncate 2xl:inline">{user?.name ?? "Compte"}</span>
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -268,10 +310,18 @@ function ActionsMenu({ user }: { user: ReturnType<typeof getUser> }) {
               </div>
             </div>
           )}
-          <Link to="/contracts" role="menuitem" onClick={() => setOpen(false)} className={itemCls}>
-            <IconContract width={18} height={18} className="text-brand-400" />
-            Contrats
-          </Link>
+          {can("contracts.view") && (
+            <Link to="/contracts" role="menuitem" onClick={() => setOpen(false)} className={itemCls}>
+              <IconContract width={18} height={18} className="text-brand-400" />
+              Contrats
+            </Link>
+          )}
+          {can("users.manage") && (
+            <Link to="/admin" role="menuitem" onClick={() => setOpen(false)} className={itemCls}>
+              <IconUsers width={18} height={18} className="text-brand-400" />
+              Administration
+            </Link>
+          )}
           {user && (
             <button type="button" role="menuitem" onClick={logout} className={itemCls}>
               <IconLogout width={18} height={18} className="text-brand-400" />
@@ -285,8 +335,16 @@ function ActionsMenu({ user }: { user: ReturnType<typeof getUser> }) {
 }
 
 export default function Layout() {
-  const user = getUser();
-  const nav = user?.role === "ADMIN" ? [...NAV, ...ADMIN_NAV] : NAV;
+  const user = useUser();
+  const can = useCan();
+  const visible = (n: NavItem) =>
+    (!n.perm || can(n.perm)) && (!n.anyPerm || n.anyPerm.some((p) => can(p)));
+  // Onglets de l'en-tête : les postes seulement — l'administration vit dans le
+  // menu du compte (dix onglets ne tiennent plus sur la ligne du logo). Le
+  // tiroir mobile, vertical, garde tout.
+  const tabs = NAV.filter(visible);
+  const nav = [...NAV, ...ADMIN_NAV].filter(visible);
+  const canCreateContract = can("contracts.create");
   const [menuOpen, setMenuOpen] = useState(false);
   // Sur /contracts, la page a déjà son propre bouton de création : deux boutons
   // pour la même action à quelques centimètres l'un de l'autre.
@@ -339,12 +397,12 @@ export default function Layout() {
 
         {/* flex-1 + min-w-0 : la nav prend la place restante et défile (barre
             masquée) plutôt que de pousser les actions hors de l'écran. */}
-        <NavTabs nav={nav} className="ml-3 hidden min-w-0 flex-1 lg:flex" />
+        <NavTabs nav={tabs} className="ml-3 hidden min-w-0 flex-1 lg:flex" />
 
         {/* ml-auto sous lg : sans la nav pour occuper le milieu, les actions
             doivent être poussées à droite elles-mêmes. */}
         <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
-          {!onContracts && (
+          {!onContracts && canCreateContract && (
             <Link to="/contracts?nouveau=1" className={buttonCls("primary", "sm")}>
               <span aria-hidden className="-ml-0.5 text-base leading-none">+</span>
               Contrat

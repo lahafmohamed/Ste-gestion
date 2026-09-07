@@ -11,6 +11,7 @@ import {
   type SizeGroup,
 } from "@ste/shared";
 import { downloadFile, productionApi, trucksApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtInt, fmtNum, fmtPct } from "../lib/format";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -21,6 +22,7 @@ import { TableWrap } from "../components/ui/Table";
 
 export default function ProductionRunPage() {
   const { id = "" } = useParams();
+  const can = useCan();
   const nav = useNavigate();
   const qc = useQueryClient();
 
@@ -104,20 +106,24 @@ export default function ProductionRunPage() {
           <div className="text-sm text-brand-500">{r.note ?? ""}</div>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            onClick={() =>
-              downloadFile(
-                `/production-runs/${r.id}/export.xlsx`,
-                `debite-${new Date(r.producedAt).toISOString().slice(0, 10)}.xlsx`
-              )
-            }
-          >
-            Exporter Excel
-          </Button>
-          <Button variant="ghost-danger" size="sm" onClick={() => setDelOpen(true)}>
-            Supprimer
-          </Button>
+          {can("contracts.export") && (
+            <Button
+              size="sm"
+              onClick={() =>
+                downloadFile(
+                  `/production-runs/${r.id}/export.xlsx`,
+                  `debite-${new Date(r.producedAt).toISOString().slice(0, 10)}.xlsx`
+                )
+              }
+            >
+              Exporter Excel
+            </Button>
+          )}
+          {can("debitage.delete") && (
+            <Button variant="ghost-danger" size="sm" onClick={() => setDelOpen(true)}>
+              Supprimer
+            </Button>
+          )}
         </div>
       </div>
 

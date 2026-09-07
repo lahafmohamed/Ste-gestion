@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PackingLogDTO, TruckDTO } from "@ste/shared";
 import { trucksApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtM3, fmtNum } from "../lib/format";
 import Button from "./ui/Button";
 import { EmptyState, FormError } from "./ui/Feedback";
@@ -241,6 +242,7 @@ function PackingEntry({
 }
 
 export default function PackingList({ truck }: { truck: TruckDTO }) {
+  const can = useCan();
   const [editing, setEditing] = useState(false);
   const rows = truck.packingLogs;
   const total = rows.reduce((s, l) => s + Number(l.volumeM3), 0);
@@ -253,7 +255,7 @@ export default function PackingList({ truck }: { truck: TruckDTO }) {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-brand-400">
           Packing list grumes ({rows.length})
         </h2>
-        {!editing && (
+        {!editing && can("reception.edit") && (
           <Button size="xs" onClick={() => setEditing(true)}>
             {rows.length ? "Modifier" : "+ Saisir"}
           </Button>

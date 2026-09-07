@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ContractDTO, ContractSummaryDTO } from "@ste/shared";
 import { contractsApi, downloadFile } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtFcfa, fmtM3, fmtPct } from "../lib/format";
 import { FEATURES, SHOW_MONEY } from "../lib/features";
 import { ContractSections } from "../components/ContractSections";
@@ -84,21 +85,23 @@ function PipelineBar({
 // termes). Tout empiler sur une page obligeait à traverser huit sections pour
 // corriger un prix. Onglets, avec l'onglet courant dans l'URL (partageable, et
 // conservé au rechargement).
+// `perms` : l'onglet s'affiche si l'utilisateur a au moins une de ces
+// permissions « Voir » (le parc réunit réception et étalage).
 const ALL_TABS = [
   { key: "suivi", label: "Suivi" },
-  { key: "parc", label: "Parc" },
-  { key: "debitage", label: "Débitage" },
-  { key: "ventes", label: "Ventes", enabled: FEATURES.sales },
+  { key: "parc", label: "Parc", perms: ["reception.view", "etalage.view"] },
+  { key: "debitage", label: "Débitage", perms: ["debitage.view"] },
+  { key: "ventes", label: "Ventes", enabled: FEATURES.sales, perms: ["ventes.view"] },
   // Empotage : les conteneurs partaient avec l'onglet Ventes, alors que le poste
   // tourne toujours quand le commercial est en veille.
-  { key: "empotage", label: "Empotage" },
-  { key: "compta", label: "Comptabilité", enabled: FEATURES.accounting },
+  { key: "empotage", label: "Empotage", perms: ["empotage.view"] },
+  { key: "compta", label: "Comptabilité", enabled: FEATURES.accounting, perms: ["compta.view"] },
   { key: "termes", label: "Termes" },
 ] as const;
 
 type TabKey = (typeof ALL_TABS)[number]["key"];
 
-const TABS = ALL_TABS.filter((t) => !("enabled" in t) || t.enabled);
+const ENABLED_TABS = ALL_TABS.filter((t) => !("enabled" in t) || t.enabled);
 
 export default function ContractDetailPage() {
   const { id = "" } = useParams();
@@ -111,6 +114,12 @@ export default function ContractDetailPage() {
   // passe de la réception à l'étalage sans quitter la page (pas de /etalage, qui
   // basculerait sur le contrat sélectionné ailleurs).
   const [etalerId, setEtalerId] = useState<string | null>(null);
+
+  const can = useCan();
+  const TABS = ENABLED_TABS.filter(
+    (t) => !("perms" in t) || t.perms.some((p) => can(p))
+  );
+  const canParcWrite = { reception: can("reception.create"), etalage: can("etalage.create") };
 
   const raw = params.get("onglet");
   const tab: TabKey = TABS.some((t) => t.key === raw) ? (raw as TabKey) : "suivi";
@@ -165,12 +174,15 @@ export default function ContractDetailPage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <Button
-            size="sm"
-            onClick={() => downloadFile(`/contracts/${c.id}/export.xlsx`, `contrat-${c.code}.xlsx`)}
-          >
-            Exporter Excel
-          </Button>
+          {can("contracts.export") && (
+            <Button
+              size="sm"
+              onClick={() => downloadFile(`/contracts/${c.id}/export.xlsx`, `contrat-${c.code}.xlsx`)}
+            >
+              Exporter Excel
+            </Button>
+          )}
+          {can("contracts.delete") && (
           <Button
             variant="ghost-danger"
             size="sm"
@@ -181,6 +193,7 @@ export default function ContractDetailPage() {
           >
             Supprimer
           </Button>
+          )}
         </div>
       </div>
 
@@ -392,12 +405,12 @@ export default function ContractDetailPage() {
         <>
           <ReceptionSection
             contractId={c.id}
-            closed={c.status === "CLOSED"}
+            closed={c.status === "CLOSED" || !canParcWrite.reception}
             onEtaler={(truckId) => setEtalerId(truckId)}
           />
           <EtalageSection
             contractId={c.id}
-            closed={c.status === "CLOSED"}
+            closed={c.status === "CLOSED" || !canParcWrite.etalage}
             openTruckId={etalerId}
             onOpened={() => setEtalerId(null)}
           />
@@ -423,6 +436,7 @@ export default function ContractDetailPage() {
         <section className="mt-5">
           <SectionHeading>Termes du contrat</SectionHeading>
           <ContractSections
+            readOnly={!can("contracts.edit")}
             contract={c}
             onSaved={() => {
               qc.invalidateQueries({ queryKey: ["contracts", id] });

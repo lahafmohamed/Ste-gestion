@@ -136,6 +136,15 @@ export const IconLogout = (p: IconProps) => (
   </Base>
 );
 
+// Feuille qui entre dans un bac : un classeur Excel qui rejoint l'app.
+export const IconImport = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M12 3v11" />
+    <path d="M8 10l4 4 4-4" />
+    <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+  </Base>
+);
+
 export const IconLedger = (p: IconProps) => (
   <Base {...p}>
     <path d="M6 3h11a1 1 0 0 1 1 1v16l-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1Z" />

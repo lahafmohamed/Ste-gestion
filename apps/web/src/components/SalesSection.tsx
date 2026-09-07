@@ -10,6 +10,7 @@ import {
   type SaleDTO,
 } from "@ste/shared";
 import { accountsApi, salesApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtFcfa, fmtNum } from "../lib/format";
 import Button from "./ui/Button";
 import { SectionHeading } from "./ui/Card";
@@ -295,6 +296,7 @@ export default function SalesSection({
   contract: ContractDTO;
   stock: ContractSummaryDTO["stockBySize"];
 }) {
+  const can = useCan();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   // Confirmation lisible sur tablette (remplace window.confirm).
@@ -320,9 +322,11 @@ export default function SalesSection({
     <section className="mt-5">
       <SectionHeading
         right={
-          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? "Fermer" : "+ Vente"}
-          </Button>
+          can("ventes.create") && (
+            <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+              {showForm ? "Fermer" : "+ Vente"}
+            </Button>
+          )
         }
       >
         Ventes ({sales.data?.length ?? 0})
@@ -350,13 +354,15 @@ export default function SalesSection({
                 <span className="text-sm font-semibold text-brand-900">
                   {fmtFcfa(saleTotalCfa(s))}
                 </span>
-                <button
-                  onClick={() => setDelSale(s)}
-                  className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
-                  aria-label="Supprimer la vente"
-                >
-                  ×
-                </button>
+                {can("ventes.delete") && (
+                  <button
+                    onClick={() => setDelSale(s)}
+                    className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                    aria-label="Supprimer la vente"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             </div>
             <div className="mt-1 text-sm text-brand-500">

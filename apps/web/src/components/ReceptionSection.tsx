@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TruckDTO } from "@ste/shared";
 import { contractsApi, trucksApi, vehiclesApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtInt, normalizeDecimal, todayISO } from "../lib/format";
 import { invalidateTrucks, parcStage, truckMatches } from "../lib/trucks";
 import TruckCard from "./TruckCard";
@@ -36,7 +37,7 @@ const emptyForm = () => ({
  */
 export default function ReceptionSection({
   contractId,
-  closed = false,
+  closed: closedProp = false,
   onEtaler,
 }: {
   contractId: string | null;
@@ -49,6 +50,9 @@ export default function ReceptionSection({
    */
   onEtaler?: (truckId: string) => void;
 }) {
+  const can = useCan();
+  // Lecture seule si le contrat est clôturé ou si le compte n'a pas la saisie.
+  const closed = closedProp || !can("reception.create");
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [q, setQ] = useState("");

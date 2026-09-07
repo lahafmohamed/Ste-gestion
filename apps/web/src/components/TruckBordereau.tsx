@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TruckDTO, TruckUpdateInput } from "@ste/shared";
 import { trucksApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Card, { SectionHeading } from "./ui/Card";
@@ -55,6 +56,7 @@ function display(t: TruckDTO, f: Field): string {
 
 export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
   const qc = useQueryClient();
+  const can = useCan();
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -105,12 +107,14 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
     <section className="mt-5">
       <SectionHeading
         right={
-          <button
-            onClick={() => (editing ? setEditing(false) : openEdit())}
-            className="-my-2 min-h-touch rounded-lg px-2.5 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
-          >
-            {editing ? "Annuler" : "Modifier"}
-          </button>
+          can("reception.edit") && (
+            <button
+              onClick={() => (editing ? setEditing(false) : openEdit())}
+              className="-my-2 min-h-touch rounded-lg px-2.5 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
+            >
+              {editing ? "Annuler" : "Modifier"}
+            </button>
+          )
         }
       >
         <span className="inline-flex items-center gap-2">

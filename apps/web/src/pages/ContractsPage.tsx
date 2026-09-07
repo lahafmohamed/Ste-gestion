@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { ContractDTO, ContractOverviewDTO } from "@ste/shared";
 import { contractsApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtInt } from "../lib/format";
 import { PageHeader } from "../components/Layout";
 import { ContractQuickCreate } from "../components/ContractSections";
@@ -79,6 +80,8 @@ function matches(c: ContractDTO, needle: string): boolean {
 
 export default function ContractsPage() {
   const nav = useNavigate();
+  const can = useCan();
+  const canCreate = can("contracts.create");
   const [params, setParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [q, setQ] = useState("");
@@ -142,9 +145,11 @@ export default function ContractsPage() {
         title="Contrats"
         subtitle={`${openCount} ouvert(s)${closedCount > 0 ? ` · ${closedCount} clôturé(s)` : ""} — l'état opérationnel est calculé à partir des opérations.`}
         right={
-          <Button variant="primary" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? "Fermer" : "+ Nouveau contrat"}
-          </Button>
+          canCreate && (
+            <Button variant="primary" onClick={() => setShowForm((s) => !s)}>
+              {showForm ? "Fermer" : "+ Nouveau contrat"}
+            </Button>
+          )
         }
       />
 
@@ -202,9 +207,11 @@ export default function ContractsPage() {
           {!contracts.isLoading && !contracts.isError && all.length === 0 && (
             <EmptyState
               action={
-                <Button variant="primary" onClick={() => setShowForm(true)}>
-                  + Créer le premier contrat
-                </Button>
+                canCreate && (
+                  <Button variant="primary" onClick={() => setShowForm(true)}>
+                    + Créer le premier contrat
+                  </Button>
+                )
               }
             >
               Aucun contrat pour l'instant.

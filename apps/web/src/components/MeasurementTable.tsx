@@ -32,6 +32,8 @@ export default function MeasurementTable({
   onUpdateLog,
   onDeleteLog,
   logPending = false,
+  canEdit = true,
+  canDelete = true,
 }: {
   m: MeasurementDTO;
   onDelete: () => void;
@@ -47,6 +49,9 @@ export default function MeasurementTable({
   onUpdateLog: (logId: string, data: LogUpdateInput) => void;
   onDeleteLog: (log: LogDTO) => void;
   logPending?: boolean;
+  /** Permissions étalage.edit / étalage.delete de l'utilisateur. */
+  canEdit?: boolean;
+  canDelete?: boolean;
 }) {
   const isDia = m.context === "YARD_DIAMETER";
   const [byBill, setByBill] = useState(false);
@@ -169,6 +174,7 @@ export default function MeasurementTable({
                   {fmtNum(l.volumeM3)}
                 </span>
                 <div className="flex items-center">
+                  {canEdit && (
                   <button
                     type="button"
                     onClick={() => startEdit(l)}
@@ -177,6 +183,8 @@ export default function MeasurementTable({
                   >
                     ✎
                   </button>
+                  )}
+                  {canDelete && (
                   <button
                     type="button"
                     onClick={() => onDeleteLog(l)}
@@ -185,6 +193,7 @@ export default function MeasurementTable({
                   >
                     ×
                   </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -289,6 +298,7 @@ export default function MeasurementTable({
                 <td className="py-1">
                   {/* Erreur d'entrée au parc : corriger ou supprimer la ligne. */}
                   <div className="flex items-center justify-end">
+                    {canEdit && (
                     <button
                       type="button"
                       onClick={() => startEdit(l)}
@@ -297,6 +307,8 @@ export default function MeasurementTable({
                     >
                       ✎
                     </button>
+                    )}
+                    {canDelete && (
                     <button
                       type="button"
                       onClick={() => onDeleteLog(l)}
@@ -305,6 +317,7 @@ export default function MeasurementTable({
                     >
                       ×
                     </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -364,12 +377,14 @@ export default function MeasurementTable({
             + Continuer l'étalage
           </Button>
         )}
-        <button
-          onClick={onDelete}
-          className="min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
-        >
-          Supprimer cet étalage
-        </button>
+        {canDelete && (
+          <button
+            onClick={onDelete}
+            className="min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+          >
+            Supprimer cet étalage
+          </button>
+        )}
         {hasBillons && (
           <button
             onClick={() => setByBill((s) => !s)}

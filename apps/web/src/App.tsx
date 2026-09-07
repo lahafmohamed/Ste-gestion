@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import type { Permission } from "@ste/shared";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
-import UsersPage from "./pages/UsersPage";
+import AdminPage from "./pages/AdminPage";
+import ImportPage from "./pages/ImportPage";
 import { authApi } from "./lib/api";
-import { isSessionValid, setSession } from "./lib/auth";
+import { isSessionValid, setSession, setSessionUser, useCan } from "./lib/auth";
 import { FEATURES } from "./lib/features";
 import DashboardPage from "./pages/DashboardPage";
 import ContractsPage from "./pages/ContractsPage";
@@ -48,8 +51,34 @@ const queryClient = new QueryClient({
   },
 });
 
+// Garde de route : sans la permission « Voir » du module, retour au tableau
+// de bord (l'entrée de navigation est déjà masquée ; ceci couvre l'URL tapée
+// ou le favori). L'API refuse de toute façon les écritures. `any` : une seule
+// des permissions suffit (page Import, à cheval sur trois modules).
+function Guard({
+  perm,
+  any,
+  children,
+}: {
+  perm?: Permission;
+  any?: Permission[];
+  children: ReactNode;
+}) {
+  const can = useCan();
+  const ok = (perm ? can(perm) : true) && (any ? any.some((p) => can(p)) : true);
+  return ok ? <>{children}</> : <Navigate to="/" replace />;
+}
+
 export default function App() {
   const [authed, setAuthed] = useState(() => isSessionValid());
+
+  // Au chargement : relire le compte (rôle, permissions) — le localStorage
+  // peut dater d'avant un changement fait par l'admin, ou d'avant les
+  // permissions elles-mêmes. Un 401 (compte désactivé) renvoie au login via req().
+  useEffect(() => {
+    if (!authed) return;
+    authApi.me().then(setSessionUser).catch(() => {});
+  }, [authed]);
 
   // Dev uniquement : connexion automatique avec l'admin du seed pour éviter le
   // formulaire à chaque rechargement. La branche est éliminée du build de prod
@@ -79,20 +108,36 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/contracts" element={<ContractsPage />} />
-            <Route path="/contracts/:id" element={<ContractDetailPage />} />
-            <Route path="/reception" element={<ReceptionPage />} />
-            <Route path="/camions" element={<CamionsPage />} />
-            <Route path="/etalage" element={<EtalagePage />} />
-            <Route path="/debitage" element={<DebitagePage />} />
-            <Route path="/stock" element={<StockPage />} />
-            {FEATURES.sales && <Route path="/ventes" element={<VentesPage />} />}
-            <Route path="/empotage" element={<EmpotagePage />} />
-            {FEATURES.accounting && <Route path="/compta" element={<ComptaPage />} />}
-            {FEATURES.report && <Route path="/rapport" element={<RapportPage />} />}
-            <Route path="/utilisateurs" element={<UsersPage />} />
+            <Route path="/contracts" element={<Guard perm="contracts.view"><ContractsPage /></Guard>} />
+            <Route path="/contracts/:id" element={<Guard perm="contracts.view"><ContractDetailPage /></Guard>} />
+            <Route path="/reception" element={<Guard perm="reception.view"><ReceptionPage /></Guard>} />
+            <Route path="/camions" element={<Guard perm="camions.view"><CamionsPage /></Guard>} />
+            <Route path="/etalage" element={<Guard perm="etalage.view"><EtalagePage /></Guard>} />
+            <Route path="/debitage" element={<Guard perm="debitage.view"><DebitagePage /></Guard>} />
+            <Route path="/stock" element={<Guard perm="stock.view"><StockPage /></Guard>} />
+            {FEATURES.sales && (
+              <Route path="/ventes" element={<Guard perm="ventes.view"><VentesPage /></Guard>} />
+            )}
+            <Route path="/empotage" element={<Guard perm="empotage.view"><EmpotagePage /></Guard>} />
+            {FEATURES.accounting && (
+              <Route path="/compta" element={<Guard perm="compta.view"><ComptaPage /></Guard>} />
+            )}
+            {FEATURES.report && (
+              <Route path="/rapport" element={<Guard perm="rapport.view"><RapportPage /></Guard>} />
+            )}
+            <Route
+              path="/import"
+              element={
+                <Guard any={["etalage.create", "debitage.create", "empotage.create"]}>
+                  <ImportPage />
+                </Guard>
+              }
+            />
+            <Route path="/admin" element={<Guard perm="users.manage"><AdminPage /></Guard>} />
+            <Route path="/utilisateurs" element={<Navigate to="/admin" replace />} />
+            {/* Fiche camion : lisible dès qu'un poste du parc est ouvert. */}
             <Route path="/trucks/:id" element={<TruckDetailPage />} />
-            <Route path="/production-runs/:id" element={<ProductionRunPage />} />
+            <Route path="/production-runs/:id" element={<Guard perm="debitage.view"><ProductionRunPage /></Guard>} />
             {/* Sans quoi un favori vers un module en veille (/ventes, /compta,
                 /rapport) affiche le chrome de l'app autour d'un vide. */}
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EntryKind } from "@ste/shared";
 import { accountsApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtFcfa } from "../lib/format";
 import Button from "./ui/Button";
 import { SectionHeading } from "./ui/Card";
@@ -121,6 +122,7 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
 
 export default function AccountsSection({ contractId }: { contractId: string }) {
   const qc = useQueryClient();
+  const can = useCan();
   const [showForm, setShowForm] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   // Confirmation lisible sur tablette (remplace window.confirm).
@@ -165,9 +167,11 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
     <section className="mt-5">
       <SectionHeading
         right={
-          <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? "Fermer" : "+ Écriture"}
-          </Button>
+          can("compta.create") && (
+            <Button size="xs" onClick={() => setShowForm((s) => !s)}>
+              {showForm ? "Fermer" : "+ Écriture"}
+            </Button>
+          )
         }
       >
         Comptes tiers ({accounts.data?.length ?? 0})
@@ -175,7 +179,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
 
       {showForm && <EntryForm contractId={contractId} onDone={() => setShowForm(false)} />}
 
-      {suggestions.data && suggestions.data.filter((s) => Number(s.delta) > 0).length > 0 && (
+      {can("compta.create") && suggestions.data && suggestions.data.filter((s) => Number(s.delta) > 0).length > 0 && (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
             Dûs suggérés (dérivés des opérations)
@@ -263,15 +267,17 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                             {e.description ?? ""}
                           </td>
                           <td className="py-1 text-right">
-                            <button
-                              onClick={() =>
-                                setDelEntry({ id: e.id, kind: e.kind, amount: e.amount })
-                              }
-                              className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
-                              aria-label="Supprimer l'écriture"
-                            >
-                              ×
-                            </button>
+                            {can("compta.delete") && (
+                              <button
+                                onClick={() =>
+                                  setDelEntry({ id: e.id, kind: e.kind, amount: e.amount })
+                                }
+                                className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                                aria-label="Supprimer l'écriture"
+                              >
+                                ×
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}

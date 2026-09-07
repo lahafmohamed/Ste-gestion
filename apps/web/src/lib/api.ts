@@ -22,6 +22,9 @@ import type {
   UserUpdateInput,
   PartyCreateInput,
   PartyDTO,
+  RolePermissionsDTO,
+  RolePermissionsUpdateInput,
+  UserRole,
   LogUpdateInput,
   MeasurementCreateInput,
   MeasurementDTO,
@@ -32,6 +35,10 @@ import type {
   ProductionRunDTO,
   ResawOpCreateInput,
   ResawOpDTO,
+  ImportApplyDTO,
+  ImportApplyInput,
+  ImportPreviewDTO,
+  ImportPreviewInput,
   SaleCreateInput,
   SaleDTO,
   TruckCreateInput,
@@ -112,6 +119,17 @@ export const usersApi = {
     req<UserDTO>("/users", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: UserUpdateInput) =>
     req<UserDTO>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+};
+
+export const permissionsApi = {
+  roles: () => req<RolePermissionsDTO>("/permissions/roles"),
+  setRole: (role: Exclude<UserRole, "ADMIN">, data: RolePermissionsUpdateInput) =>
+    req<RolePermissionsDTO>(`/permissions/roles/${role}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  resetRole: (role: Exclude<UserRole, "ADMIN">) =>
+    req<RolePermissionsDTO>(`/permissions/roles/${role}/reset`, { method: "POST" }),
 };
 
 export const contractsApi = {
@@ -243,6 +261,13 @@ export const productionApi = {
   remove: (id: string) => req<void>(`/production-runs/${id}`, { method: "DELETE" }),
   cutting: (contractId: string) =>
     req<ContractCuttingDTO>(`/contracts/${contractId}/cutting`),
+};
+
+export const importsApi = {
+  preview: (data: ImportPreviewInput) =>
+    req<ImportPreviewDTO>("/imports/preview", { method: "POST", body: JSON.stringify(data) }),
+  apply: (data: ImportApplyInput) =>
+    req<ImportApplyDTO>("/imports/apply", { method: "POST", body: JSON.stringify(data) }),
 };
 
 export const resawApi = {

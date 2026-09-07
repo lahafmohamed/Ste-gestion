@@ -147,10 +147,13 @@ function SectionCard({
   section,
   contract,
   onSaved,
+  readOnly = false,
 }: {
   section: Section;
   contract: ContractDTO;
   onSaved: () => void;
+  /** Sans `contracts.edit` : la carte se lit, ne s'édite pas. */
+  readOnly?: boolean;
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -217,12 +220,14 @@ function SectionCard({
           </Badge>
         </div>
         {/* min-h-touch : « Modifier » se tape au pouce sur la fiche. */}
-        <button
-          onClick={() => (editing ? closeEdit() : openEdit())}
-          className="-my-1 min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
-        >
-          {editing ? "Annuler" : "Modifier"}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => (editing ? closeEdit() : openEdit())}
+            className="-my-1 min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
+          >
+            {editing ? "Annuler" : "Modifier"}
+          </button>
+        )}
       </div>
       {section.hint && !editing && (
         <p className="mt-1 text-xs text-brand-400">{section.hint}</p>
@@ -306,14 +311,22 @@ function SectionCard({
 export function ContractSections({
   contract,
   onSaved,
+  readOnly = false,
 }: {
   contract: ContractDTO;
   onSaved: () => void;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-3">
       {SECTIONS.map((s) => (
-        <SectionCard key={s.id} section={s} contract={contract} onSaved={onSaved} />
+        <SectionCard
+          key={s.id}
+          section={s}
+          contract={contract}
+          onSaved={onSaved}
+          readOnly={readOnly}
+        />
       ))}
     </div>
   );

@@ -5,6 +5,7 @@ import { APP_NAME } from "@ste/shared";
 import { bootstrapAdmin, registerAuth } from "./auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
+import { permissionRoutes } from "./routes/permissions.js";
 import { contractRoutes } from "./routes/contracts.js";
 import { truckRoutes } from "./routes/trucks.js";
 import { vehicleRoutes } from "./routes/vehicles.js";
@@ -16,6 +17,7 @@ import { saleRoutes } from "./routes/sales.js";
 import { containerRoutes } from "./routes/containers.js";
 import { reportRoutes } from "./routes/reports.js";
 import { exportRoutes } from "./routes/exports.js";
+import { importRoutes } from "./routes/imports.js";
 
 const app = Fastify({ logger: true });
 
@@ -36,6 +38,7 @@ app.get("/health", async () => ({ ok: true, app: APP_NAME }));
 
 await app.register(authRoutes);
 await app.register(userRoutes);
+await app.register(permissionRoutes);
 await app.register(contractRoutes);
 await app.register(truckRoutes);
 await app.register(vehicleRoutes);
@@ -47,6 +50,7 @@ await app.register(saleRoutes);
 await app.register(containerRoutes);
 await app.register(reportRoutes);
 await app.register(exportRoutes);
+await app.register(importRoutes);
 
 await bootstrapAdmin(app);
 

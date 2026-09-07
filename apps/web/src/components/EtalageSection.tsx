@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import type { MeasurementCreateInput, TruckDTO } from "@ste/shared";
 import { measurementTotalM3, truckBillCount, truckBillNos } from "@ste/shared";
 import { trucksApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
 import { declaredOf, diaOf, girthOf, invalidateTrucks, parcStage, truckMatches } from "../lib/trucks";
 import TallyEntry from "./TallyEntry";
@@ -46,7 +47,7 @@ const COLUMNS = [
 
 export default function EtalageSection({
   contractId,
-  closed = false,
+  closed: closedProp = false,
   openTruckId,
   onOpened,
 }: {
@@ -58,6 +59,9 @@ export default function EtalageSection({
   /** Ce camion est ouvert : l'hôte peut nettoyer l'URL / son état. */
   onOpened?: () => void;
 }) {
+  const can = useCan();
+  // Lecture seule si le contrat est clôturé ou si le compte n'a pas la saisie.
+  const closed = closedProp || !can("etalage.create");
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   // Camion en cours d'étalage ou de billonnage.

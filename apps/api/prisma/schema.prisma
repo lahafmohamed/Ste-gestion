@@ -30,10 +30,24 @@ model User {
   passwordHash String   @map("password_hash")
   role         UserRole @default(BUREAU)
   active       Boolean  @default(true)
+  // Surcharges individuelles par rapport à la matrice du rôle (clés du
+  // catalogue partagé `module.action`). Vides par défaut.
+  permissionsGranted String[] @default([]) @map("permissions_granted")
+  permissionsRevoked String[] @default([]) @map("permissions_revoked")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("user")
+}
+
+// Matrice rôle → permission, éditable depuis l'écran Admin. ADMIN n'y figure
+// pas (il a tout). Semée à la migration avec la matrice par défaut (PLAN §7).
+model RolePermission {
+  role       UserRole
+  permission String
+
+  @@id([role, permission])
+  @@map("role_permission")
 }
 
 model Contract {
