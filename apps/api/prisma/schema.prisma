@@ -37,6 +37,8 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  importBatches ImportBatch[]
+
   @@map("user")
 }
 
@@ -111,6 +113,7 @@ model Contract {
   sales          Sale[]
   containers     Container[]
   resawOps       ResawOp[]
+  importBatches  ImportBatch[]
 
   @@map("contract")
 }
@@ -491,4 +494,30 @@ model SawnLine {
   volumeM3  Decimal   @map("volume_m3") @db.Decimal(12, 6)
 
   @@map("sawn_line")
+}
+
+// Historique des imports Excel réussis : qui a déposé quel classeur, quand, et
+// ce qu'il a créé. Le détail des feuilles reste en JSON (même forme que la
+// réponse d'application) — c'est un journal, pas une source de vérité.
+model ImportBatch {
+  id         String   @id @default(cuid())
+  contractId String   @map("contract_id")
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  userId     String?  @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  filename     String
+  sheetCount   Int     @map("sheet_count")
+  lineCount    Int     @map("line_count")
+  pieceCount   Int     @map("piece_count")
+  totalM3      Decimal @map("total_m3") @db.Decimal(14, 6)
+  createdTrucks Int    @map("created_trucks")
+  /// Feuilles enregistrées (ImportAppliedSheet + volume) et feuilles écartées.
+  applied Json
+  skipped Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([contractId, createdAt])
+  @@map("import_batch")
 }

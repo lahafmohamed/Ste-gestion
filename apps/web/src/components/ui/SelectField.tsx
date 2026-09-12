@@ -196,9 +196,13 @@ export default function SelectField({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-haspopup="listbox"
-        className={`flex min-h-touch items-center justify-between gap-2 rounded-lg border border-brand-300 bg-white py-2 pl-3 pr-2.5 text-left text-base outline-none transition-[border-color,box-shadow] hover:border-brand-400 focus-visible:border-accent-500 focus-visible:ring-[3px] focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`flex min-h-touch items-center justify-between gap-2 rounded-lg border border-brand-300 bg-white py-2 pl-3 pr-2.5 text-left text-base outline-none transition-[border-color,box-shadow,transform,background-color] duration-150 ease-out hover:border-brand-400 hover:bg-brand-50 motion-safe:active:scale-[0.96] focus-visible:border-accent-500 focus-visible:ring-[3px] focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50 ${
           width === "full" ? "w-full min-w-0" : ""
-        } ${open ? "border-brand-900 ring-1 ring-brand-900" : ""} ${
+        } ${
+          // Ouvert : même repère que la prise de focus d'un champ (liseré accent
+          // + halo), au lieu du cerclage noir qui tranchait avec les champs.
+          open ? "border-accent-500 ring-[3px] ring-accent-500/20" : ""
+        } ${
           // Rien de choisi : le libellé reste un appel à choisir, pas une valeur.
           selected && selected.value !== "" ? "text-brand-900" : "text-brand-400"
         }`}
@@ -256,7 +260,7 @@ export default function SelectField({
                     // Ligne survolée ou visée au clavier : même repère pour les
                     // deux, sinon la souris et les flèches racontent deux
                     // histoires différentes.
-                    i === active && !isSelected ? "bg-accent-50 text-brand-900" : ""
+                    i === active && !isSelected ? "bg-accent-100 text-brand-900" : ""
                   }`}
                 >
                   <span className="truncate">{o.label}</span>
@@ -290,8 +294,8 @@ function ChevronIcon({ open }: { open: boolean }) {
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`h-5 w-5 shrink-0 text-brand-400 transition-transform duration-150 ease-out ${
-        open ? "-rotate-180" : ""
+      className={`h-5 w-5 shrink-0 transition-[transform,color] duration-150 ease-out ${
+        open ? "-rotate-180 text-accent-600" : "text-brand-400"
       }`}
       aria-hidden="true"
     >

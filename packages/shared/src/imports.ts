@@ -92,11 +92,32 @@ export type ImportAppliedSheet = {
   /** Id de l'objet créé : relevé, session ou conteneur. */
   createdId: string;
   lines: number;
+  /** Volume recalculé par l'app pour cette feuille (m³). */
+  volumeM3?: string;
 };
+
+export type ImportSkippedSheet = { name: string; reason: string };
 
 export type ImportApplyDTO = {
   applied: ImportAppliedSheet[];
-  skipped: { name: string; reason: string }[];
+  skipped: ImportSkippedSheet[];
+  /** Ligne d'historique créée quand au moins une feuille est enregistrée. */
+  batchId?: string;
+};
+
+/** Une ligne du journal des imports réussis (le plus récent d'abord). */
+export type ImportBatchDTO = {
+  id: string;
+  filename: string;
+  createdAt: string;
+  user: { id: string; name: string } | null;
+  sheetCount: number;
+  lineCount: number;
+  pieceCount: number;
+  totalM3: string;
+  createdTrucks: number;
+  applied: ImportAppliedSheet[];
+  skipped: ImportSkippedSheet[];
 };
 
 const fileFields = {

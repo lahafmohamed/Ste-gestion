@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { importApplySchema, importPreviewSchema } from "@ste/shared";
 import { getCachedUser, permissionsFor } from "../permissions.js";
-import { applyImport, previewImport } from "../imports/service.js";
+import { applyImport, listImportBatches, previewImport } from "../imports/service.js";
 
 // Import des classeurs Excel du terrain. Le fichier voyage en base64 dans le
 // JSON (classeurs de quelques dizaines de Ko ; limite 8 Mo sur ces routes).
@@ -58,6 +58,7 @@ export async function importRoutes(app: FastifyInstance) {
         buf,
         parsed.data.sheets,
         await permissionsFor(u),
+        u.id,
       );
       return reply.code(201).send(res);
     } catch (e) {
@@ -65,5 +66,13 @@ export async function importRoutes(app: FastifyInstance) {
       if (status) return reply.code(status).send({ error: (e as Error).message });
       throw e;
     }
+  });
+
+  // Journal des classeurs déjà enregistrés sur le contrat (lecture partagée).
+  app.get("/imports/history", async (req, reply) => {
+    const q = req.query as { contractId?: string; limit?: string };
+    if (!q.contractId) return reply.code(400).send({ error: "contractId requis" });
+    const limit = Math.min(Math.max(Number(q.limit) || 30, 1), 100);
+    return listImportBatches(q.contractId, limit);
   });
 }

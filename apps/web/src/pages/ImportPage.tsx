@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   IMPORT_SHEET_LABELS,
   type ContractDTO,
   type ImportApplyDTO,
+  type ImportBatchDTO,
   type ImportIssue,
   type ImportPreviewDTO,
   type ImportSheetPreview,
@@ -80,11 +81,7 @@ function readAsBase64(file: File): Promise<string> {
 
 export default function ImportPage() {
   return (
-    <StepLayout
-      title="Import Excel"
-      subtitle="Déposer un classeur terrain (étalage, billonnage, débitage, empotage) : l'app le lit, montre ce qu'elle va créer, puis enregistre."
-      wide
-    >
+    <StepLayout title="Import Excel" wide>
       {(c) => <ImportFlow key={c.id} contract={c} />}
     </StepLayout>
   );
@@ -129,6 +126,7 @@ function ImportFlow({ contract }: { contract: ContractDTO }) {
         "production-runs",
         "sawn-inventory",
         "contracts",
+        "import-history",
       ]) {
         qc.invalidateQueries({ queryKey: [key] });
       }
@@ -238,7 +236,114 @@ function ImportFlow({ contract }: { contract: ContractDTO }) {
       )}
 
       {result && <ResultPanel result={result} contractId={contract.id} />}
+
+      <HistoryPanel contractId={contract.id} />
     </div>
+  );
+}
+
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("fr-FR")} à ${d.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+/** Journal des classeurs déjà enregistrés sur le contrat — le plus récent en
+    haut, chaque ligne dépliable sur le détail des feuilles. */
+function HistoryPanel({ contractId }: { contractId: string }) {
+  const { data, isPending, isError } = useQuery({
+    queryKey: ["import-history", contractId],
+    queryFn: () => importsApi.history(contractId),
+  });
+
+  return (
+    <section className="rounded-xl bg-white p-4 shadow-card">
+      <h2 className="text-sm font-semibold text-brand-900">Imports enregistrés</h2>
+      {isPending && <p className="mt-2 text-sm text-brand-500">Chargement de l'historique…</p>}
+      {isError && <FormError>Historique indisponible.</FormError>}
+      {data && data.length === 0 && (
+        <p className="mt-2 text-sm text-brand-500">
+          Aucun classeur importé sur ce contrat pour l'instant.
+        </p>
+      )}
+      {data && data.length > 0 && (
+        <ul className="mt-2 divide-y divide-brand-50">
+          {data.map((b) => (
+            <HistoryRow key={b.id} batch={b} contractId={contractId} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function HistoryRow({ batch, contractId }: { batch: ImportBatchDTO; contractId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="py-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex min-h-touch w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-1 text-left hover:bg-brand-50"
+        aria-expanded={open}
+      >
+        <span className="font-medium text-brand-900">{batch.filename}</span>
+        <span className="text-sm text-brand-500">{fmtDateTime(batch.createdAt)}</span>
+        {batch.user && <span className="text-sm text-brand-500">· {batch.user.name}</span>}
+        <span className="ml-auto flex flex-wrap items-center gap-x-3 text-sm text-brand-700">
+          <span className="tabular-nums">
+            {fmtInt(batch.sheetCount)} feuille{batch.sheetCount > 1 ? "s" : ""}
+          </span>
+          <span className="tabular-nums">{fmtInt(batch.lineCount)} lignes</span>
+          <span className="tabular-nums">{fmtNum(batch.totalM3)} m³</span>
+          {batch.createdTrucks > 0 && (
+            <Badge tone="amber">
+              {fmtInt(batch.createdTrucks)} camion{batch.createdTrucks > 1 ? "s" : ""} créé
+              {batch.createdTrucks > 1 ? "s" : ""}
+            </Badge>
+          )}
+          <span className="text-brand-400">{open ? "▾" : "▸"}</span>
+        </span>
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-1 pl-1 text-sm">
+          {batch.applied.map((a) => (
+            <li key={a.name} className="flex flex-wrap items-center gap-2">
+              <Badge tone={TYPE_TONE[a.type]}>{IMPORT_SHEET_LABELS[a.type]}</Badge>
+              <span className="text-brand-700">{a.name}</span>
+              <span className="text-brand-500">· {fmtInt(a.lines)} lignes</span>
+              {a.volumeM3 && <span className="text-brand-500">· {fmtNum(a.volumeM3)} m³</span>}
+              {a.createdTruck && <Badge tone="amber">camion créé</Badge>}
+              {a.truckId && (
+                <Link to={`/trucks/${a.truckId}`} className="underline text-brand-600">
+                  ouvrir le camion
+                </Link>
+              )}
+              {a.type === "SAWN" && (
+                <Link to={`/production-runs/${a.createdId}`} className="underline text-brand-600">
+                  ouvrir la session
+                </Link>
+              )}
+              {a.type === "CONTAINER" && (
+                <Link
+                  to={`/contracts/${contractId}?onglet=empotage`}
+                  className="underline text-brand-600"
+                >
+                  voir les conteneurs
+                </Link>
+              )}
+            </li>
+          ))}
+          {batch.skipped.map((s) => (
+            <li key={s.name} className="text-amber-800">
+              ⚠ {s.name} : {s.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 

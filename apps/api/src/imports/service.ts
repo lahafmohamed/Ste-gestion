@@ -8,10 +8,12 @@ import {
   volumeGirthM3,
   type ImportAppliedSheet,
   type ImportApplyDTO,
+  type ImportBatchDTO,
   type ImportIssue,
   type ImportLine,
   type ImportPreviewDTO,
   type ImportSheetPreview,
+  type ImportSkippedSheet,
   type Permission,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
@@ -353,6 +355,7 @@ export async function applyImport(
   buffer: Buffer,
   wanted: string[],
   permissions: readonly string[],
+  userId: string | null,
 ): Promise<ImportApplyDTO> {
   const preview = await previewImport(contractId, filename, buffer, permissions);
   const contract = await prisma.contract.findUniqueOrThrow({
@@ -438,6 +441,7 @@ export async function applyImport(
         createdTruck,
         createdId: m.id,
         lines: logs.length,
+        volumeM3: sheet.totalM3,
       });
       continue;
     }
@@ -473,6 +477,7 @@ export async function applyImport(
         createdTruck,
         createdId: r.id,
         lines: lines.length,
+        volumeM3: sheet.totalM3,
       });
       continue;
     }
@@ -504,8 +509,65 @@ export async function applyImport(
         },
         select: { id: true },
       });
-      applied.push({ name: sheet.name, type: sheet.type, createdId: c.id, lines: items.length });
+      applied.push({
+        name: sheet.name,
+        type: sheet.type,
+        createdId: c.id,
+        lines: items.length,
+        volumeM3: sheet.totalM3,
+      });
     }
   }
-  return { applied, skipped };
+
+  // Journal : une ligne par classeur réellement enregistré. Rien n'est écrit
+  // quand tout a été écarté — l'historique ne liste que les imports réussis.
+  let batchId: string | undefined;
+  if (applied.length > 0) {
+    const names = new Set(applied.map((a) => a.name));
+    const kept = preview.sheets.filter((s) => names.has(s.name));
+    const batch = await prisma.importBatch.create({
+      data: {
+        contractId,
+        userId,
+        filename,
+        sheetCount: applied.length,
+        lineCount: applied.reduce((n, a) => n + a.lines, 0),
+        pieceCount: kept.reduce((n, s) => n + s.pieceCount, 0),
+        totalM3: dec(kept.reduce((n, s) => n + Number(s.totalM3), 0)),
+        createdTrucks: created.size,
+        applied: applied as unknown as Prisma.InputJsonValue,
+        skipped: skipped as unknown as Prisma.InputJsonValue,
+      },
+      select: { id: true },
+    });
+    batchId = batch.id;
+  }
+
+  return { applied, skipped, batchId };
+}
+
+/** Journal des imports réussis d'un contrat, le plus récent d'abord. */
+export async function listImportBatches(
+  contractId: string,
+  limit = 30,
+): Promise<ImportBatchDTO[]> {
+  const rows = await prisma.importBatch.findMany({
+    where: { contractId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: { user: { select: { id: true, name: true } } },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    filename: r.filename,
+    createdAt: r.createdAt.toISOString(),
+    user: r.user ? { id: r.user.id, name: r.user.name } : null,
+    sheetCount: r.sheetCount,
+    lineCount: r.lineCount,
+    pieceCount: r.pieceCount,
+    totalM3: r.totalM3.toString(),
+    createdTrucks: r.createdTrucks,
+    applied: (r.applied ?? []) as unknown as ImportAppliedSheet[],
+    skipped: (r.skipped ?? []) as unknown as ImportSkippedSheet[],
+  }));
 }

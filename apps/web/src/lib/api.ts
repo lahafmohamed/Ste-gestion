@@ -37,6 +37,7 @@ import type {
   ResawOpDTO,
   ImportApplyDTO,
   ImportApplyInput,
+  ImportBatchDTO,
   ImportPreviewDTO,
   ImportPreviewInput,
   SaleCreateInput,
@@ -268,6 +269,8 @@ export const importsApi = {
     req<ImportPreviewDTO>("/imports/preview", { method: "POST", body: JSON.stringify(data) }),
   apply: (data: ImportApplyInput) =>
     req<ImportApplyDTO>("/imports/apply", { method: "POST", body: JSON.stringify(data) }),
+  history: (contractId: string) =>
+    req<ImportBatchDTO[]>(`/imports/history?contractId=${encodeURIComponent(contractId)}`),
 };
 
 export const resawApi = {
