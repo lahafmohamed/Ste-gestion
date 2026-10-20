@@ -5,6 +5,7 @@ import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
 import { inputQuietCls } from "./ui/Input";
 import { useOnline } from "../lib/online";
+import { IconX, IconPlus } from "./icons";
 
 type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
 const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
@@ -84,7 +85,7 @@ export default function EmpotageEntry({
             key={i}
             className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
           >
-            <span className="text-xs text-brand-400">{i + 1}</span>
+            <span className="text-xs text-brand-500">{i + 1}</span>
             {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
               <div
                 key={k}
@@ -121,16 +122,16 @@ export default function EmpotageEntry({
               <span className="text-center text-xs text-brand-300">—</span>
             )}
             <span className="text-right text-base tabular-nums text-brand-700">
-              <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
+              <span className="mr-1 text-xs text-brand-500 sm:hidden">m³</span>
               {info ? info.volume.toFixed(3) : "—"}
             </span>
             <button
               type="button"
               onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-              className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
+              className="flex min-h-touch w-full items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
               aria-label="Supprimer la ligne"
             >
-              ×
+              <IconX width={18} height={18} />
             </button>
           </div>
         );
@@ -143,7 +144,8 @@ export default function EmpotageEntry({
       <div className="sticky bottom-0 z-10 mt-3 rounded-xl bg-white/95 p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_-8px_24px_-12px_oklch(0_0_0/0.25)] backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <Button variant="secondary" size="xs" onClick={() => setRows((p) => [...p, emptyRow()])}>
-            + Ligne
+            <IconPlus width={16} height={16} className="-ml-0.5" />
+            Ligne
           </Button>
           <div className="text-sm">
             <span className="text-brand-500">{fmtNum(pieces)} pièces · </span>

@@ -278,7 +278,7 @@ export default function DateField({
         aria-label={open ? "Fermer le calendrier" : "Ouvrir le calendrier"}
         aria-expanded={open}
         aria-controls={open ? gridId : undefined}
-        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-brand-400 transition-[color,transform] duration-150 ease-out hover:text-brand-900 focus-visible:text-brand-900 focus-visible:outline-none motion-safe:active:scale-[0.96] active:text-brand-900 disabled:opacity-50"
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-brand-500 transition-[color,transform] duration-150 ease-out hover:text-brand-900 focus-visible:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 motion-safe:active:scale-[0.96] active:text-brand-900 disabled:opacity-50"
       >
         <CalendarIcon />
       </button>

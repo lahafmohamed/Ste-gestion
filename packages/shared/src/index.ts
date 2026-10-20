@@ -200,7 +200,8 @@ const sawnLineInput = z.object({
 });
 
 export const productionRunCreateSchema = z.object({
-  contractId: z.string().min(1),
+  // Pas de contractId : le débité tombe dans le stock général. Le serveur
+  // recopie le contrat des camions sciés (null si plusieurs contrats).
   producedAt: z.coerce.date().optional(),
   note: z.string().trim().max(500).optional(),
   truckIds: z.array(z.string().min(1)).optional(),
@@ -224,7 +225,8 @@ export type SawnLineDTO = {
 
 export type ProductionRunDTO = {
   id: string;
-  contractId: string;
+  /** Déduit des camions sciés — null si session sans camion ou multi-contrats. */
+  contractId: string | null;
   producedAt: string;
   note: string | null;
   createdAt: string;
@@ -252,7 +254,7 @@ export function runGroupTotals(r: ProductionRunDTO): Record<SizeGroup, number> {
 // Les deux sens (consommé / produit) partagent la forme d'une ligne débitée.
 
 export const resawOpCreateSchema = z.object({
-  contractId: z.string().min(1),
+  // Stock → stock : pas de contrat.
   resawnAt: z.coerce.date().optional(),
   note: z.string().trim().max(500).optional(),
   consumed: z.array(sawnLineInput).min(1), // pris dans le stock
@@ -262,7 +264,7 @@ export type ResawOpCreateInput = z.infer<typeof resawOpCreateSchema>;
 
 export type ResawOpDTO = {
   id: string;
-  contractId: string;
+  contractId: string | null;
   resawnAt: string;
   note: string | null;
   createdAt: string;
@@ -394,19 +396,9 @@ export const truckUpdateSchema = z.object({
 export type TruckUpdateInput = z.infer<typeof truckUpdateSchema>;
 
 // ── Packing list grumes (spécification de transport SODEFOR) ──────────
-const packingLogInput = z.object({
-  billNo: z.string().trim().max(30).optional(),
-  diaTopCm: decimalString.optional(),
-  diaBottomCm: decimalString.optional(),
-  diaMeanCm: decimalString.optional(),
-  lengthM: decimalString.optional(),
-  volumeM3: decimalString,
-});
-export const packingCreateSchema = z.object({
-  logs: z.array(packingLogInput).min(1),
-});
-export type PackingCreateInput = z.infer<typeof packingCreateSchema>;
-
+// Lecture seule : la saisie a été retirée de la fiche camion, seules les
+// lignes déjà en base servent encore (volume de repli dans les résumés et
+// préremplissage des n° de billes à l'étalage Ø).
 export type PackingLogDTO = {
   id: string;
   position: number;
@@ -616,39 +608,107 @@ export function truckBillNos(t: {
 }
 
 // ── Avancement du débitage d'un camion ────────────────────────────────
-// Croise billons girth × sessions : logIds vides = camion entier (tous ses
-// billons comptent sciés — comportement historique).
+// Croise billons girth × sessions. Règle de la saisie (« aucun coché = camion
+// entier ») appliquée camion par camion : une session liée au camion sans
+// AUCUN de ses billons cochés l'a scié en entier (comportement historique) ;
+// sinon seuls ses billons cochés sont partis à la scie. Une session à deux
+// camions peut donc scier l'un en entier et l'autre en partie.
 
-export type TruckSawnProgress = {
+export type TruckSawnProgress<L = LogDTO> = {
   total: number; // billons girth du camion
   sawn: number; // billons passés à la scie
   started: boolean; // ≥1 session liée au camion
   complete: boolean; // tout est scié
-  remaining: LogDTO[]; // billons pas encore sciés
+  remaining: L[]; // billons pas encore sciés
+  girthM3: number; // cubage de tous les billons du camion
+  /** Cubage des billons passés à la scie — dénominateur du rendement (F6). */
+  sawnGirthM3: number;
 };
 
-export function truckSawnProgress(
-  t: { id: string; measurements: MeasurementDTO[] },
+/** Billon girth tel que le portent un DTO ou une ligne Prisma (Decimal). */
+type GirthLog = { id: string; volumeM3: unknown };
+
+export function truckSawnProgress<L extends GirthLog = LogDTO>(
+  t: { id: string; measurements: { context: string; logs: L[] }[] },
   runs: Pick<ProductionRunDTO, "truckIds" | "logIds">[]
-): TruckSawnProgress {
+): TruckSawnProgress<L> {
   const billons = t.measurements
     .filter((m) => m.context === "YARD_GIRTH")
     .flatMap((m) => m.logs);
+  const billonIds = new Set(billons.map((l) => l.id));
   const myRuns = runs.filter((r) => r.truckIds.includes(t.id));
-  const wholeTruck = myRuns.some((r) => r.logIds.length === 0);
+  const wholeTruck = myRuns.some((r) => !r.logIds.some((id) => billonIds.has(id)));
   // logIds de TOUTES les sessions : un billon du camion peut être lié à une
   // session sans que le camion le soit (données saisies à la main / API).
   const sawnIds = new Set(runs.flatMap((r) => r.logIds));
   const remaining = wholeTruck ? [] : billons.filter((l) => !sawnIds.has(l.id));
   const sawn = billons.length - remaining.length;
   const started = myRuns.length > 0 || sawn > 0;
+  const girthM3 = billons.reduce((s, l) => s + Number(l.volumeM3), 0);
+  const remainingM3 = remaining.reduce((s, l) => s + Number(l.volumeM3), 0);
   return {
     total: billons.length,
     sawn,
     started,
     complete: started && (billons.length === 0 ? wholeTruck : sawn === billons.length),
     remaining,
+    girthM3,
+    sawnGirthM3: Math.max(girthM3 - remainingM3, 0),
   };
+}
+
+/**
+ * Cubage des billons passés à la scie, par camion, à partir de listes à plat
+ * (requêtes API) — même règle que truckSawnProgress : un lien session↔camion
+ * sans aucun billon de ce camion coché = camion entier ; sinon billons cochés.
+ * C'est le dénominateur du rendement (F6) tant qu'un camion n'est pas fini :
+ * diviser par tous ses billons ferait chuter le rendement d'un camion entamé.
+ */
+export function sawnGirthByTruck(
+  girthLogs: { id: string; truckId: string; volumeM3: unknown }[],
+  runTrucks: { runId: string; truckId: string }[],
+  runLogs: { runId: string; logId: string }[]
+): Map<string, number> {
+  const truckOfLog = new Map(girthLogs.map((l) => [l.id, l.truckId]));
+  // Sessions ayant coché ≥1 billon d'un camion donné.
+  const runsWithBillons = new Map<string, Set<string>>();
+  for (const rl of runLogs) {
+    const tid = truckOfLog.get(rl.logId);
+    if (!tid) continue;
+    let set = runsWithBillons.get(tid);
+    if (!set) runsWithBillons.set(tid, (set = new Set()));
+    set.add(rl.runId);
+  }
+  const wholeTrucks = new Set(
+    runTrucks.filter((rt) => !runsWithBillons.get(rt.truckId)?.has(rt.runId)).map((rt) => rt.truckId)
+  );
+  const sawnLogIds = new Set(runLogs.map((rl) => rl.logId));
+  const out = new Map<string, number>();
+  for (const l of girthLogs) {
+    if (!wholeTrucks.has(l.truckId) && !sawnLogIds.has(l.id)) continue;
+    out.set(l.truckId, (out.get(l.truckId) ?? 0) + Number(l.volumeM3));
+  }
+  return out;
+}
+
+/**
+ * Cubage des billons sciés par UNE session (rendement de la session, saisie
+ * live) : billons cochés de chaque camion, ou le camion entier quand aucun de
+ * ses billons ne l'est.
+ */
+export function runSawnGirthM3(
+  trucks: { id: string; measurements: { context: string; logs: GirthLog[] }[] }[],
+  logIds: string[]
+): number {
+  const checked = new Set(logIds);
+  return trucks.reduce((sum, t) => {
+    const billons = t.measurements
+      .filter((m) => m.context === "YARD_GIRTH")
+      .flatMap((m) => m.logs);
+    const mine = billons.filter((l) => checked.has(l.id));
+    const used = mine.length > 0 ? mine : billons;
+    return sum + used.reduce((s, l) => s + Number(l.volumeM3), 0);
+  }, 0);
 }
 
 // ── Comptes tiers ──────────────────────────────────────────────────────
@@ -722,7 +782,7 @@ export type ContractOverviewDTO = {
   brousseM3: string; // même règle que le résumé : étalage brousse > packing > déclaré
   estTrucksTotal: number | null;
   debitedM3: string;
-  outputPct: string; // débité / girth (rendement scierie)
+  outputPct: string; // débité ÷ billons sciés (rendement scierie, F6)
   stockProductsM3: string; // débité + rescié entrant − vendu − rescié sortant
   salesRevenueCfa: string;
   balance: string; // dû − payé (positif = reste à payer)
@@ -755,7 +815,11 @@ export type ContractSummaryDTO = {
 
   // Production
   debitedM3: string;
-  outputPct: string; // F6 : débité ÷ girth × 100
+  /** Billons passés à la scie (camion entier si session sans billon coché). */
+  sawnGirthM3: string;
+  // F6 : débité ÷ billons sciés × 100 — les billons qui attendent au parc ne
+  // font plus baisser le rendement ; l'avancement = sawnGirthM3 ÷ girthM3.
+  outputPct: string;
   quotaUsedPct: string; // girth ÷ quota × 100
   longM3: string; // avivés ≥ 6,5 ft
   shortM3: string; // avivés < 6,5 ft
@@ -765,16 +829,7 @@ export type ContractSummaryDTO = {
   girthLt85M3: string;
 
   // Stock
-  // stock = produit + rescié entrant − vendu − rescié sortant
-  stockBySize: {
-    code: string;
-    group: SizeGroup;
-    producedM3: string;
-    soldM3: string;
-    resawnInM3: string; // produit par resciage
-    resawnOutM3: string; // consommé par resciage
-    stockM3: string;
-  }[];
+  stockBySize: StockSizeRowDTO[];
   stockProductsM3: string;
   stockParcM3: string; // girth des camions non sciés
 
@@ -787,6 +842,46 @@ export type ContractSummaryDTO = {
   totalPaid: string;
   balance: string;
   profitEstimate: string; // CA − fullCost
+};
+
+// ── Stock général ─────────────────────────────────────────────────────
+// Le stock ne se découpe pas par contrat : le débité de tous les contrats
+// tombe dans le même stock, et l'empotage y puise sans choisir de contrat.
+// stock = produit + rescié entrant − vendu − rescié sortant
+export type StockSizeRowDTO = {
+  code: string;
+  group: SizeGroup;
+  producedM3: string;
+  soldM3: string;
+  resawnInM3: string; // produit par resciage
+  resawnOutM3: string; // consommé par resciage
+  stockM3: string;
+};
+
+/** GET /stock/summary — mêmes chiffres que le résumé contrat, tous contrats. */
+export type StockSummaryDTO = {
+  stockBySize: StockSizeRowDTO[];
+  stockProductsM3: string;
+  stockParcM3: string; // billons non sciés restants
+  debitedM3: string;
+  resawnInM3: string;
+  resawnOutM3: string;
+  soldM3: string;
+};
+
+/** GET /stock/parc — camions ayant encore des billons au parc (tous contrats). */
+export type ParcTruckDTO = {
+  truckId: string;
+  contractId: string;
+  contractCode: string;
+  registration: string;
+  deliveryNote: string | null;
+  arrivedAt: string;
+  /** Billons restants (girth non scié) — pas le total du camion. */
+  billonCount: number;
+  girthM3: string;
+  girthGte85M3: string;
+  girthLt85M3: string;
 };
 
 export type AccountSuggestionDTO = {
@@ -886,7 +981,7 @@ const containerItemInput = z.object({
 });
 
 export const containerCreateSchema = z.object({
-  contractId: z.string().min(1),
+  // Pas de contractId : l'empotage puise dans le stock général.
   clientId: z.string().min(1).nullable().optional(),
   containerNo: z.string().trim().min(1, "N° conteneur requis").max(30),
   sealNo: z.string().trim().max(30).optional(),
@@ -932,7 +1027,8 @@ export type ContainerItemDTO = {
 
 export type ContainerDTO = {
   id: string;
-  contractId: string;
+  /** Legacy : conteneurs créés avant le stock général. Plus jamais renseigné. */
+  contractId: string | null;
   clientId: string | null;
   containerNo: string;
   sealNo: string | null;
@@ -1043,6 +1139,9 @@ export type TruckStatDTO = {
   diaM3: string;
   /** Débité attribué (Σ sessions liées ÷ nb camions liés — approximation si session multi-camions). */
   debitedM3: string;
+  /** Billons passés à la scie (camion entier si session sans billon coché) — base du rendement. */
+  sawnGirthM3: string;
+  /** Rendement F6 : débité ÷ billons sciés (pas ÷ tous les billons d'un camion entamé). */
   outputPct: string;
   // ── Daily Truck Log : splits du débité par bande d'épaisseur / longueur ──
   mainM3: string; // ép ≥ 3" (MAIN SIZE)

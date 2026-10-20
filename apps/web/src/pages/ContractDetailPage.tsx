@@ -16,9 +16,13 @@ import CuttingSection from "../components/CuttingSection";
 import SalesSection from "../components/SalesSection";
 import ContainersSection from "../components/ContainersSection";
 import AccountsSection from "../components/AccountsSection";
+import { IconLock } from "../components/icons";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card, { BackLink, Kpi, SectionHeading } from "../components/ui/Card";
+import { Notice, QueryError } from "../components/ui/Feedback";
+import { SkeletonLine, SkeletonList } from "../components/ui/Skeleton";
+import Tabs from "../components/ui/Tabs";
 
 // Chaîne de mesure du bois : chaque étape a son unité (billes puis billons) et
 // son cubage. Même vocabulaire que la réception (étalage → billonnage → débitage).
@@ -36,24 +40,34 @@ function FlowStep({
   muted?: boolean;
 }) {
   return (
-    <div
+    <li
       className={`min-w-[8.5rem] flex-1 rounded-lg p-3 ${
         muted
           ? "border border-dashed border-brand-200 bg-brand-50/60"
           : "bg-brand-50 ring-1 ring-inset ring-brand-100"
       }`}
     >
-      <div className="flex items-baseline gap-1.5 text-xs text-brand-500">
-        <span className="tabular-nums text-brand-400">{step}</span>
+      <div className="flex items-center gap-1.5 text-sm text-brand-600">
+        {/* Pastille d'étape : l'ordre se lit d'un coup d'œil, même en défilant. */}
+        <span
+          aria-hidden
+          className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
+            muted ? "bg-brand-100 text-brand-500" : "bg-accent-100 text-accent-700"
+          }`}
+        >
+          {step}
+        </span>
         {label}
       </div>
       <div
-        className={`mt-1 font-semibold tabular-nums ${muted ? "text-brand-400" : "text-brand-900"}`}
+        className={`mt-1.5 text-lg font-semibold tracking-tight tabular-nums ${
+          muted ? "text-brand-500" : "text-brand-900"
+        }`}
       >
         {value}
       </div>
-      <div className="text-xs text-brand-400">{sub ?? "—"}</div>
-    </div>
+      <div className="text-xs text-brand-500">{sub ?? "—"}</div>
+    </li>
   );
 }
 
@@ -70,9 +84,11 @@ function PipelineBar({
 }) {
   return (
     <div>
-      <div className="flex justify-between text-sm">
+      {/* Téléphone : la valeur passe sous le libellé au lieu de couper les
+          deux textes en colonnes étroites. */}
+      <div className="flex flex-wrap justify-between gap-x-4 gap-y-0.5 text-sm">
         <span className="text-brand-600">{label}</span>
-        <span className="text-brand-900">{value}</span>
+        <span className="font-medium text-brand-900">{value}</span>
       </div>
       <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-brand-100">
         <div className={`h-full ${color}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
@@ -141,37 +157,58 @@ export default function ContractDetailPage() {
     },
   });
 
-  if (q.isLoading) return <p className="p-6 text-sm text-brand-500">Chargement…</p>;
+  // Squelette à la forme de la fiche (retour, titre, jauge, tableau) : la page
+  // ne saute pas quand le contrat arrive.
+  if (q.isLoading)
+    return (
+      <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3" aria-busy="true">
+        <SkeletonLine className="w-24" />
+        <SkeletonLine className="mt-5 h-7 w-56 max-w-full" />
+        <SkeletonLine className="mt-3 w-96 max-w-full" />
+        <div className="mt-8">
+          <SkeletonList count={2} lines={3} />
+        </div>
+      </div>
+    );
   if (q.isError || !q.data)
     return (
-      <div className="p-6">
-        <p className="text-sm text-red-600">Contrat introuvable.</p>
-        <Link to="/contracts" className="text-sm text-brand-500 underline">
-          ← Retour
-        </Link>
+      <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
+        <BackLink to="/contracts">Contrats</BackLink>
+        <div className="mt-3">
+          <QueryError error={q.error} onRetry={() => q.refetch()}>
+            Impossible d'ouvrir ce contrat
+          </QueryError>
+        </div>
       </div>
     );
 
   const c: ContractDTO = q.data;
   const s: ContractSummaryDTO | undefined = summaryQ.data;
+  const meta = [
+    c.year,
+    c.forest,
+    c.managementCenter,
+    c.signedAt && `signé le ${new Date(c.signedAt).toLocaleDateString("fr-FR")}`,
+    c.durationMonths && `${c.durationMonths} mois`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
       <BackLink to="/contracts">Contrats</BackLink>
 
-      <div className="mt-2 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-title font-semibold text-brand-900">{c.code}</h1>
-          <div className="text-sm text-brand-500">
-            {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
-            {c.year ? ` · ${c.year}` : ""}
-            {c.forest ? ` · ${c.forest}` : ""}
-            {c.managementCenter ? ` · ${c.managementCenter}` : ""}
-            {c.signedAt
-              ? ` · signé le ${new Date(c.signedAt).toLocaleDateString("fr-FR")}`
-              : ""}
-            {c.durationMonths ? ` · ${c.durationMonths} mois` : ""}
-          </div>
+      {/* Téléphone : les actions passent sous le titre plutôt que de couper le
+          n° de contrat en deux (« CT- » / « 2026-014 »). */}
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-title font-semibold tracking-tight text-brand-900">
+            <span className="whitespace-nowrap">{c.code}</span>
+            <Badge tone={c.status === "OPEN" ? "parc" : "brand"}>
+              {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
+            </Badge>
+          </h1>
+          {meta && <div className="mt-1 text-sm text-brand-600">{meta}</div>}
         </div>
         <div className="flex gap-3">
           {can("contracts.export") && (
@@ -197,9 +234,11 @@ export default function ContractDetailPage() {
         </div>
       </div>
 
-      {/* Suppression en cascade : camions, étalages, sciage, ventes, conteneurs
-          et compta partent avec le contrat. Recopier le n° évite le clic réflexe
-          sur une boîte de dialogue — c'est irréversible et il n'y a pas d'annulation. */}
+      {/* Suppression en cascade : camions, étalages, ventes et compta partent
+          avec le contrat. Le débitage, les conteneurs et le resciage restent —
+          ils appartiennent au stock général et perdent seulement le lien.
+          Recopier le n° évite le clic réflexe sur une boîte de dialogue —
+          c'est irréversible et il n'y a pas d'annulation. */}
       {delOpen && (
         <div className="mt-3 rounded-xl border border-red-300 bg-red-50 p-4">
           <div className="text-sm font-semibold text-red-800">
@@ -207,9 +246,10 @@ export default function ContractDetailPage() {
           </div>
           <p className="mt-1 text-sm text-red-700">
             {s
-              ? `${s.trucksEntered} camion${s.trucksEntered > 1 ? "s" : ""}, leurs étalages et billonnages, le sciage, les ventes, les conteneurs et la comptabilité seront effacés.`
-              : "Toutes les opérations du contrat seront effacées."}{" "}
-            Action irréversible.
+              ? `${s.trucksEntered} camion${s.trucksEntered > 1 ? "s" : ""}, leurs étalages et billonnages, les ventes et la comptabilité seront effacés.`
+              : "Les camions, étalages, ventes et la comptabilité du contrat seront effacés."}{" "}
+            Action irréversible. Le débitage, les conteneurs et le resciage restent au stock
+            général : ils perdent seulement le lien avec ce contrat.
           </p>
           <label className="mt-3 flex flex-col gap-1 text-sm">
             <span className="text-red-800">
@@ -223,7 +263,7 @@ export default function ContractDetailPage() {
               autoCorrect="off"
               spellCheck={false}
               placeholder={c.code}
-              className="min-h-touch rounded-lg border border-red-300 bg-white px-3 py-2 text-base outline-none focus:border-red-600 sm:max-w-xs"
+              className="min-h-touch rounded-lg border border-red-300 bg-white px-3 py-2 text-base outline-none transition-[border-color,box-shadow] focus:border-red-600 focus:ring-[3px] focus:ring-red-600/20 sm:max-w-xs"
             />
           </label>
           {del.isError && (
@@ -248,41 +288,20 @@ export default function ContractDetailPage() {
 
       {/* Contrat clôturé : l'API refuse toute opération métier (409). */}
       {c.status === "CLOSED" && (
-        <div className="mt-3 rounded-lg bg-brand-100 px-3 py-2 text-sm text-brand-600">
-          🔒 Contrat clôturé — lecture seule. Le repasser en « Ouvert » dans{" "}
+        <Notice icon={IconLock} className="mt-3">
+          Contrat clôturé — lecture seule. Le repasser en « Ouvert » dans{" "}
           <button
             type="button"
             onClick={() => setTab("termes")}
-            className="underline hover:text-brand-900"
+            className="font-medium underline hover:text-brand-900"
           >
             Termes
           </button>{" "}
           pour corriger une saisie.
-        </div>
+        </Notice>
       )}
 
-      {/* overflow-x-auto force aussi overflow-y en auto (règle CSS) : le -mb-px des
-          onglets déborde d'1px et Chrome affiche une barre de défilement verticale
-          fantôme à droite. Barres masquées, le glissement tactile reste possible. */}
-      <div className="-mx-4 mt-5 overflow-x-auto border-b border-brand-200 px-4 scrollbar-none">
-        <div className="flex min-w-max gap-1">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              aria-current={tab === t.key ? "page" : undefined}
-              className={`-mb-px min-h-touch whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 ${
-                tab === t.key
-                  ? "border-accent-500 text-accent-800"
-                  : "border-transparent text-brand-500 hover:text-brand-900 active:bg-brand-100"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <Tabs className="mt-5" tabs={TABS} value={tab} onChange={setTab} label="Sections du contrat" />
 
       {tab === "suivi" && (
         <>
@@ -305,11 +324,12 @@ export default function ContractDetailPage() {
 
         {/* Pipeline — tout dérivé des opérations */}
         {s && (
-          <section className="mt-5">
+          <section className="mt-8">
             <SectionHeading>Pipeline</SectionHeading>
             <Card className="space-y-3">
-              {/* Chaîne de mesure — mêmes étapes et mêmes mots que la réception. */}
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {/* Chaîne de mesure — mêmes étapes et mêmes mots que la réception.
+                  Liste ordonnée : l'ordre est le sens du bois. */}
+              <ol className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                 <FlowStep
                   step={1}
                   label="Brousse"
@@ -342,14 +362,22 @@ export default function ContractDetailPage() {
                   }
                   muted={Number(s.debitedM3) === 0}
                 />
-              </div>
+              </ol>
 
-              <PipelineBar
-                label={`Débitage — ${s.trucksSawn} camion${s.trucksSawn > 1 ? "s" : ""} scié${s.trucksSawn > 1 ? "s" : ""} · ${s.trucksOnParcUncut} sur parc`}
-                value={`${fmtM3(s.debitedM3)} (${fmtPct(Number(s.outputPct))} des billons)`}
-                pct={Number(s.outputPct)}
-                color="bg-accent-500"
-              />
+              {/* Avancement du sciage (part des billons passés à la scie). Le
+                  rendement, lui, se lit à l'étape 4 : débité ÷ billons sciés. */}
+              {(() => {
+                const girth = Number(s.girthM3);
+                const sawnPct = girth > 0 ? (Number(s.sawnGirthM3) / girth) * 100 : 0;
+                return (
+                  <PipelineBar
+                    label={`Sciage — ${s.trucksSawn} camion${s.trucksSawn > 1 ? "s" : ""} scié${s.trucksSawn > 1 ? "s" : ""} · ${s.trucksOnParcUncut} sur parc`}
+                    value={`${fmtPct(sawnPct, 0)} des billons passés à la scie`}
+                    pct={sawnPct}
+                    color="bg-accent-500"
+                  />
+                );
+              })()}
               {(Number(s.girthM3) > 0 || Number(s.debitedM3) > 0) && (
                 <div className="flex flex-wrap gap-2 text-xs">
                   {/* Perte au parc : brousse (brut forêt) vs billes étalées — écorce,
@@ -379,7 +407,9 @@ export default function ContractDetailPage() {
                   )}
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
+              {/* Quatre colonnes seulement quand l'argent s'affiche : sans lui,
+                  deux tuiles sur une grille de quatre laissaient une demi-rangée vide. */}
+              <div className={`grid grid-cols-2 gap-3 pt-1 ${SHOW_MONEY ? "sm:grid-cols-4" : ""}`}>
                 <Kpi inset label="Stock produits" value={fmtM3(s.stockProductsM3)} />
                 <Kpi inset label="Stock parc (billons)" value={fmtM3(s.stockParcM3)} />
                 {/* Argent : dépend des ventes et de la compta, en veille tous les deux. */}
@@ -398,6 +428,9 @@ export default function ContractDetailPage() {
           </section>
         )}
 
+        {/* Le tableau du classeur : une ligne par camion, du comptage parc au
+            coût du m³ débité. C'est la vue que le bureau ouvre en premier. */}
+        <TruckStatsSection contract={c} />
         </>
       )}
 
@@ -414,7 +447,6 @@ export default function ContractDetailPage() {
             openTruckId={etalerId}
             onOpened={() => setEtalerId(null)}
           />
-          <TruckStatsSection contractId={c.id} />
         </>
       )}
 
@@ -427,7 +459,20 @@ export default function ContractDetailPage() {
 
       {tab === "ventes" && s && <SalesSection contract={c} stock={s.stockBySize} />}
 
-      {tab === "empotage" && <ContainersSection contractId={c.id} />}
+      {/* L'empotage puise dans le stock général : les nouveaux conteneurs ne
+          portent plus de contrat. Ne restent ici que les anciens. */}
+      {tab === "empotage" && (
+        <>
+          <Notice className="mt-4">
+            L'empotage se fait sur le stock général —{" "}
+            <Link to="/empotage" className="font-medium underline hover:text-brand-900">
+              page Empotage
+            </Link>
+            . Ici ne restent que les conteneurs rattachés à ce contrat.
+          </Notice>
+          <ContainersSection contractId={c.id} />
+        </>
+      )}
 
       {tab === "compta" && <AccountsSection contractId={c.id} />}
 

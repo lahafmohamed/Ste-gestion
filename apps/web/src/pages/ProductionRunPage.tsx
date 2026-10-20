@@ -4,21 +4,26 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   runGroupTotals,
   runPieceCount,
+  runSawnGirthM3,
   runTotalM3,
   sawnLongShortM3,
   sawnThicknessBands,
+  sizeSortIndex,
   SIZE_GROUP_LABELS,
+  type SawnLineDTO,
   type SizeGroup,
 } from "@ste/shared";
 import { downloadFile, productionApi, trucksApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtInt, fmtNum, fmtPct } from "../lib/format";
+import { fmtDec3, fmtInt, fmtNum, fmtPct, fmtM3 } from "../lib/format";
+import { truckLabel } from "../lib/trucks";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card, { BackLink } from "../components/ui/Card";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { QueryError } from "../components/ui/Feedback";
 import { SkeletonList } from "../components/ui/Skeleton";
-import { TableWrap } from "../components/ui/Table";
+import { TableWrap, Td, Th } from "../components/ui/Table";
 
 export default function ProductionRunPage() {
   const { id = "" } = useParams();
@@ -31,11 +36,13 @@ export default function ProductionRunPage() {
     queryFn: () => productionApi.get(id),
   });
 
+  // Une session peut n'avoir aucun contrat (camions de contrats différents) :
+  // on retombe alors sur tout le parc pour retrouver les immatriculations.
   const contractId = q.data?.contractId;
   const trucksQ = useQuery({
-    queryKey: ["trucks", contractId],
-    queryFn: () => trucksApi.listByContract(contractId!),
-    enabled: !!contractId,
+    queryKey: ["trucks", contractId ?? "all"],
+    queryFn: () => (contractId ? trucksApi.listByContract(contractId) : trucksApi.list()),
+    enabled: !!q.data,
   });
 
   const del = useMutation({
@@ -53,17 +60,19 @@ export default function ProductionRunPage() {
 
   if (q.isLoading)
     return (
-      <div className="mx-auto max-w-page px-4 py-6">
+      <div className="mx-auto max-w-page-wide px-4 py-6">
         <SkeletonList count={2} />
       </div>
     );
   if (q.isError || !q.data)
     return (
-      <div className="p-6">
-        <p className="text-sm text-red-600">Session introuvable.</p>
-        <Link to="/contracts" className="text-sm text-brand-500 underline">
-          ← Contrats
-        </Link>
+      <div className="mx-auto max-w-page-wide px-4 py-6">
+        <BackLink to="/debitage">Débitage</BackLink>
+        <div className="mt-3">
+          <QueryError error={q.error} onRetry={() => q.refetch()}>
+            Impossible d'ouvrir cette session de débitage
+          </QueryError>
+        </div>
       </div>
     );
 
@@ -80,30 +89,26 @@ export default function ProductionRunPage() {
       .flatMap((m) => m.logs)
       .filter((l) => r.logIds.includes(l.id))
   );
-  // Rendement = débité ÷ cubage des billons sciés si précisés, sinon camions entiers.
-  const girthLinked =
-    sawnBillons.length > 0
-      ? sawnBillons.reduce((s, l) => s + Number(l.volumeM3), 0)
-      : linkedTrucks.reduce(
-          (s, t) =>
-            s +
-            t.measurements
-              .filter((m) => m.context === "YARD_GIRTH")
-              .reduce((x, m) => x + m.logs.reduce((y, l) => y + Number(l.volumeM3), 0), 0),
-          0
-        );
+  // Rendement = débité ÷ billons sciés : ceux cochés pour chaque camion, ou le
+  // camion entier quand aucun des siens ne l'est (session à deux camions).
+  const girthLinked = runSawnGirthM3(linkedTrucks, r.logIds);
   const rendement = girthLinked > 0 ? (total / girthLinked) * 100 : null;
 
   return (
-    <div className="mx-auto max-w-page px-4 py-6 short:py-3">
-      <BackLink to={`/contracts/${r.contractId}`}>Contrat</BackLink>
+    <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
+      {/* Session sans contrat (camions de plusieurs contrats) : retour au
+          débitage — « /contracts/null » menait à une fiche vide. */}
+      {r.contractId ? (
+        <BackLink to={`/contracts/${r.contractId}`}>Contrat</BackLink>
+      ) : (
+        <BackLink to="/debitage">Débitage</BackLink>
+      )}
 
-      <div className="mt-2 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-title font-semibold text-brand-900">
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="text-title font-semibold tracking-tight text-brand-900">
             Débitage du {new Date(r.producedAt).toLocaleDateString("fr-FR")}
           </h1>
-          <div className="text-sm text-brand-500">{r.note ?? ""}</div>
         </div>
         <div className="flex items-center gap-3">
           {can("contracts.export") && (
@@ -129,37 +134,40 @@ export default function ProductionRunPage() {
 
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="inline-flex items-center rounded-full bg-brand-900 px-3 py-1 text-sm font-medium text-white">
-          {fmtNum(runTotalM3(r).toFixed(6))} m³
+          {fmtM3(runTotalM3(r))}
         </span>
         <Badge size="md">{fmtInt(runPieceCount(r))} pièces</Badge>
         {(Object.keys(groups) as SizeGroup[])
           .filter((g) => groups[g] > 0)
           .map((g) => (
             <Badge key={g} size="md">
-              {SIZE_GROUP_LABELS[g]} {fmtNum(groups[g].toFixed(3))} m³
+              {SIZE_GROUP_LABELS[g]} {fmtM3(groups[g])}
             </Badge>
           ))}
       </div>
 
       {/* Camions sciés + rendement de la session */}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-xs uppercase tracking-wide text-brand-400">Camions sciés :</span>
+        <span className="text-brand-600">Camions sciés :</span>
         {linkedTrucks.length === 0 ? (
-          <span className="text-brand-400">aucun camion lié</span>
+          <span className="text-brand-500">aucun camion lié</span>
         ) : (
           linkedTrucks.map((t) => (
             <Link
               key={t.id}
               to={`/trucks/${t.id}`}
-              className="inline-flex min-h-touch items-center rounded-full border border-brand-300 px-3 py-1 text-sm text-brand-700 transition-colors hover:border-brand-900 active:bg-brand-100"
+              className="inline-flex min-h-touch items-center gap-1.5 rounded-full border border-brand-300 px-3 py-1 text-sm text-brand-700 transition-colors hover:border-brand-900 active:bg-brand-100"
             >
-              {t.registration}
+              {/* B/L d'abord : la session se rapproche des bordereaux, pas des
+                  immatriculations. */}
+              {truckLabel(t)}
+              {t.deliveryNote && <span className="text-brand-500">{t.registration}</span>}
             </Link>
           ))
         )}
         {rendement !== null && (
           <Badge tone="parc">
-            Rendement {fmtPct(rendement)} ({fmtNum(girthLinked.toFixed(3))} m³ de billons
+            Rendement {fmtPct(rendement)} ({fmtM3(girthLinked)} de billons
             {sawnBillons.length > 0 ? ` · ${sawnBillons.length} billons` : ""})
           </Badge>
         )}
@@ -168,7 +176,7 @@ export default function ProductionRunPage() {
       {/* Billons sciés précisés */}
       {sawnBillons.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="uppercase tracking-wide text-brand-400">Billons sciés :</span>
+          <span className="text-sm text-brand-600">Billons sciés :</span>
           {sawnBillons.map((l) => (
             <Badge key={l.id} tone="parc" title={`${Number(l.volumeM3).toFixed(4)} m³`}>
               {l.externalId ?? `#${l.position}`}
@@ -192,46 +200,65 @@ export default function ProductionRunPage() {
           ))}
       </div>
 
+      {/* La taille n'est pas une colonne : « 7"+ », « 1" », « 2" » sont eux-mêmes
+          des cotes en pouces, et collés à la colonne ép ils se lisaient comme une
+          dimension de plus (« 7 » puis « 7"+ »). Elle devient l'intertitre qui
+          porte ses propres totaux — mêmes sections qu'un conteneur empoté. */}
       <Card className="mt-4">
-        <TableWrap className="-mx-4 px-4">
-        <table className="w-full min-w-[560px] text-base">
-          <thead>
-            <tr className="text-left text-xs text-brand-500">
-              <th className="py-1 font-normal">#</th>
-              <th className="py-1 font-normal">L (ft)</th>
-              <th className="py-1 font-normal">l (in)</th>
-              <th className="py-1 font-normal">ép (in)</th>
-              <th className="py-1 text-right font-normal">Nbr</th>
-              <th className="py-1 font-normal">Taille</th>
-              <th className="py-1 text-right font-normal">m³</th>
-            </tr>
-          </thead>
-          <tbody>
-            {r.lines.map((l) => (
-              <tr key={l.id} className="border-t border-brand-100">
-                <td className="py-1 text-brand-400">{l.position}</td>
-                <td className="py-1 tabular-nums">{fmtNum(l.lengthFt)}</td>
-                <td className="py-1 tabular-nums">{fmtNum(l.widthIn)}</td>
-                <td className="py-1 tabular-nums">{fmtNum(l.thicknessIn)}</td>
-                <td className="py-1 text-right tabular-nums">{l.count}</td>
-                <td className="py-1">{l.sizeCode}</td>
-                <td className="py-1 text-right tabular-nums">{fmtNum(l.volumeM3)}</td>
+        <TableWrap stickyHeader className="-mx-4 px-4">
+          <table className="w-full min-w-[520px] text-base">
+            <thead>
+              <tr className="text-left text-xs text-brand-500">
+                <Th>#</Th>
+                <Th right>L (ft)</Th>
+                <Th right>l (in)</Th>
+                <Th right>ép (in)</Th>
+                <Th right>Nbr</Th>
+                <Th right>m³</Th>
               </tr>
+            </thead>
+            {sizeSections(r.lines).map((sec) => (
+              <tbody key={sec.code}>
+                <tr className="border-t border-brand-200">
+                  <th
+                    scope="colgroup"
+                    colSpan={4}
+                    className="py-1.5 pr-3 text-left text-sm font-semibold text-brand-900"
+                  >
+                    {sec.code}
+                  </th>
+                  <td className="py-1.5 pr-3 text-right text-sm tabular-nums text-brand-500">
+                    {fmtInt(sec.count)}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right text-sm tabular-nums text-brand-500">
+                    {fmtNum(sec.m3.toFixed(3))}
+                  </td>
+                </tr>
+                {sec.lines.map((l) => (
+                  // Sur la colonne large, la ligne survolée se suit d'un bout à
+                  // l'autre du tableau.
+                  <tr
+                    key={l.id}
+                    className="border-t border-brand-100 transition-colors duration-150 ease-out hover:bg-brand-50"
+                  >
+                    <Td className="text-brand-500">{l.position}</Td>
+                    <Td num>{fmtNum(l.lengthFt)}</Td>
+                    <Td num>{fmtNum(l.widthIn)}</Td>
+                    <Td num>{fmtNum(l.thicknessIn)}</Td>
+                    <Td num>{l.count}</Td>
+                    <Td num>{fmtDec3(l.volumeM3)}</Td>
+                  </tr>
+                ))}
+              </tbody>
             ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-brand-200 font-semibold">
-              <td colSpan={4} className="py-1.5">
-                Total
-              </td>
-              <td className="py-1.5 text-right tabular-nums">{fmtInt(runPieceCount(r))}</td>
-              <td />
-              <td className="py-1.5 text-right tabular-nums">
-                {fmtNum(runTotalM3(r).toFixed(6))}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+            <tfoot>
+              <tr className="border-t-2 border-brand-300 font-semibold">
+                <Td colSpan={4}>Total</Td>
+                <Td num>{fmtInt(runPieceCount(r))}</Td>
+                <Td num>{fmtDec3(runTotalM3(r))}</Td>
+              </tr>
+            </tfoot>
+          </table>
         </TableWrap>
       </Card>
 
@@ -243,9 +270,29 @@ export default function ProductionRunPage() {
         onConfirm={() => del.mutate()}
         onCancel={() => setDelOpen(false)}
       >
-        {r.lines.length} ligne{r.lines.length > 1 ? "s" : ""}, {fmtNum(total.toFixed(3))} m³
+        {r.lines.length} ligne{r.lines.length > 1 ? "s" : ""}, {fmtM3(total)}
         seront effacés. Action irréversible.
       </ConfirmDialog>
     </div>
   );
+}
+
+/** Lignes d'une session regroupées par taille, dans l'ordre du classeur (F4). */
+function sizeSections(
+  lines: SawnLineDTO[]
+): { code: string; count: number; m3: number; lines: SawnLineDTO[] }[] {
+  const by = new Map<string, SawnLineDTO[]>();
+  for (const l of lines) {
+    const g = by.get(l.sizeCode);
+    if (g) g.push(l);
+    else by.set(l.sizeCode, [l]);
+  }
+  return [...by.entries()]
+    .sort(([a], [b]) => sizeSortIndex(a) - sizeSortIndex(b) || a.localeCompare(b))
+    .map(([code, rows]) => ({
+      code,
+      count: rows.reduce((s, l) => s + l.count, 0),
+      m3: rows.reduce((s, l) => s + Number(l.volumeM3), 0),
+      lines: rows,
+    }));
 }

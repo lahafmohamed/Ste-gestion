@@ -9,9 +9,10 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { EmptyState, FormError, QueryError } from "../components/ui/Feedback";
+import { EmptyState, FormError, QueryError, Notice } from "../components/ui/Feedback";
 import Input, { Field, SearchInput } from "../components/ui/Input";
 import { SkeletonList } from "../components/ui/Skeleton";
+import { IconPlus } from "../components/icons";
 
 // Le parc de camions — référentiel du portail. Les mêmes camions reviennent
 // voyage après voyage : ils se saisissent ici une fois, et la Réception les
@@ -137,7 +138,7 @@ export default function CamionsPage() {
               setShowForm((s) => !s);
             }}
           >
-            {showForm ? "Fermer" : "+ Camion"}
+            {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Camion</>}
           </Button>
           )
         }
@@ -174,10 +175,10 @@ export default function CamionsPage() {
             </div>
 
             {dup && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                ⚠ {dup.registration} est déjà au parc — la même plaque écrite
+              <Notice tone="warn" className="mt-2">
+                {dup.registration} est déjà au parc — la même plaque écrite
                 autrement reste le même camion.
-              </p>
+              </Notice>
             )}
 
             <div className="mt-3 flex items-center justify-between gap-3">
@@ -216,7 +217,8 @@ export default function CamionsPage() {
               action={
                 can("camions.create") && (
                   <Button variant="primary" onClick={() => setShowForm(true)}>
-                    + Camion
+                    <IconPlus width={16} height={16} className="-ml-0.5" />
+                    Camion
                   </Button>
                 )
               }
@@ -231,7 +233,7 @@ export default function CamionsPage() {
 
           {shown.map((x) =>
             editingId === x.id ? (
-              <Card key={x.id} pad="sm" className="border-brand-900">
+              <Card key={x.id} pad="sm" className="ring-2 ring-accent-500">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -261,10 +263,10 @@ export default function CamionsPage() {
                   {/* Corriger la plaque corrige aussi les bordereaux déjà saisis :
                       c'est le même camion, la faute de frappe n'a pas à survivre. */}
                   {x.tripCount > 0 && edit.registration.trim() !== x.registration && (
-                    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                      ⚠ {x.tripCount} réception{x.tripCount > 1 ? "s" : ""} porteront la
+                    <Notice tone="warn" className="mt-2">
+                      {x.tripCount} réception{x.tripCount > 1 ? "s" : ""} porteront la
                       nouvelle immatriculation.
-                    </p>
+                    </Notice>
                   )}
                   {editError && (
                     <div className="mt-2">
@@ -303,11 +305,13 @@ export default function CamionsPage() {
                 </form>
               </Card>
             ) : (
-              <Card key={x.id} pad="sm" className={x.active ? "" : "opacity-60"}>
+              <Card key={x.id} pad="sm">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-brand-900">{x.registration}</span>
+                      <span className={`font-medium ${x.active ? "text-brand-900" : "text-brand-500"}`}>
+                        {x.registration}
+                      </span>
                       {x.code && <Badge tone="accent">{x.code}</Badge>}
                       {!x.active && <Badge>Retiré</Badge>}
                       {x.tripCount > 0 ? (
@@ -324,7 +328,7 @@ export default function CamionsPage() {
                         .join(" · ")}
                     </div>
                     {x.lastTripAt && (
-                      <div className="mt-0.5 text-sm text-brand-400">
+                      <div className="mt-0.5 text-sm text-brand-500">
                         Dernier voyage le {new Date(x.lastTripAt).toLocaleDateString("fr-FR")}
                       </div>
                     )}

@@ -8,12 +8,13 @@ import { invalidateTrucks, parcStage, truckMatches } from "../lib/trucks";
 import TruckCard from "./TruckCard";
 import VehiclePicker, { VEHICLE_NEW } from "./VehiclePicker";
 import Button from "./ui/Button";
-import { Kpi, SectionHeading } from "./ui/Card";
+import { Kpi, KpiStrip, SectionHeading } from "./ui/Card";
 import DateField from "./ui/DateField";
-import { EmptyState, FormError, QueryError } from "./ui/Feedback";
+import { EmptyState, FormError, QueryError, Notice } from "./ui/Feedback";
 import Input, { Field, SearchInput } from "./ui/Input";
 import SelectField from "./ui/SelectField";
 import { SkeletonList } from "./ui/Skeleton";
+import { IconCheck, IconLock, IconPlus } from "./icons";
 
 /** Formulaire vierge — recréé à chaque camion enregistré (« camion suivant »). */
 const emptyForm = () => ({
@@ -65,6 +66,7 @@ export default function ReceptionSection({
   // Ref et non state — lu dans onSuccess, juste après le clic.
   const chainRef = useRef(false);
   const [justReceived, setJustReceived] = useState<TruckDTO | null>(null);
+  const blRef = useRef<HTMLInputElement>(null);
   const regRef = useRef<HTMLInputElement>(null);
 
   const contracts = useQuery({ queryKey: ["contracts"], queryFn: contractsApi.list });
@@ -106,9 +108,9 @@ export default function ReceptionSection({
     onError: (e: Error) => setError(e.message),
   });
 
-  // Bordereau suivant : le curseur repart sur l'immatriculation, pas au doigt.
+  // Bordereau suivant : le curseur repart sur le n° de B/L, pas au doigt.
   useEffect(() => {
-    if (justReceived) regRef.current?.focus();
+    if (justReceived) blRef.current?.focus();
   }, [justReceived]);
 
   function submit(e: React.FormEvent) {
@@ -171,11 +173,11 @@ export default function ReceptionSection({
     <section className="mt-5">
       {/* Chiffres du portail — « … » tant que la liste n'est pas là, jamais un
           zéro qui se lirait comme « aucun camion ». */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Kpi label="Camions reçus" value={trucks.data ? fmtInt(stats.total) : "…"} />
-        <Kpi label="Arrivés aujourd'hui" value={trucks.data ? fmtInt(stats.today) : "…"} />
-        <Kpi label="En attente d'étalage" value={trucks.data ? fmtInt(stats.aEtaler) : "…"} />
-      </div>
+      <KpiStrip cols={3} className="mb-8">
+        <Kpi bare label="Camions reçus" value={trucks.data ? fmtInt(stats.total) : "…"} />
+        <Kpi bare label="Arrivés aujourd'hui" value={trucks.data ? fmtInt(stats.today) : "…"} />
+        <Kpi bare label="En attente d'étalage" value={trucks.data ? fmtInt(stats.aEtaler) : "…"} />
+      </KpiStrip>
 
       <SectionHeading
         right={
@@ -187,7 +189,7 @@ export default function ReceptionSection({
                 setShowForm((s) => !s);
               }}
             >
-              {showForm ? "Fermer" : "+ Camion arrivé"}
+              {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Camion arrivé</>}
             </Button>
           )
         }
@@ -205,10 +207,11 @@ export default function ReceptionSection({
 
           {/* Bordereau précédent enregistré : de quoi vérifier et enchaîner. */}
           {justReceived && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-parc-50 px-3 py-2 text-sm text-parc-800">
-              <span>
-                {justReceived.registration} réceptionné ✓
-                {justReceived.deliveryNote ? ` · B/L ${justReceived.deliveryNote}` : ""}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-parc-50 px-3 py-2 text-sm text-parc-800 ring-1 ring-inset ring-parc-200/80">
+              <span className="inline-flex items-center gap-1.5">
+                <IconCheck width={16} height={16} className="shrink-0 text-parc-700" aria-hidden />
+                {justReceived.deliveryNote ? `B/L ${justReceived.deliveryNote} · ` : ""}
+                {justReceived.registration} réceptionné
               </span>
               {onEtaler && (
                 <button
@@ -267,7 +270,29 @@ export default function ReceptionSection({
             </p>
           </div>
 
-          {/* Le camion d'abord : au portail ce sont toujours les mêmes, les
+          {/* Le bordereau d'abord : c'est lui qui identifie le voyage. Le même
+              camion revient dix fois, son B/L jamais — c'est le numéro que
+              l'opérateur a sous les yeux en arrivant au portail. */}
+          <div className="mb-3">
+            <Field label="N° de bordereau (B/L)">
+              <Input
+                ref={blRef}
+                value={v.deliveryNote}
+                onChange={(e) => setV((p) => ({ ...p, deliveryNote: e.target.value }))}
+                placeholder="176530"
+              />
+            </Field>
+            {/* B/L déjà vu sur ce contrat → probable faute de frappe (non bloquant). */}
+            {blDup && (
+              <Notice tone="warn" className="mt-2">
+                B/L {blDup.deliveryNote} déjà saisi sur ce contrat (camion {blDup.registration},
+                arrivé le {new Date(blDup.arrivedAt).toLocaleDateString("fr-FR")}). Vérifier le
+                bordereau avant de continuer.
+              </Notice>
+            )}
+          </div>
+
+          {/* Le camion ensuite : au portail ce sont toujours les mêmes, les
               retaper n'apporte que des variantes d'écriture et des doublons. */}
           <div className="mb-3">
             <VehiclePicker
@@ -281,34 +306,24 @@ export default function ReceptionSection({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {(
               [
-                ["deliveryNote", "B/L", "176530", false],
-                ["declaredFieldM3", "Vol brousse (m³)", "33.171", false],
-                ["declaredLogCount", "Nombre de billes", "58", false],
+                ["declaredFieldM3", "Vol brousse (m³)", "33.171"],
+                ["declaredLogCount", "Nombre de billes", "58"],
               ] as const
-            ).map(([key, label, ph, required]) => {
+            ).map(([key, label, ph]) => (
               // Champs chiffrés : la virgule du clavier FR doit devenir un point,
               // sinon « 33,171 » part tel quel et l'API refuse la ligne.
-              const isNum = key === "declaredFieldM3" || key === "declaredLogCount";
-              return (
-                <Field key={key} label={label}>
-                  <Input
-                    required={required}
-                    inputMode={isNum ? "decimal" : undefined}
-                    value={v[key]}
-                    onChange={(e) =>
-                      setV((p) => ({
-                        ...p,
-                        [key]: isNum ? normalizeDecimal(e.target.value) : e.target.value,
-                      }))
-                    }
-                    placeholder={ph}
-                  />
-                </Field>
-              );
-            })}
+              <Field key={key} label={label}>
+                <Input
+                  inputMode="decimal"
+                  value={v[key]}
+                  onChange={(e) => setV((p) => ({ ...p, [key]: normalizeDecimal(e.target.value) }))}
+                  placeholder={ph}
+                />
+              </Field>
+            ))}
             <Field label="Arrivé le">
               <DateField
                 value={v.arrivedAt}
@@ -319,20 +334,11 @@ export default function ReceptionSection({
             </Field>
           </div>
 
-          {/* B/L déjà vu sur ce contrat → probable faute de frappe (non bloquant). */}
-          {blDup && (
-            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              ⚠ B/L {blDup.deliveryNote} déjà saisi sur ce contrat (camion {blDup.registration},
-              arrivé le {new Date(blDup.arrivedAt).toLocaleDateString("fr-FR")}). Vérifier le
-              bordereau avant de continuer.
-            </p>
-          )}
-
           <div className="mt-3 border-t border-brand-100 pt-3">
             {formClosed && (
-              <p className="mb-2 rounded-lg bg-brand-100 px-3 py-2 text-sm text-brand-600">
-                🔒 Contrat {formContract?.code} clôturé — le rouvrir avant d'y ajouter un camion.
-              </p>
+              <Notice icon={IconLock} className="mb-2">
+                Contrat {formContract?.code} clôturé — le rouvrir avant d'y ajouter un camion.
+              </Notice>
             )}
             {error && (
               <div className="mb-2">
@@ -355,7 +361,7 @@ export default function ReceptionSection({
                 {create.isPending
                   ? "Enregistrement…"
                   : onEtaler
-                    ? "Réceptionner → étaler les billes"
+                    ? "Réceptionner et étaler"
                     : "Réceptionner"}
               </Button>
               <Button
@@ -376,7 +382,7 @@ export default function ReceptionSection({
         <SearchInput
           value={q}
           onChange={setQ}
-          placeholder="Immatriculation, B/L, parcelle…"
+          placeholder="B/L, immatriculation, parcelle…"
           aria-label="Chercher un camion"
           className="mb-2"
         />

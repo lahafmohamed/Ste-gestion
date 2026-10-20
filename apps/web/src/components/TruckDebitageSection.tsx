@@ -6,7 +6,9 @@ import { contractsApi, productionApi } from "../lib/api";
 import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
 import Badge from "./ui/Badge";
 import { SectionHeading } from "./ui/Card";
-import { QueryError } from "./ui/Feedback";
+import { Notice, QueryError } from "./ui/Feedback";
+import { SkeletonLine } from "./ui/Skeleton";
+import { IconCheck } from "./icons";
 
 // Miroir de la feuille « DEBITE TECK DU … » (docs/pdf5) : elle est tenue PAR
 // CAMION et porte, à côté du tableau de stock, un encadré B/L · cubage brousse ·
@@ -29,7 +31,7 @@ function Line({
     <div className="flex items-baseline justify-between gap-3 py-1">
       <span className="text-sm text-brand-500">
         {label}
-        {hint && <span className="ml-1.5 text-xs text-brand-400">{hint}</span>}
+        {hint && <span className="ml-1.5 text-xs text-brand-500">{hint}</span>}
       </span>
       <span
         className={`tabular-nums ${strong ? "text-base font-semibold text-brand-900" : "text-sm text-brand-900"}`}
@@ -46,13 +48,15 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
     queryKey: ["truck-stats", truck.contractId],
     queryFn: () => contractsApi.truckStats(truck.contractId),
   });
+  // Filtré par camion : une session qui mélange deux contrats n'a plus de
+  // contrat, elle doit quand même apparaître sur la fiche de son camion.
   const runs = useQuery({
-    queryKey: ["production", truck.contractId],
-    queryFn: () => productionApi.listByContract(truck.contractId),
+    queryKey: ["production", "truck", truck.id],
+    queryFn: () => productionApi.list({ truckId: truck.id }),
   });
 
   const s = stats.data?.find((x) => x.truckId === truck.id);
-  const myRuns = (runs.data ?? []).filter((r) => r.truckIds.includes(truck.id));
+  const myRuns = runs.data ?? [];
 
   // N° des billons de CE camion, pour nommer les billes passées à la scie.
   const girthLogs = truck.measurements.find((m) => m.context === "YARD_GIRTH")?.logs ?? [];
@@ -67,6 +71,9 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
 
   const debited = Number(s?.debitedM3 ?? 0);
   const girth = Number(s?.girthM3 ?? 0);
+  // Billons déjà passés à la scie : base du rendement d'un camion entamé.
+  const sawnGirth = Number(s?.sawnGirthM3 ?? 0);
+  const partial = sawnGirth > 0 && sawnGirth < girth - 0.0005;
 
   return (
     <section className="mt-5">
@@ -92,7 +99,11 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
             Impossible de charger le débitage du camion
           </QueryError>
         ) : stats.isLoading || runs.isLoading ? (
-          <p className="text-sm text-brand-500">Chargement…</p>
+          <div className="space-y-2.5" aria-busy="true">
+            <SkeletonLine className="w-1/3" />
+            <SkeletonLine className="w-2/3" />
+            <SkeletonLine className="w-1/2" />
+          </div>
         ) : debited === 0 ? (
           <div className="text-sm text-brand-500">
             Camion pas encore scié.
@@ -113,6 +124,9 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
           <>
             {/* Encadré de la feuille DEBITE, mêmes intitulés que le papier. */}
             <div className="divide-y divide-brand-100">
+              {/* Le B/L ouvre l'encadré, comme sur la feuille : c'est par lui
+                  que le parc rapproche la ligne sciée du camion arrivé. */}
+              <Line label="B/L" value={truck.deliveryNote || "—"} />
               <Line
                 label="Cubage brousse"
                 hint="bordereau"
@@ -123,11 +137,20 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
                 hint="billons girth"
                 value={girth > 0 ? fmtM3(girth) : "—"}
               />
+              {/* Camion entamé : le rendement se lit sur ce qui est passé à la
+                  scie — divisé par tous les billons, il chutait de moitié. */}
+              {partial && (
+                <Line
+                  label="Billons sciés"
+                  hint={`${progress.sawn}/${progress.total}`}
+                  value={fmtM3(sawnGirth)}
+                />
+              )}
               <Line label="Débité" value={fmtM3(debited)} strong />
               <Line
                 label="Rendement parc"
-                hint="débité ÷ billons"
-                value={girth > 0 ? fmtPct(Number(s!.outputPct)) : "—"}
+                hint={partial ? "débité ÷ billons sciés" : "débité ÷ billons"}
+                value={sawnGirth > 0 ? fmtPct(Number(s!.outputPct)) : "—"}
               />
             </div>
 
@@ -141,7 +164,7 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
                 }`}
               >
                 {progress.complete ? (
-                  <>✓ Camion entièrement scié ({progress.total} billons)</>
+                  <span className="inline-flex items-center gap-1.5"><IconCheck width={16} height={16} className="shrink-0" aria-hidden />Camion entièrement scié ({progress.total} billons)</span>
                 ) : (
                   <>
                     <strong className="tabular-nums">
@@ -160,30 +183,29 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
             )}
 
             {shared && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                ⚠ Une session porte sur plusieurs camions : le débité ci-dessus est une
+              <Notice tone="warn" className="mt-2">
+                Une session porte sur plusieurs camions : le débité ci-dessus est une
                 quote-part (volume de session ÷ nb de camions liés), pas une mesure propre à ce
                 camion.
-              </p>
+              </Notice>
             )}
 
             {/* Splits Daily Truck Log — ce que le débité a donné, par produit. */}
             <div className="mt-3 flex flex-wrap gap-1.5">
               <Badge tone="info">
-                MS {fmtNum(Number(s!.msM3).toFixed(3))} m³
-                <span className="opacity-70">
-                  {" "}
+                MS {fmtM3(Number(s!.msM3))}
+                <span className="ml-1 font-normal">
                   (main {fmtNum(Number(s!.mainM3).toFixed(3))} · 1,5″{" "}
                   {fmtNum(Number(s!.band15M3).toFixed(3))})
                 </span>
               </Badge>
               <Badge tone="accent">
-                1″ {fmtNum(Number(s!.oneInchM3).toFixed(3))} m³ ({fmtPct(Number(s!.oneInchPct), 0)}
+                1″ {fmtM3(Number(s!.oneInchM3))} ({fmtPct(Number(s!.oneInchPct), 0)}
                 )
               </Badge>
               <Badge>
                 Long ≥ 6,5 ft {fmtNum(Number(s!.longM3).toFixed(3))} · court{" "}
-                {fmtNum(Number(s!.shortM3).toFixed(3))} m³
+                {fmtM3(Number(s!.shortM3))}
               </Badge>
               {s!.costPerM3 && (
                 <Badge>

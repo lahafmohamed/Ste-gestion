@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   billParent,
   truckSawnProgress,
@@ -5,14 +6,9 @@ import {
   type ProductionRunDTO,
   type TruckDTO,
 } from "@ste/shared";
+import { truckLabel } from "../lib/trucks";
 import Chip from "./ui/Chip";
-
-// Cubage des billons (girth) d'un camion — dénominateur du rendement.
-export function truckGirthM3(t: TruckDTO): number {
-  return t.measurements
-    .filter((m) => m.context === "YARD_GIRTH")
-    .reduce((s, m) => s + m.logs.reduce((x, l) => x + Number(l.volumeM3), 0), 0);
-}
+import { IconCheck } from "./icons";
 
 // Billons d'un camion — c'est le billon qui part au sciage, pas la bille.
 export function truckBillons(t: TruckDTO) {
@@ -92,13 +88,23 @@ export default function SawnTruckPicker({
 
   const selectedTrucks = trucks.filter((t) => truckIds.includes(t.id));
 
+  // Un contrat accumule les camions : au bout de 27 voyages, les 24 déjà sciés
+  // noient les 2 ou 3 qui restent à passer à la scie. On les replie — sans les
+  // supprimer, le resciage et les corrections de session en ont besoin. Un
+  // camion déjà coché reste visible même replié, sinon la sélection disparaît.
+  const [showDone, setShowDone] = useState(false);
+  const isDone = (t: TruckDTO) =>
+    progressByTruck.get(t.id)!.complete && !truckIds.includes(t.id);
+  const doneCount = trucks.filter(isDone).length;
+  const visibleTrucks = showDone ? trucks : trucks.filter((t) => !isDone(t));
+
   return (
     <div className="mb-3">
       <div className="mb-1 text-xs text-brand-500">
         Camions sciés (optionnel — définit « sur parc non sciés »)
       </div>
       <div className="flex flex-wrap gap-2">
-        {trucks.map((t) => {
+        {visibleTrucks.map((t) => {
           const p = progressByTruck.get(t.id)!;
           const sel = truckIds.includes(t.id);
           return (
@@ -106,16 +112,22 @@ export default function SawnTruckPicker({
               key={t.id}
               selected={sel}
               onClick={() => toggleTruck(t.id)}
-              title={
-                p.total > 0
-                  ? `${p.sawn}/${p.total} billons sciés`
-                  : "Pas d'étalage billons (girth)"
-              }
+              title={`${t.registration}${t.deliveryNote ? ` · B/L ${t.deliveryNote}` : ""} — ${
+                p.total > 0 ? `${p.sawn}/${p.total} billons sciés` : "pas d'étalage billons (girth)"
+              }`}
             >
-              {t.registration}
+              {/* Le bordereau en tête : c'est lui qui est écrit sur la feuille
+                  DEBITE, l'immat ne fait que nommer le camion. */}
+              {truckLabel(t)}
+              {t.deliveryNote && (
+                <span className={`ml-1 font-normal ${sel ? "text-white/70" : "text-brand-500"}`}>
+                  {t.registration}
+                </span>
+              )}
               {p.complete ? (
-                <span className={`ml-1 ${sel ? "text-parc-300" : "text-parc-700"}`}>
-                  ✓ fini
+                <span className={`ml-1 inline-flex items-center gap-0.5 ${sel ? "text-parc-300" : "text-parc-700"}`}>
+                  <IconCheck width={14} height={14} className="shrink-0" aria-hidden />
+                  fini
                 </span>
               ) : p.sawn > 0 ? (
                 <span
@@ -127,7 +139,27 @@ export default function SawnTruckPicker({
             </Chip>
           );
         })}
+
+        {doneCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowDone((v) => !v)}
+            aria-expanded={showDone}
+            className="min-h-touch rounded-full px-3 text-sm text-brand-500 underline hover:text-brand-900 active:bg-brand-200"
+          >
+            {showDone
+              ? `Masquer les ${doneCount} camions finis`
+              : `+ ${doneCount} camion${doneCount > 1 ? "s" : ""} déjà fini${doneCount > 1 ? "s" : ""}`}
+          </button>
+        )}
       </div>
+
+      {/* Tous sciés : sans ce mot, la ligne de chips vide se lit comme un bug. */}
+      {visibleTrucks.length === 0 && (
+        <p className="mt-1 text-sm text-brand-500">
+          Tous les camions du contrat sont sciés — à rouvrir seulement pour un resciage.
+        </p>
+      )}
 
       {/* Billons sciés du/des camion(s) coché(s) — vide = camion entier.
           Groupés par bille mère : c'est le billon qui passe à la scie. */}
@@ -142,12 +174,12 @@ export default function SawnTruckPicker({
           <div key={t.id} className="mt-2 rounded-lg bg-brand-50 p-2">
             <div className="mb-1 flex items-center justify-between text-xs text-brand-500">
               <span>
-                Billons sciés de {t.registration} — {selCount === 0
+                Billons sciés de {truckLabel(t)} — {selCount === 0
                   ? "aucun coché = camion entier"
                   : `${selCount}/${billons.length}`}
                 {p.sawn > 0 && (
                   <span className="ml-1.5 text-parc-700">
-                    · {p.complete ? "tout déjà scié" : `${p.sawn} déjà scié${p.sawn > 1 ? "s" : ""} ✓`}
+                    · {p.complete ? "tout déjà scié" : `${p.sawn} déjà scié${p.sawn > 1 ? "s" : ""}`}
                   </span>
                 )}
               </span>
@@ -188,7 +220,7 @@ export default function SawnTruckPicker({
                       }`}
                     >
                       {g.bill}
-                      <span className="ml-0.5 text-brand-400">·{ids.length}</span>
+                      <span className="ml-0.5 text-brand-500">·{ids.length}</span>
                     </button>
                     {g.billons.map((l) => {
                       const done = alreadySawnIds.has(l.id);
@@ -205,7 +237,7 @@ export default function SawnTruckPicker({
                         >
                           {/* Suffixe seul (A, B, C…) : la bille est déjà en tête de ligne. */}
                           {l.externalId?.slice(g.bill.length) || l.externalId || `#${l.position}`}
-                          {done ? " ✓" : ""}
+                          {done && <IconCheck width={14} height={14} className="ml-1 shrink-0" aria-hidden />}
                         </Chip>
                       );
                     })}

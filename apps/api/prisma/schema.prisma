@@ -304,9 +304,12 @@ enum SizeGroup {
 }
 
 model ProductionRun {
-  id         String   @id @default(cuid())
-  contractId String   @map("contract_id")
-  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+  // Le débité part au stock général : le contrat ne se choisit plus, il se
+  // déduit des camions sciés (null si la session mélange deux contrats ou si
+  // aucun camion n'est lié). Il ne sert plus qu'au rendement par contrat.
+  contractId String?   @map("contract_id")
+  contract   Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
   producedAt DateTime @default(now()) @map("produced_at")
   note       String?
   createdAt  DateTime @default(now()) @map("created_at")
@@ -381,9 +384,11 @@ enum ContainerStatus {
 }
 
 model Container {
-  id          String          @id @default(cuid())
-  contractId  String          @map("contract_id")
-  contract    Contract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+  // Empotage : on charge ce qui est disponible au stock général, sans contrat.
+  // Le lien camions reste possible (cochés à la main) mais n'est plus demandé.
+  contractId  String?         @map("contract_id")
+  contract    Contract?       @relation(fields: [contractId], references: [id], onDelete: SetNull)
   clientId    String?         @map("client_id")
   client      Party?          @relation(fields: [clientId], references: [id])
   containerNo String          @map("container_no")
@@ -446,9 +451,10 @@ enum ResawLineKind {
 }
 
 model ResawOp {
-  id         String   @id @default(cuid())
-  contractId String   @map("contract_id")
-  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+  // Resciage = stock → stock : pas de contrat.
+  contractId String?   @map("contract_id")
+  contract   Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
   resawnAt   DateTime @default(now()) @map("resawn_at")
   note       String?
   createdAt  DateTime @default(now()) @map("created_at")

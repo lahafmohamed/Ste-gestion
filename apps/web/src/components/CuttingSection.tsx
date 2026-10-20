@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { SIZE_GROUP_LABELS } from "@ste/shared";
 import { productionApi } from "../lib/api";
-import { fmtInt, fmtNum } from "../lib/format";
+import { fmtDec3, fmtInt } from "../lib/format";
 import CuttingCharts from "./CuttingCharts";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import { SectionHeading } from "./ui/Card";
@@ -9,9 +9,10 @@ import { EmptyState, QueryError } from "./ui/Feedback";
 import { SkeletonCard } from "./ui/Skeleton";
 import { TableWrap } from "./ui/Table";
 
-export default function CuttingSection({ contractId }: { contractId: string }) {
+// Sans contrat : tout le débité, tous contrats confondus (page Débitage).
+export default function CuttingSection({ contractId }: { contractId?: string }) {
   const q = useQuery({
-    queryKey: ["cutting", contractId],
+    queryKey: ["cutting", contractId ?? "all"],
     queryFn: () => productionApi.cutting(contractId),
   });
 
@@ -52,7 +53,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
                     <td className="py-1 pr-4">
                       <Badge tone={SIZE_GROUP_TONE[s.group]}>{SIZE_GROUP_LABELS[s.group]}</Badge>
                     </td>
-                    <td className="py-1 pr-4 text-right tabular-nums">{fmtNum(s.volumeM3)}</td>
+                    <td className="py-1 pr-4 text-right tabular-nums">{fmtDec3(s.volumeM3)}</td>
                     <td className="py-1 text-right tabular-nums">{fmtInt(s.pieces)}</td>
                   </tr>
                 ))}
@@ -62,7 +63,7 @@ export default function CuttingSection({ contractId }: { contractId: string }) {
                   <td className="py-1.5 pr-4" colSpan={2}>
                     TOTAL
                   </td>
-                  <td className="py-1.5 pr-4 text-right tabular-nums">{fmtNum(q.data.totalM3)}</td>
+                  <td className="py-1.5 pr-4 text-right tabular-nums">{fmtDec3(q.data.totalM3)}</td>
                   <td className="py-1.5 text-right tabular-nums">{fmtInt(q.data.totalPieces)}</td>
                 </tr>
               </tfoot>

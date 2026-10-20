@@ -6,7 +6,8 @@ export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 // :active : retour d'appui tactile — le hover n'existe pas au doigt (le
 // tap-highlight iOS est désactivé globalement, voir index.css). Le léger
-// rétrécissement (scale 0.96) donne la sensation d'un bouton qui s'enfonce.
+// rétrécissement (scale 0.96) donne la sensation d'un bouton qui s'enfonce,
+// sauf en mouvement réduit (la teinte :active suffit alors).
 const VARIANT: Record<ButtonVariant, string> = {
   // primary = brun teck du logo (accent) — l'identité vit dans les actions.
   primary: "bg-accent-500 text-white shadow-btn hover:bg-accent-600 active:bg-accent-700",
@@ -19,7 +20,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   danger: "bg-red-600 text-white shadow-btn hover:bg-red-700 active:bg-red-800",
   // Action destructrice secondaire (« Supprimer » discret des fiches) : gris
   // au repos, ne devient rouge qu'à l'intention.
-  "ghost-danger": "text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100",
+  "ghost-danger": "text-brand-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100",
 };
 
 // lg : saisie tablette — 16px (pas de zoom auto iOS) et grande cible tactile.
@@ -35,7 +36,7 @@ const SIZE: Record<ButtonSize, string> = {
 const BASE =
   "inline-flex items-center justify-center gap-2 rounded-lg font-medium " +
   "transition-[background-color,box-shadow,transform,color] duration-150 ease-out " +
-  "active:scale-[0.96] " +
+  "motion-safe:active:scale-[0.96] " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 " +
   "disabled:pointer-events-none disabled:opacity-50";
 

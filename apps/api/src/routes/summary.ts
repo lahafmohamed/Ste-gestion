@@ -4,7 +4,7 @@ import {
   GIRTH_SPLIT_CM,
   LONG_SPLIT_FT,
   billCount,
-  sawnVolumeM3,
+  sawnGirthByTruck as sawnGirthOfTrucks,
   sizeSortIndex,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
@@ -15,7 +15,7 @@ export async function summaryRoutes(app: FastifyInstance) {
   // résumé complet (7 requêtes) répété une fois par contrat.
   // Route statique : elle passe avant `/contracts/:id` côté routeur Fastify.
   app.get("/contracts/overview", async () => {
-    const [contracts, trucks, logs, sawnLines, saleLines, resawLines, entries] =
+    const [contracts, trucks, logs, sawnLines, saleLines, resawLines, entries, runTrucks, runLogs] =
       await Promise.all([
         prisma.contract.findMany({ select: { id: true, quotaM3: true } }),
         prisma.truck.findMany({
@@ -31,6 +31,7 @@ export async function summaryRoutes(app: FastifyInstance) {
         prisma.log.findMany({
           where: { measurement: { context: { in: ["FIELD", "YARD_GIRTH"] } } },
           select: {
+            id: true,
             volumeM3: true,
             measurement: { select: { context: true, truckId: true } },
           },
@@ -52,21 +53,36 @@ export async function summaryRoutes(app: FastifyInstance) {
           by: ["contractId", "kind"],
           _sum: { amount: true },
         }),
+        // Sessions rattachées à un contrat — les mêmes qui comptent dans le
+        // débité : leurs billons sciés forment le dénominateur du rendement.
+        prisma.productionRunTruck.findMany({
+          where: { run: { contractId: { not: null } } },
+          select: { runId: true, truckId: true },
+        }),
+        prisma.productionRunLog.findMany({
+          where: { run: { contractId: { not: null } } },
+          select: { runId: true, logId: true },
+        }),
       ]);
 
     // Camion → contrat : les lignes de relevé ne portent que le camion.
     const contractByTruck = new Map(trucks.map((t) => [t.id, t.contractId]));
 
     const fieldByTruck = new Map<string, number>();
-    const girthByContract = new Map<string, number>();
+    const girthLogs: { id: string; truckId: string; volumeM3: unknown }[] = [];
     for (const l of logs) {
       const tid = l.measurement.truckId;
       if (l.measurement.context === "FIELD") {
         fieldByTruck.set(tid, (fieldByTruck.get(tid) ?? 0) + Number(l.volumeM3));
       } else {
-        const cid = contractByTruck.get(tid);
-        if (cid) girthByContract.set(cid, (girthByContract.get(cid) ?? 0) + Number(l.volumeM3));
+        girthLogs.push({ id: l.id, truckId: tid, volumeM3: l.volumeM3 });
       }
+    }
+    // Rendement F6 sur les billons passés à la scie, pas sur tout le parc.
+    const sawnGirthByContract = new Map<string, number>();
+    for (const [tid, v] of sawnGirthOfTrucks(girthLogs, runTrucks, runLogs)) {
+      const cid = contractByTruck.get(tid);
+      if (cid) sawnGirthByContract.set(cid, (sawnGirthByContract.get(cid) ?? 0) + v);
     }
 
     // ── Agrégats production / ventes / resciage / compta, par contrat ──
@@ -82,13 +98,18 @@ export async function summaryRoutes(app: FastifyInstance) {
       }
       return b;
     };
-    for (const l of sawnLines) bucket(l.run.contractId).debited += Number(l.volumeM3);
+    // Débitage et resciage alimentent le stock général : ce qui n'est rattaché
+    // à aucun contrat (session multi-contrats, resciage) ne compte pour aucun.
+    for (const l of sawnLines) {
+      if (l.run.contractId) bucket(l.run.contractId).debited += Number(l.volumeM3);
+    }
     for (const l of saleLines) {
       const b = bucket(l.sale.contractId);
       b.sold += Number(l.volumeM3);
       b.revenue += Number(l.amountCfa);
     }
     for (const l of resawLines) {
+      if (!l.op.contractId) continue;
       const b = bucket(l.op.contractId);
       if (l.kind === "PRODUCED") b.resawIn += Number(l.volumeM3);
       else b.resawOut += Number(l.volumeM3);
@@ -126,7 +147,7 @@ export async function summaryRoutes(app: FastifyInstance) {
       const estTrucksRemaining = avg > 0 ? Math.ceil(remainingQuota / avg) : null;
       const b = money.get(c.id);
       const debited = b?.debited ?? 0;
-      const girth = girthByContract.get(c.id) ?? 0;
+      const sawnGirth = sawnGirthByContract.get(c.id) ?? 0;
       const stockProducts = debited + (b?.resawIn ?? 0) - (b?.sold ?? 0) - (b?.resawOut ?? 0);
       return {
         contractId: c.id,
@@ -135,7 +156,7 @@ export async function summaryRoutes(app: FastifyInstance) {
         brousseM3: a.brousse.toFixed(6),
         estTrucksTotal: estTrucksRemaining !== null ? a.trucks + estTrucksRemaining : null,
         debitedM3: debited.toFixed(6),
-        outputPct: (girth > 0 ? (debited / girth) * 100 : 0).toFixed(4),
+        outputPct: (sawnGirth > 0 ? (debited / sawnGirth) * 100 : 0).toFixed(4),
         stockProductsM3: stockProducts.toFixed(6),
         salesRevenueCfa: (b?.revenue ?? 0).toFixed(2),
         balance: ((b?.due ?? 0) - (b?.paid ?? 0)).toFixed(2),
@@ -293,9 +314,17 @@ export async function summaryRoutes(app: FastifyInstance) {
       }
     }
     let stockParcM3 = 0;
+    // Billons passés à la scie (camion entier ou billons cochés) : dénominateur
+    // du rendement — ceux qui attendent au parc ne le font plus baisser.
+    let sawnGirthM3 = 0;
     for (const [tid, v] of girthByTruck) {
-      if (wholeTruckSawn.has(tid)) continue; // tout parti au sciage
-      stockParcM3 += Math.max(v - (sawnGirthByTruck.get(tid) ?? 0), 0);
+      if (wholeTruckSawn.has(tid)) {
+        sawnGirthM3 += v;
+        continue; // tout parti au sciage
+      }
+      const sawn = Math.min(sawnGirthByTruck.get(tid) ?? 0, v);
+      sawnGirthM3 += sawn;
+      stockParcM3 += v - sawn;
     }
 
     // ── Brousse par camion (consommation du quota SODEFOR) ──
@@ -427,7 +456,8 @@ export async function summaryRoutes(app: FastifyInstance) {
       girthM3: girthM3.toFixed(6),
       diaM3: diaM3.toFixed(6),
       debitedM3: debitedM3.toFixed(6),
-      outputPct: (girthM3 > 0 ? (debitedM3 / girthM3) * 100 : 0).toFixed(4),
+      sawnGirthM3: sawnGirthM3.toFixed(6),
+      outputPct: (sawnGirthM3 > 0 ? (debitedM3 / sawnGirthM3) * 100 : 0).toFixed(4),
       // Quota SODEFOR consommé au cubage brousse (mesuré à l'état brut, sortie forêt).
       quotaUsedPct: (quota > 0 ? (brousseM3 / quota) * 100 : 0).toFixed(4),
       longM3: longM3.toFixed(6),
@@ -446,117 +476,6 @@ export async function summaryRoutes(app: FastifyInstance) {
       balance: (fullCost - totalPaid).toFixed(2),
       profitEstimate: (salesRevenueCfa - fullCost).toFixed(2),
     };
-  });
-
-  // Stock d'avivés à la granularité L×l×ép — base du panier d'empotage.
-  // Les ventes (m³ par taille, sans dimensions ni nombre de pièces) ne sont pas
-  // déductibles ici : ce stock est celui du bois physique disponible à empoter.
-  app.get<{ Params: { id: string } }>("/contracts/:id/sawn-inventory", async (req, reply) => {
-    const contractId = req.params.id;
-    const contract = await prisma.contract.findUnique({
-      where: { id: contractId },
-      select: { id: true },
-    });
-    if (!contract) return reply.code(404).send({ error: "Contrat introuvable" });
-
-    const dims = {
-      lengthFt: true,
-      widthIn: true,
-      thicknessIn: true,
-      count: true,
-      sizeCode: true,
-      sizeGroup: true,
-    } as const;
-
-    const [sawn, resaw, packed] = await Promise.all([
-      prisma.sawnLine.findMany({ where: { run: { contractId } }, select: dims }),
-      prisma.resawLine.findMany({
-        where: { op: { contractId } },
-        select: { ...dims, kind: true },
-      }),
-      prisma.containerItem.findMany({
-        where: { container: { contractId } },
-        select: dims,
-      }),
-    ]);
-
-    type Row = {
-      key: string;
-      lengthFt: number;
-      widthIn: number;
-      thicknessIn: number;
-      sizeCode: string;
-      sizeGroup: SizeGroup;
-      producedCount: number;
-      resawnInCount: number;
-      resawnOutCount: number;
-      packedCount: number;
-    };
-    const rows = new Map<string, Row>();
-    const bucket = (l: {
-      lengthFt: unknown;
-      widthIn: unknown;
-      thicknessIn: unknown;
-      sizeCode: string;
-      sizeGroup: string;
-    }) => {
-      const L = Number(l.lengthFt);
-      const w = Number(l.widthIn);
-      const t = Number(l.thicknessIn);
-      const key = `${L}x${w}x${t}`;
-      let r = rows.get(key);
-      if (!r) {
-        r = {
-          key,
-          lengthFt: L,
-          widthIn: w,
-          thicknessIn: t,
-          sizeCode: l.sizeCode,
-          sizeGroup: l.sizeGroup as SizeGroup,
-          producedCount: 0,
-          resawnInCount: 0,
-          resawnOutCount: 0,
-          packedCount: 0,
-        };
-        rows.set(key, r);
-      }
-      return r;
-    };
-
-    for (const l of sawn) bucket(l).producedCount += l.count;
-    for (const l of resaw) {
-      const r = bucket(l);
-      if (l.kind === "PRODUCED") r.resawnInCount += l.count;
-      else r.resawnOutCount += l.count;
-    }
-    for (const l of packed) bucket(l).packedCount += l.count;
-
-    return [...rows.values()]
-      .map((r) => {
-        const available =
-          r.producedCount + r.resawnInCount - r.resawnOutCount - r.packedCount;
-        const unit = sawnVolumeM3(r.lengthFt, r.widthIn, r.thicknessIn, 1);
-        return {
-          key: r.key,
-          lengthFt: String(r.lengthFt),
-          widthIn: String(r.widthIn),
-          thicknessIn: String(r.thicknessIn),
-          sizeCode: r.sizeCode,
-          sizeGroup: r.sizeGroup,
-          producedCount: r.producedCount,
-          resawnInCount: r.resawnInCount,
-          resawnOutCount: r.resawnOutCount,
-          packedCount: r.packedCount,
-          availableCount: available,
-          unitM3: unit.toFixed(6),
-          availableM3: (unit * available).toFixed(6),
-        };
-      })
-      .sort(
-        (a, b) =>
-          sizeSortIndex(a.sizeCode) - sizeSortIndex(b.sizeCode) ||
-          Number(a.lengthFt) - Number(b.lengthFt)
-      );
   });
 
   // Suggestions de dûs (attendu vs existant) pour les tiers assignés

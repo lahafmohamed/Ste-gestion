@@ -8,7 +8,10 @@ import {
   sawnVolumeM3,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
-import { ensureContractOpen } from "../contract-lock.js";
+
+// Empotage : on charge ce qui est disponible au stock général — pas de contrat
+// à choisir. Le lien camions reste possible (traçabilité), tous contrats
+// confondus, et n'est plus obligatoire.
 
 const withItems = {
   items: { orderBy: { position: "asc" as const } },
@@ -22,11 +25,11 @@ function serialize(c: ContainerRel) {
   return { ...rest, truckIds: trucks.map((t) => t.truckId) };
 }
 
-// Vérifie que les camions liés appartiennent bien au contrat.
-async function assertTrucks(truckIds: string[], contractId: string) {
+// Vérifie que les camions cochés existent (tous contrats confondus).
+async function assertTrucks(truckIds: string[]) {
   const ids = [...new Set(truckIds)];
   if (ids.length === 0) return ids;
-  const ok = await prisma.truck.count({ where: { id: { in: ids }, contractId } });
+  const ok = await prisma.truck.count({ where: { id: { in: ids } } });
   if (ok !== ids.length) throw new Error("INVALID_TRUCK");
   return ids;
 }
@@ -86,18 +89,16 @@ export async function containerRoutes(app: FastifyInstance) {
     const parsed = containerCreateSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const d = parsed.data;
-    if (!(await ensureContractOpen(reply, d.contractId))) return;
 
     let truckIds: string[];
     try {
-      truckIds = await assertTrucks(d.truckIds ?? [], d.contractId);
+      truckIds = await assertTrucks(d.truckIds ?? []);
     } catch {
-      return reply.code(400).send({ error: "Camion invalide pour ce contrat" });
+      return reply.code(400).send({ error: "Camion introuvable" });
     }
 
     const c = await prisma.container.create({
       data: {
-        contractId: d.contractId,
         clientId: d.clientId ?? null,
         containerNo: d.containerNo,
         sealNo: d.sealNo,
@@ -122,14 +123,14 @@ export async function containerRoutes(app: FastifyInstance) {
 
     const existing = await prisma.container.findUnique({
       where: { id: req.params.id },
-      select: { contractId: true },
+      select: { id: true },
     });
     if (!existing) return reply.code(404).send({ error: "Conteneur introuvable" });
 
     // Remplacer les camions liés si fournis.
     if (truckIds) {
       try {
-        const ids = await assertTrucks(truckIds, existing.contractId);
+        const ids = await assertTrucks(truckIds);
         await prisma.$transaction([
           prisma.containerTruck.deleteMany({ where: { containerId: req.params.id } }),
           prisma.containerTruck.createMany({
@@ -137,7 +138,7 @@ export async function containerRoutes(app: FastifyInstance) {
           }),
         ]);
       } catch {
-        return reply.code(400).send({ error: "Camion invalide pour ce contrat" });
+        return reply.code(400).send({ error: "Camion introuvable" });
       }
     }
 
@@ -167,10 +168,9 @@ export async function containerRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const container = await prisma.container.findUnique({
       where: { id: req.params.id },
-      select: { id: true, contractId: true, _count: { select: { items: true } } },
+      select: { id: true, _count: { select: { items: true } } },
     });
     if (!container) return reply.code(404).send({ error: "Conteneur introuvable" });
-    if (!(await ensureContractOpen(reply, container.contractId))) return;
 
     await prisma.containerItem.createMany({
       data: buildItems(parsed.data.items, container._count.items + 1).map((it) => ({

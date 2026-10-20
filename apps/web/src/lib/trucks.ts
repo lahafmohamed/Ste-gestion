@@ -28,6 +28,15 @@ export function declaredOf(t: TruckDTO) {
   };
 }
 
+/**
+ * Étiquette courte du camion là où la place est comptée (chips, pastilles,
+ * listes du débitage) : le bordereau identifie le voyage — le même camion
+ * revient tous les jours, son B/L jamais. L'immat sert de repli.
+ */
+export function truckLabel(t: Pick<TruckDTO, "registration" | "deliveryNote">) {
+  return t.deliveryNote ? `B/L ${t.deliveryNote}` : t.registration;
+}
+
 export type ParcStage = "A_ETALER" | "A_BILLONNER" | "TERMINE";
 
 /** Où en est le camion dans la chaîne parc (file d'attente de l'étalage). */

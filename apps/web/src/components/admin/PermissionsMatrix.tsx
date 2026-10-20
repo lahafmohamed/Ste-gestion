@@ -14,6 +14,7 @@ import { permissionsApi } from "../../lib/api";
 import { FormError, QueryError } from "../ui/Feedback";
 import { SkeletonList } from "../ui/Skeleton";
 import { TableWrap } from "../ui/Table";
+import { IconCheck } from "../icons";
 
 type EditableRole = Exclude<UserRole, "ADMIN">;
 const ROLES: EditableRole[] = ["BUREAU", "PARC", "SCIERIE", "EXPORT"];
@@ -112,7 +113,7 @@ export default function PermissionsMatrix() {
             <tr className="border-b border-brand-100">
               <th className="px-3 py-2 text-left font-normal text-brand-500">Module · action</th>
               <th
-                className="px-2 py-2 text-center font-medium text-brand-400"
+                className="px-2 py-2 text-center font-medium text-brand-500"
                 title="L'administrateur a toutes les permissions"
               >
                 Admin
@@ -166,7 +167,7 @@ export default function PermissionsMatrix() {
         </table>
       </TableWrap>
 
-      <p className="text-xs text-brand-400">
+      <p className="text-xs text-brand-500">
         « Utilisateurs / permissions » reste réservé à l'administrateur et ne se délègue pas.
       </p>
     </div>
@@ -191,10 +192,10 @@ function ModuleRows({
       <tr className="border-t border-brand-100 bg-brand-50/60">
         <th scope="rowgroup" className="px-3 py-2 text-left">
           <div className="font-semibold text-brand-900">{mod.label}</div>
-          <div className="text-xs font-normal text-brand-400">{mod.hint}</div>
+          <div className="text-xs font-normal text-brand-500">{mod.hint}</div>
         </th>
-        <td className="px-2 py-2 text-center text-brand-300" aria-hidden>
-          ✓
+        <td className="px-2 py-2 text-center text-brand-500" aria-hidden>
+          <IconCheck width={16} height={16} className="mx-auto" />
         </td>
         {ROLES.map((r) => {
           const all = mod.actions.every((a) => has(r, `${mod.key}.${a}` as Permission));
@@ -210,7 +211,7 @@ function ModuleRows({
                   all
                     ? "text-parc-800 hover:bg-parc-100"
                     : none
-                      ? "text-brand-400 hover:bg-brand-100"
+                      ? "text-brand-500 hover:bg-brand-100"
                       : "text-amber-700 hover:bg-amber-50"
                 }`}
               >

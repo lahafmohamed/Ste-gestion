@@ -63,6 +63,16 @@ rendement_parc = volume_debite_total / cubage_parc_total
 
 - Vérif : 15.9257 / 28.865 = **0.5517 (55.17 %)** ✅
 - Dénominateur = **cubage parc (F2/girth)**, pas le diamètre.
+- **Camion / contrat en cours de sciage (décision 2026-10-14)** : le dénominateur est le
+  cubage des **billons passés à la scie**, pas tout le girth. Règle de saisie appliquée
+  camion par camion : une session liée à un camion **sans aucun de ses billons cochés** l'a
+  scié **en entier** ; sinon seuls ses billons cochés comptent. Avant : un camion à moitié
+  scié affichait ~27 % au lieu de ~60 %, et le rendement d'un contrat baissait à chaque
+  camion arrivé au parc. Même règle partout (`truckSawnProgress`, `sawnGirthByTruck`,
+  `runSawnGirthM3` dans `@ste/shared`) : fiche camion, analyse par camion, session,
+  résumé et vue liste des contrats, export Excel. L'**avancement** du sciage
+  (`sawnGirthM3 ÷ girthM3`) se lit à part, sur la barre « Sciage » de la fiche contrat.
+  Camion entièrement scié : chiffre identique à l'ancien calcul.
 
 ---
 

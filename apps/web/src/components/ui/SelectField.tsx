@@ -204,7 +204,7 @@ export default function SelectField({
           open ? "border-accent-500 ring-[3px] ring-accent-500/20" : ""
         } ${
           // Rien de choisi : le libellé reste un appel à choisir, pas une valeur.
-          selected && selected.value !== "" ? "text-brand-900" : "text-brand-400"
+          selected && selected.value !== "" ? "text-brand-900" : "text-brand-500"
         }`}
         {...aria}
       >
@@ -235,7 +235,7 @@ export default function SelectField({
             {/* Liste encore vide (tiers en cours de chargement) : le dire, plutôt
                 qu'ouvrir une boîte vide sans explication. */}
             {items.length === 0 && (
-              <p className="px-3 py-2 text-sm text-brand-400">Aucun choix disponible</p>
+              <p className="px-3 py-2 text-sm text-brand-500">Aucun choix disponible</p>
             )}
             {items.map((o, i) => {
               const isSelected = o.value === value;
@@ -254,7 +254,7 @@ export default function SelectField({
                     isSelected
                       ? "bg-accent-500 text-white"
                       : o.value === ""
-                        ? "text-brand-400"
+                        ? "text-brand-500"
                         : "text-brand-800"
                   } ${
                     // Ligne survolée ou visée au clavier : même repère pour les
@@ -266,7 +266,7 @@ export default function SelectField({
                   <span className="truncate">{o.label}</span>
                   <span className="flex shrink-0 items-center gap-2">
                     {o.hint && (
-                      <span className={`text-sm ${isSelected ? "text-white/70" : "text-brand-400"}`}>
+                      <span className={`text-sm ${isSelected ? "text-white/70" : "text-brand-500"}`}>
                         {o.hint}
                       </span>
                     )}
@@ -295,7 +295,7 @@ function ChevronIcon({ open }: { open: boolean }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={`h-5 w-5 shrink-0 transition-[transform,color] duration-150 ease-out ${
-        open ? "-rotate-180 text-accent-600" : "text-brand-400"
+        open ? "-rotate-180 text-accent-600" : "text-brand-500"
       }`}
       aria-hidden="true"
     >

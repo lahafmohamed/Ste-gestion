@@ -4,7 +4,9 @@ import {
   LONG_SPLIT_FT,
   THICKNESS_BANDS,
   billCount,
+  runSawnGirthM3,
   truckCostCfa,
+  truckSawnProgress,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
 
@@ -26,14 +28,24 @@ export async function reportRoutes(app: FastifyInstance) {
           measurements: { include: { logs: true }, orderBy: { measuredAt: "asc" } },
         },
       }),
+      // Sessions qui ont scié un camion du contrat — y compris celles qui
+      // mélangent deux contrats (contractId null) : leur quote-part revient à
+      // chacun de leurs camions, sinon le camion paraît « pas encore scié ».
       prisma.productionRun.findMany({
-        where: { contractId },
+        where: { trucks: { some: { truck: { contractId } } } },
         include: {
           lines: { select: { volumeM3: true, thicknessIn: true, lengthFt: true } },
           trucks: true,
+          logs: { select: { logId: true } },
         },
       }),
     ]);
+
+    // Billons cochés par session : dénominateur du rendement d'un camion entamé.
+    const runLinks = runs.map((r) => ({
+      truckIds: r.trucks.map((x) => x.truckId),
+      logIds: r.logs.map((x) => x.logId),
+    }));
 
     // Débité attribué : volumes de la session ÷ nb de camions liés — total et
     // splits Daily Truck Log (bandes d'épaisseur + LONG/SHORT).
@@ -110,6 +122,9 @@ export async function reportRoutes(app: FastifyInstance) {
       }
       const split = debitedByTruck.get(t.id);
       const debited = split?.total ?? 0;
+      // F6 sur les seuls billons passés à la scie : un camion à moitié scié
+      // n'affiche plus un rendement divisé par deux.
+      const sawnGirth = truckSawnProgress(t, runLinks).sawnGirthM3;
       // Fallback sur le déclaré (B/L) si pas d'étalage brousse saisi.
       if (fieldM3 === 0 && t.declaredFieldM3) fieldM3 = Number(t.declaredFieldM3);
       // Billes : étalage Ø > billes mères déduites des n° de billons > bordereau.
@@ -150,7 +165,8 @@ export async function reportRoutes(app: FastifyInstance) {
         girthLt85M3: lt85.toFixed(6),
         diaM3: diaM3.toFixed(6),
         debitedM3: debited.toFixed(6),
-        outputPct: pct(debited, girthM3),
+        sawnGirthM3: sawnGirth.toFixed(6),
+        outputPct: pct(debited, sawnGirth),
         mainM3: (split?.gte3 ?? 0).toFixed(6),
         band15M3: (split?.b15to3 ?? 0).toFixed(6),
         msM3: msM3.toFixed(6),
@@ -195,14 +211,16 @@ export async function reportRoutes(app: FastifyInstance) {
           where: { contractId, producedAt: range },
           include: {
             lines: true,
+            logs: { select: { logId: true } },
             trucks: {
               include: {
                 truck: {
                   select: {
+                    id: true,
                     registration: true,
                     measurements: {
                       where: { context: "YARD_GIRTH" },
-                      include: { logs: { select: { volumeM3: true } } },
+                      include: { logs: { select: { id: true, volumeM3: true } } },
                     },
                   },
                 },
@@ -288,14 +306,10 @@ export async function reportRoutes(app: FastifyInstance) {
           const bi = THICKNESS_BANDS.findIndex((b) => b.test(t));
           if (bi >= 0) bandTotals[bi] += v;
         }
-        const girthLinked = r.trucks.reduce(
-          (s, rt) =>
-            s +
-            rt.truck.measurements.reduce(
-              (x, m) => x + m.logs.reduce((y, l) => y + Number(l.volumeM3), 0),
-              0
-            ),
-          0
+        // Billons cochés de chaque camion, ou le camion entier s'il n'en a aucun.
+        const girthLinked = runSawnGirthM3(
+          r.trucks.map((rt) => rt.truck),
+          r.logs.map((l) => l.logId)
         );
         return {
           note: r.note,

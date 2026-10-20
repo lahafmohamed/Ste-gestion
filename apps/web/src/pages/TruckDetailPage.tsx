@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { LogDTO, MeasurementContext, MeasurementDTO } from "@ste/shared";
 import {
   MEASUREMENT_CONTEXT_LABELS,
@@ -16,17 +16,25 @@ import { useTruckMutations } from "../hooks/useTruckMutations";
 import MeasurementTable from "../components/MeasurementTable";
 import TallyEntry from "../components/TallyEntry";
 import TruckBordereau from "../components/TruckBordereau";
-import PackingList from "../components/PackingList";
 import TruckDebitageSection from "../components/TruckDebitageSection";
 import Badge, { type BadgeTone } from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Chip from "../components/ui/Chip";
 import { BackLink } from "../components/ui/Card";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { FormError } from "../components/ui/Feedback";
+import { FormError, QueryError } from "../components/ui/Feedback";
 import { SkeletonList } from "../components/ui/Skeleton";
+import { IconCheck, IconChevronDown } from "../components/icons";
 
 const CONTEXTS: MeasurementContext[] = ["FIELD", "YARD_GIRTH", "YARD_DIAMETER"];
+
+// Libellés courts pour le résumé de la section repliée — le libellé complet
+// (« Cubage billons (girth) ») reste sur l'onglet une fois dépliée.
+const SHORT_LABELS: Record<MeasurementContext, string> = {
+  FIELD: "brousse",
+  YARD_GIRTH: "billons",
+  YARD_DIAMETER: "billes",
+};
 
 export default function TruckDetailPage() {
   const { id = "" } = useParams();
@@ -54,6 +62,11 @@ export default function TruckDetailPage() {
   // tableaux. `null` = choix automatique selon l'étape atteinte.
   const [measTab, setMeasTab] = useState<MeasurementContext | null>(null);
 
+  // Section cubage dépliée ou non. `null` = auto : repliée sur un camion scié
+  // (le cubage n'y est plus que de l'historique, la fiche se lit alors
+  // en-tête → bordereau → débitage), ouverte tant qu'il reste à saisir.
+  const [measOpen, setMeasOpen] = useState<boolean | null>(null);
+
   // Confirmations lisibles sur tablette (remplacent window.confirm).
   const [delTruckOpen, setDelTruckOpen] = useState(false);
   const [delMeas, setDelMeas] = useState<MeasurementDTO | null>(null);
@@ -67,11 +80,13 @@ export default function TruckDetailPage() {
     );
   if (q.isError || !q.data)
     return (
-      <div className="p-6">
-        <p className="text-sm text-red-600">Camion introuvable.</p>
-        <Link to="/contracts" className="text-sm text-brand-500 underline">
-          ← Contrats
-        </Link>
+      <div className="mx-auto max-w-page px-4 py-6">
+        <BackLink to="/reception">Réception</BackLink>
+        <div className="mt-3">
+          <QueryError error={q.error} onRetry={() => q.refetch()}>
+            Impossible d'ouvrir ce camion
+          </QueryError>
+        </div>
       </div>
     );
 
@@ -109,6 +124,16 @@ export default function TruckDetailPage() {
   const activeCtx = measTab && tabs.includes(measTab) ? measTab : fallback;
   const measurement = t.measurements.find((m) => m.context === activeCtx);
 
+  // Repli : les totaux restent lisibles sur l'en-tête, sans déplier.
+  const measShown = measOpen ?? !t.sawn;
+  const measSummary = tabs
+    .map((c) => {
+      const m = t.measurements.find((x) => x.context === c);
+      return m ? `${SHORT_LABELS[c]} ${fmtM3(measurementTotalM3(m))}` : null;
+    })
+    .filter((v): v is string => v !== null)
+    .join(" · ");
+
   // Étalage Ø : reprendre les n° de billes déjà saisis en packing list.
   const packingIds = t.packingLogs
     .map((p) => p.billNo?.trim())
@@ -118,9 +143,9 @@ export default function TruckDetailPage() {
     <div className="mx-auto max-w-page px-4 py-6 short:py-3">
       <BackLink to={`/contracts/${t.contractId}`}>Contrat</BackLink>
 
-      <div className="mt-2 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="flex flex-wrap items-center gap-2 text-title font-semibold text-brand-900">
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-title font-semibold tracking-tight text-brand-900">
             {t.registration}
             {/* Où en est le camion dans la chaîne — visible sans dérouler la page. */}
             <Badge tone={stage.tone}>{stage.label}</Badge>
@@ -176,13 +201,14 @@ export default function TruckDetailPage() {
               <>
                 <Badge tone="parc">
                   écart {countGap > 0 ? "+" : ""}
-                  {countGap} · confirmé ✓
+                  {countGap} · confirmé
+                  <IconCheck width={14} height={14} className="ml-1 shrink-0" aria-hidden />
                 </Badge>
                 <button
                   type="button"
                   onClick={() => confirmGap.mutate(false)}
                   disabled={confirmGap.isPending || !can("etalage.edit")}
-                  className="min-h-touch rounded-lg px-2 text-brand-400 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200 disabled:opacity-50"
+                  className="min-h-touch rounded-lg px-2 text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200 disabled:opacity-50"
                 >
                   annuler
                 </button>
@@ -208,75 +234,106 @@ export default function TruckDetailPage() {
       )}
 
       <TruckBordereau truck={t} />
-      <PackingList truck={t} />
+
+      {/* Ce que ce camion a donné à la scie — lu bien plus souvent que le
+          détail des relevés, donc au-dessus du gros tableau de cubage. */}
+      <TruckDebitageSection truck={t} />
 
       <section className="mt-5">
-        {/* Un seul tableau à l'écran : on bascule billes ↔ billons au lieu de scroller. */}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {tabs.map((c) => {
-            const m = t.measurements.find((x) => x.context === c);
-            return (
-              <Chip key={c} selected={c === activeCtx} onClick={() => setMeasTab(c)}>
-                {MEASUREMENT_CONTEXT_LABELS[c]}
-                {m ? ` · ${fmtM3(measurementTotalM3(m))}` : " · à saisir"}
-              </Chip>
-            );
-          })}
-        </div>
-        <div className="rounded-xl bg-white shadow-card p-4">
-          {measurement ? (
-            <MeasurementTable
-              m={measurement}
-              onDelete={() => setDelMeas(measurement)}
-              canEdit={can("etalage.edit")}
-              canDelete={can("etalage.delete")}
-              onAppend={
-                can("etalage.create")
-                  ? (data) => appendMeasurement.mutate({ measurementId: measurement.id, data })
-                  : undefined
-              }
-              appending={appendMeasurement.isPending}
-              billNos={activeCtx === "YARD_GIRTH" ? billNos : undefined}
-              appendDraftKey={`${t.id}:${activeCtx}:append`}
-              appendError={measError?.key === `${activeCtx}:append` ? measError.message : null}
-              onUpdateLog={(logId, data) => updateLog.mutate({ logId, data })}
-              onDeleteLog={setDelLogTarget}
-              logPending={updateLog.isPending || delLog.isPending}
-            />
-          ) : !can("etalage.create") ? (
-            <p className="text-sm text-brand-500">Aucun relevé — saisie réservée au parc.</p>
-          ) : (
-            <>
-              {/* Étalage Ø : reprendre les n° de billes déjà saisis en packing list. */}
-              {activeCtx === "YARD_DIAMETER" && !diaPrefill && packingIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    clearTallyDraft(`${t.id}:${activeCtx}`);
-                    setDiaPrefill(packingIds);
-                  }}
-                  className="mb-3 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2 text-sm text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
-                >
-                  Préremplir les n° depuis la packing list ({packingIds.length} billes)
-                </button>
-              )}
-              <TallyEntry
-                key={activeCtx === "YARD_DIAMETER" && diaPrefill ? "prefill" : "blank"}
-                context={activeCtx}
-                saving={addMeasurement.isPending}
-                error={measError?.key === activeCtx ? measError.message : null}
-                bills={activeCtx === "YARD_GIRTH" ? billNos : undefined}
-                draftKey={`${t.id}:${activeCtx}`}
-                initialIds={activeCtx === "YARD_DIAMETER" ? (diaPrefill ?? undefined) : undefined}
-                onSave={(data) => addMeasurement.mutate(data)}
+        {/* Camion scié : plus rien à saisir ici, le détail est de l'historique.
+            On le replie derrière son total — tant que le camion tourne, la
+            section reste ouverte, c'est le point de saisie du parc. */}
+        {t.sawn && (
+          <button
+            type="button"
+            onClick={() => setMeasOpen(!measShown)}
+            className="mb-2 flex min-h-touch w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-1 text-left transition-colors hover:bg-brand-100/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
+            aria-expanded={measShown}
+          >
+            <span className="text-base font-semibold tracking-tight text-brand-900">
+              Cubage billes / billons
+            </span>
+            <span className="ml-auto flex items-center gap-3 text-sm text-brand-700">
+              <span className="tabular-nums">{measSummary || "aucun relevé"}</span>
+              <IconChevronDown
+                width={18}
+                height={18}
+                className={`shrink-0 text-brand-500 transition-transform duration-150 ease-out motion-reduce:transition-none ${measShown ? "" : "-rotate-90"}`}
               />
-            </>
-          )}
-        </div>
+            </span>
+          </button>
+        )}
+        {measShown && (
+          <>
+            {/* Un seul tableau à l'écran : on bascule billes ↔ billons au lieu de scroller. */}
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {tabs.map((c) => {
+                const m = t.measurements.find((x) => x.context === c);
+                return (
+                  <Chip key={c} selected={c === activeCtx} onClick={() => setMeasTab(c)}>
+                    {MEASUREMENT_CONTEXT_LABELS[c]}
+                    {m ? ` · ${fmtM3(measurementTotalM3(m))}` : " · à saisir"}
+                  </Chip>
+                );
+              })}
+            </div>
+            <div className="rounded-xl bg-white shadow-card p-4">
+              {measurement ? (
+                <MeasurementTable
+                  m={measurement}
+                  onDelete={() => setDelMeas(measurement)}
+                  canEdit={can("etalage.edit")}
+                  canDelete={can("etalage.delete")}
+                  onAppend={
+                    can("etalage.create")
+                      ? (data) => appendMeasurement.mutate({ measurementId: measurement.id, data })
+                      : undefined
+                  }
+                  appending={appendMeasurement.isPending}
+                  billNos={activeCtx === "YARD_GIRTH" ? billNos : undefined}
+                  appendDraftKey={`${t.id}:${activeCtx}:append`}
+                  appendError={measError?.key === `${activeCtx}:append` ? measError.message : null}
+                  onUpdateLog={(logId, data) => updateLog.mutate({ logId, data })}
+                  onDeleteLog={setDelLogTarget}
+                  logPending={updateLog.isPending || delLog.isPending}
+                />
+              ) : !can("etalage.create") ? (
+                <p className="text-sm text-brand-500">
+                  Aucun relevé — saisie réservée au parc.
+                </p>
+              ) : (
+                <>
+                  {/* Étalage Ø : reprendre les n° de billes déjà saisis en packing list. */}
+                  {activeCtx === "YARD_DIAMETER" && !diaPrefill && packingIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearTallyDraft(`${t.id}:${activeCtx}`);
+                        setDiaPrefill(packingIds);
+                      }}
+                      className="mb-3 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2 text-sm text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
+                    >
+                      Préremplir les n° depuis la packing list ({packingIds.length} billes)
+                    </button>
+                  )}
+                  <TallyEntry
+                    key={activeCtx === "YARD_DIAMETER" && diaPrefill ? "prefill" : "blank"}
+                    context={activeCtx}
+                    saving={addMeasurement.isPending}
+                    error={measError?.key === activeCtx ? measError.message : null}
+                    bills={activeCtx === "YARD_GIRTH" ? billNos : undefined}
+                    draftKey={`${t.id}:${activeCtx}`}
+                    initialIds={
+                      activeCtx === "YARD_DIAMETER" ? (diaPrefill ?? undefined) : undefined
+                    }
+                    onSave={(data) => addMeasurement.mutate(data)}
+                  />
+                </>
+              )}
+            </div>
+          </>
+        )}
       </section>
-
-      {/* Étape suivante de la chaîne : ce que ce camion a donné à la scie. */}
-      <TruckDebitageSection truck={t} />
 
       <ConfirmDialog
         open={delTruckOpen}

@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SIZE_GROUP_LABELS, type SawnInventoryRowDTO, type SizeGroup } from "@ste/shared";
-import { contractsApi } from "../lib/api";
+import { stockApi } from "../lib/api";
 import { fmtNum } from "../lib/format";
 import EmpotageEntry from "./EmpotageEntry";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
 import Chip from "./ui/Chip";
-import { EmptyState, QueryError } from "./ui/Feedback";
+import { EmptyState, QueryError, Notice } from "./ui/Feedback";
 import { SearchInput } from "./ui/Input";
 import { SkeletonList } from "./ui/Skeleton";
+import { IconArrowLeft } from "./icons";
 
 type Item = { lengthFt: string; widthIn: string; thicknessIn: string; count: number };
 
@@ -28,11 +29,9 @@ function dimsLabel(r: SawnInventoryRowDTO) {
  * saisie manuelle reste accessible pour le bois hors stock.
  */
 export default function EmpotagePicker({
-  contractId,
   onSave,
   saving,
 }: {
-  contractId: string;
   onSave: (items: Item[]) => void;
   saving: boolean;
 }) {
@@ -43,9 +42,10 @@ export default function EmpotagePicker({
   // Le stock épuisé encombre la liste ; on le garde accessible pour vérifier.
   const [showEmpty, setShowEmpty] = useState(false);
 
+  // Panier d'empotage : le stock général, tous contrats confondus.
   const inv = useQuery({
-    queryKey: ["sawn-inventory", contractId],
-    queryFn: () => contractsApi.sawnInventory(contractId),
+    queryKey: ["stock", "inventory"],
+    queryFn: () => stockApi.sawnInventory(),
   });
 
   const rows = useMemo(() => {
@@ -104,7 +104,8 @@ export default function EmpotagePicker({
       <div>
         <div className="mb-2 flex justify-end">
           <Button size="xs" onClick={() => setManual(false)}>
-            ← Choisir dans le stock
+            <IconArrowLeft width={16} height={16} className="-ml-0.5" />
+            Choisir dans le stock
           </Button>
         </div>
         <EmpotageEntry saving={saving} onSave={onSave} />
@@ -241,10 +242,10 @@ export default function EmpotagePicker({
           (la liste des tailles est longue, valider ne doit pas coûter un scroll). */}
       <div className="sticky bottom-0 z-10 -mx-3 -mb-3 mt-3 rounded-b-xl border-t border-brand-200 bg-white px-3 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))] pt-3">
         {over.length > 0 && (
-          <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
-            ⚠ {over.length} taille(s) demandées au-delà du stock — le stock passera en
+          <Notice tone="warn" className="mb-2">
+            {over.length} taille(s) demandée(s) au-delà du stock — le stock passera en
             négatif.
-          </div>
+          </Notice>
         )}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="text-sm">

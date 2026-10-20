@@ -230,7 +230,7 @@ function SectionCard({
         )}
       </div>
       {section.hint && !editing && (
-        <p className="mt-1 text-xs text-brand-400">{section.hint}</p>
+        <p className="mt-1 text-xs text-brand-500">{section.hint}</p>
       )}
 
       {!editing ? (
@@ -370,7 +370,7 @@ export function ContractQuickCreate({
       className="rounded-xl bg-white shadow-card p-4"
     >
       <h3 className="text-sm font-semibold text-brand-900">Nouveau contrat</h3>
-      <p className="mt-1 text-xs text-brand-400">
+      <p className="mt-1 text-xs text-brand-500">
         Seuls le numéro et le quota sont connus au départ — le reste se complète sur la
         fiche, au fil du contrat.
       </p>

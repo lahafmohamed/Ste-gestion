@@ -29,13 +29,11 @@ export default function CuttingResume({
   const rows = r.rows.filter((x) => x.m3 > 0 || x.key !== "other");
   return (
     <div className={`rounded-lg bg-brand-50 ring-1 ring-inset ring-brand-100 ${className}`}>
-      <div className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-500">
-        Cutting résumé
-      </div>
+      <div className="px-3 pt-2.5 text-sm font-semibold text-brand-800">Cutting résumé</div>
       <table className="w-full text-sm">
         <tbody>
           {rows.map((x) => (
-            <tr key={x.key} className={x.m3 > 0 ? "text-brand-800" : "text-brand-400"}>
+            <tr key={x.key} className={x.m3 > 0 ? "text-brand-800" : "text-brand-500"}>
               <td className="px-3 py-1">{x.label}</td>
               <td className="px-3 py-1 text-right tabular-nums">{m3(x.m3)}</td>
               <td className="whitespace-nowrap px-3 py-1 text-right tabular-nums">{fmtPct(x.pct, 1)}</td>

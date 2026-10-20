@@ -3,20 +3,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   classifySize,
   sawnVolumeM3,
-  type ContractSummaryDTO,
   type ResawOpDTO,
   type SawnLineDTO,
+  type StockSizeRowDTO,
 } from "@ste/shared";
 import { resawApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtNum, fmtPct, normalizeDecimal, todayISO } from "../lib/format";
+import { fmtDec3, fmtNum, fmtPct, normalizeDecimal, todayISO, fmtM3 } from "../lib/format";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
 import Card, { SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
 import DateField from "./ui/DateField";
-import { FormError } from "./ui/Feedback";
+import { EmptyState, FormError, QueryError, Notice } from "./ui/Feedback";
 import Input, { Field, inputQuietCls } from "./ui/Input";
+import { SkeletonCard } from "./ui/Skeleton";
+import { IconX, IconPlus } from "./icons";
 
 // Resciage : du bois déjà scié en stock repasse à la scie pour donner des
 // sections plus petites. Deux blocs symétriques (consommé / produit), même
@@ -90,7 +92,7 @@ function LinesEditor({
                 key={i}
                 className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
               >
-                <span className="text-xs text-brand-400">{i + 1}</span>
+                <span className="text-xs text-brand-500">{i + 1}</span>
                 {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
                   <div
                     key={k}
@@ -130,16 +132,16 @@ function LinesEditor({
                   <span className="text-center text-xs text-brand-300">—</span>
                 )}
                 <span className="text-right text-base tabular-nums text-brand-700">
-                  <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
+                  <span className="mr-1 text-xs text-brand-500 sm:hidden">m³</span>
                   {info ? info.volume.toFixed(3) : "—"}
                 </span>
                 <button
                   type="button"
                   onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-                  className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
+                  className="flex min-h-touch w-full items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
                   aria-label="Supprimer la ligne"
                 >
-                  ×
+                  <IconX width={18} height={18} />
                 </button>
               </div>
             );
@@ -151,7 +153,8 @@ function LinesEditor({
         onClick={() => setRows((p) => [...p, emptyRow()])}
         className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2 text-base font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
       >
-        + Ligne
+        <IconPlus width={16} height={16} className="-ml-0.5" />
+        Ligne
       </button>
     </div>
   );
@@ -161,17 +164,13 @@ function linesSummary(lines: SawnLineDTO[]) {
   const bySize = new Map<string, number>();
   for (const l of lines) bySize.set(l.sizeCode, (bySize.get(l.sizeCode) ?? 0) + Number(l.volumeM3));
   return [...bySize.entries()]
-    .map(([code, m3]) => `${code} ${fmtNum(m3.toFixed(3))}`)
+    .map(([code, m3]) => `${code} ${fmtDec3(m3)}`)
     .join(" · ");
 }
 
-export default function ResawSection({
-  contractId,
-  summary,
-}: {
-  contractId: string;
-  summary: ContractSummaryDTO;
-}) {
+// Resciage : stock → stock, sans contrat (le bois rescié revient au stock
+// général, quel que soit le contrat qui l'a produit).
+export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRowDTO[] }) {
   const can = useCan();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -183,13 +182,14 @@ export default function ResawSection({
   const [error, setError] = useState<string | null>(null);
 
   const ops = useQuery({
-    queryKey: ["resaws", contractId],
-    queryFn: () => resawApi.listByContract(contractId),
+    queryKey: ["resaws", "all"],
+    queryFn: () => resawApi.list(),
   });
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ["resaws", contractId] });
-    qc.invalidateQueries({ queryKey: ["summary", contractId] });
+    qc.invalidateQueries({ queryKey: ["resaws"] });
+    qc.invalidateQueries({ queryKey: ["stock"] });
+    qc.invalidateQueries({ queryKey: ["summary"] });
   }
 
   const createMut = useMutation({
@@ -220,7 +220,7 @@ export default function ResawSection({
   const lossM3 = inM3 - outM3; // perte de trait de scie (normale, ≥ 0)
 
   // Stock dispo par taille → alerte si on consomme plus qu'il n'y en a.
-  const stockByCode = new Map(summary.stockBySize.map((r) => [r.code, Number(r.stockM3)]));
+  const stockByCode = new Map(stockBySize.map((r) => [r.code, Number(r.stockM3)]));
   const consumedByCode = new Map<string, number>();
   for (const x of consumedInfos) {
     consumedByCode.set(x!.size.code, (consumedByCode.get(x!.size.code) ?? 0) + x!.volume);
@@ -234,7 +234,6 @@ export default function ResawSection({
     const produced = toLines(producedRows);
     if (consumed.length === 0 || produced.length === 0) return;
     createMut.mutate({
-      contractId,
       // Midi local : la date seule ne doit pas glisser d'un jour en UTC.
       resawnAt: date ? new Date(`${date}T12:00:00`) : undefined,
       note: note.trim() || undefined,
@@ -250,12 +249,12 @@ export default function ResawSection({
         right={
           can("stock.create") && (
             <Button size="sm" onClick={() => setOpen((v) => !v)}>
-              {open ? "Fermer" : "+ Resciage"}
+              {open ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Resciage</>}
             </Button>
           )
         }
       >
-        Resciage (stock → sections plus petites)
+        Resciage
       </SectionHeading>
 
       {open && (
@@ -273,19 +272,19 @@ export default function ResawSection({
             </Field>
           </div>
 
-          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-500">
+          <div className="mb-1 text-sm font-semibold text-brand-800">
             Bois consommé (pris du stock)
           </div>
           <LinesEditor rows={consumedRows} setRows={setConsumedRows} />
 
-          <div className="mb-1 mt-4 text-xs font-medium uppercase tracking-wide text-brand-500">
+          <div className="mb-1 mt-4 text-sm font-semibold text-brand-800">
             Bois produit (sections plus petites)
           </div>
           <LinesEditor rows={producedRows} setRows={setProducedRows} />
 
           {overStock.length > 0 && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              ⚠ Consommé au-delà du stock :{" "}
+            <Notice tone="warn" className="mt-3">
+              Consommé au-delà du stock :{" "}
               {overStock
                 .map(
                   ([code, v]) =>
@@ -295,7 +294,7 @@ export default function ResawSection({
                 )
                 .join(", ")}
               . Vérifier les tailles saisies.
-            </div>
+            </Notice>
           )}
           {outM3 > inM3 + 1e-6 && (
             <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -306,10 +305,10 @@ export default function ResawSection({
           {(inM3 > 0 || outM3 > 0) && (
             <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm">
               <span className="text-brand-500">
-                Consommé {fmtNum(inM3.toFixed(3))} → produit {fmtNum(outM3.toFixed(3))} m³
+                Consommé {fmtNum(inM3.toFixed(3))} → produit {fmtM3(outM3)}
               </span>
               <span className="font-medium text-brand-700">
-                Perte {fmtNum(Math.max(lossM3, 0).toFixed(3))} m³
+                Perte {fmtM3(Math.max(lossM3, 0))}
                 {inM3 > 0 && ` (${fmtPct((Math.max(lossM3, 0) / inM3) * 100, 1)})`}
               </span>
             </div>
@@ -334,6 +333,14 @@ export default function ResawSection({
         </Card>
       )}
 
+      {ops.isLoading && <SkeletonCard lines={1} />}
+      {ops.isError && (
+        <QueryError error={ops.error} onRetry={() => ops.refetch()}>
+          Impossible de charger les resciages
+        </QueryError>
+      )}
+      {ops.data?.length === 0 && !open && <EmptyState>Aucun resciage.</EmptyState>}
+
       {(ops.data?.length ?? 0) > 0 && (
         <Card className="mb-4">
           <ul className="divide-y divide-brand-100">
@@ -348,12 +355,12 @@ export default function ResawSection({
                         {new Date(o.resawnAt).toLocaleDateString("fr-FR")}
                       </span>{" "}
                       <span className="text-brand-500">
-                        — {fmtNum(inTotal.toFixed(3))} → {fmtNum(outTotal.toFixed(3))} m³
+                        — {fmtDec3(inTotal)} → {fmtDec3(outTotal)} m³
                       </span>
                       {o.note && <span className="ml-1 text-brand-500">· {o.note}</span>}
                     </div>
                     <div className="mt-0.5 text-xs text-brand-500">
-                      {linesSummary(o.consumed)} <span className="text-brand-400">→</span>{" "}
+                      {linesSummary(o.consumed)} <span className="text-brand-500">→</span>{" "}
                       {linesSummary(o.produced)}
                     </div>
                   </div>

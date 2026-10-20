@@ -54,8 +54,7 @@ const RULES: Rule[] = [
   { method: "PATCH", pattern: new RegExp(`^/contracts/${ID}$`), permission: "contracts.edit" },
   { method: "DELETE", pattern: new RegExp(`^/contracts/${ID}$`), permission: "contracts.delete" },
 
-  // Réception (camions, packing list grumes)
-  { method: "*", pattern: new RegExp(`^/trucks/${ID}/packing$`), permission: "reception.edit" },
+  // Réception (camions)
   {
     method: "POST",
     pattern: new RegExp(`^/trucks/${ID}/measurements$`),

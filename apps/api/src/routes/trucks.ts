@@ -4,7 +4,6 @@ import {
   M3_TO_CFT,
   logUpdateSchema,
   measurementCreateSchema,
-  packingCreateSchema,
   truckCreateSchema,
   truckUpdateSchema,
   volumeDiameterM3,
@@ -137,45 +136,6 @@ export async function truckRoutes(app: FastifyInstance) {
       }
       throw e;
     }
-  });
-
-  // ── Packing list grumes (spécification de transport) ────────────────
-  // Remplace l'ensemble des lignes du camion (saisie/re-saisie en bloc).
-  app.post<{ Params: { id: string } }>("/trucks/:id/packing", async (req, reply) => {
-    const parsed = packingCreateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
-    }
-    if (!(await ensureTruckContractOpen(reply, req.params.id))) return;
-    const truck = await prisma.truck.findUnique({ where: { id: req.params.id } });
-    if (!truck) return reply.code(404).send({ error: "Camion introuvable" });
-
-    await prisma.$transaction([
-      prisma.packingLog.deleteMany({ where: { truckId: truck.id } }),
-      prisma.packingLog.createMany({
-        data: parsed.data.logs.map((l, i) => ({
-          truckId: truck.id,
-          position: i + 1,
-          billNo: l.billNo,
-          diaTopCm: l.diaTopCm,
-          diaBottomCm: l.diaBottomCm,
-          diaMeanCm: l.diaMeanCm,
-          lengthM: l.lengthM,
-          volumeM3: l.volumeM3,
-        })),
-      }),
-    ]);
-    const t = await prisma.truck.findUnique({
-      where: { id: truck.id },
-      include: truckInclude,
-    });
-    return reply.code(201).send(serializeTruck(t!));
-  });
-
-  // Vider la packing list
-  app.delete<{ Params: { id: string } }>("/trucks/:id/packing", async (req, reply) => {
-    await prisma.packingLog.deleteMany({ where: { truckId: req.params.id } });
-    return reply.code(204).send();
   });
 
   // Nouvel étalage (calculs volume côté serveur — F1/F2)

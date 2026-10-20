@@ -15,7 +15,9 @@ import type {
   DailyReportDTO,
   LoginInput,
   LoginResponse,
+  ParcTruckDTO,
   SawnInventoryRowDTO,
+  StockSummaryDTO,
   TruckStatDTO,
   UserCreateInput,
   UserDTO,
@@ -28,7 +30,6 @@ import type {
   LogUpdateInput,
   MeasurementCreateInput,
   MeasurementDTO,
-  PackingCreateInput,
   TruckUpdateInput,
   ContractCuttingDTO,
   ProductionRunCreateInput,
@@ -52,6 +53,13 @@ import type {
 import { clearSession, getToken } from "./auth";
 
 const BASE = "/api";
+
+/** Query string sans les paramètres vides (« tous contrats » = pas de filtre). */
+const qs = (params: Record<string, string | undefined>) => {
+  const entries = Object.entries(params).filter(([, v]) => v) as [string, string][];
+  const s = new URLSearchParams(entries).toString();
+  return s ? "?" + s : "";
+};
 
 async function req<T>(
   path: string,
@@ -151,12 +159,19 @@ export const contractsApi = {
   /** Vue liste de tous les contrats en une requête (voir ContractOverviewDTO). */
   overview: () => req<ContractOverviewDTO[]>("/contracts/overview"),
   summary: (id: string) => req<ContractSummaryDTO>(`/contracts/${id}/summary`),
-  /** Stock d'avivés par dimension exacte (panier d'empotage). */
-  sawnInventory: (id: string) =>
-    req<SawnInventoryRowDTO[]>(`/contracts/${id}/sawn-inventory`),
   truckStats: (id: string) => req<TruckStatDTO[]>(`/contracts/${id}/truck-stats`),
   dailyReport: (id: string, date: string) =>
     req<DailyReportDTO>(`/contracts/${id}/daily-report?date=${date}`),
+};
+
+// Stock général : tous contrats confondus. `contractId` ne sert qu'aux vues
+// par contrat (fiche contrat) — la page Stock n'en passe pas.
+export const stockApi = {
+  summary: (contractId?: string) => req<StockSummaryDTO>("/stock/summary" + qs({ contractId })),
+  sawnInventory: (contractId?: string) =>
+    req<SawnInventoryRowDTO[]>("/stock/sawn-inventory" + qs({ contractId })),
+  /** Camions ayant encore des billons au parc. */
+  parc: (contractId?: string) => req<ParcTruckDTO[]>("/stock/parc" + qs({ contractId })),
 };
 
 export const trucksApi = {
@@ -185,13 +200,6 @@ export const trucksApi = {
   updateLog: (id: string, data: LogUpdateInput) =>
     req<MeasurementDTO>(`/logs/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   removeLog: (id: string) => req<void>(`/logs/${id}`, { method: "DELETE" }),
-  setPacking: (truckId: string, data: PackingCreateInput) =>
-    req<TruckDTO>(`/trucks/${truckId}/packing`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  clearPacking: (truckId: string) =>
-    req<void>(`/trucks/${truckId}/packing`, { method: "DELETE" }),
 };
 
 /** Parc de camions — le référentiel où la réception choisit l'immatriculation. */
@@ -231,8 +239,7 @@ export const salesApi = {
 };
 
 export const containersApi = {
-  listByContract: (contractId: string) =>
-    req<ContainerDTO[]>(`/containers?contractId=${encodeURIComponent(contractId)}`),
+  list: (contractId?: string) => req<ContainerDTO[]>("/containers" + qs({ contractId })),
   get: (id: string) => req<ContainerDTO>(`/containers/${id}`),
   create: (data: ContainerCreateInput) =>
     req<ContainerDTO>("/containers", { method: "POST", body: JSON.stringify(data) }),
@@ -249,10 +256,8 @@ export const containersApi = {
 };
 
 export const productionApi = {
-  listByContract: (contractId: string) =>
-    req<ProductionRunDTO[]>(
-      `/production-runs?contractId=${encodeURIComponent(contractId)}`
-    ),
+  list: (filter?: { contractId?: string; truckId?: string }) =>
+    req<ProductionRunDTO[]>("/production-runs" + qs({ ...filter })),
   get: (id: string) => req<ProductionRunDTO>(`/production-runs/${id}`),
   create: (data: ProductionRunCreateInput) =>
     req<ProductionRunDTO>("/production-runs", {
@@ -260,8 +265,7 @@ export const productionApi = {
       body: JSON.stringify(data),
     }),
   remove: (id: string) => req<void>(`/production-runs/${id}`, { method: "DELETE" }),
-  cutting: (contractId: string) =>
-    req<ContractCuttingDTO>(`/contracts/${contractId}/cutting`),
+  cutting: (contractId?: string) => req<ContractCuttingDTO>("/cutting" + qs({ contractId })),
 };
 
 export const importsApi = {
@@ -274,8 +278,7 @@ export const importsApi = {
 };
 
 export const resawApi = {
-  listByContract: (contractId: string) =>
-    req<ResawOpDTO[]>(`/resaws?contractId=${encodeURIComponent(contractId)}`),
+  list: (contractId?: string) => req<ResawOpDTO[]>("/resaws" + qs({ contractId })),
   create: (data: ResawOpCreateInput) =>
     req<ResawOpDTO>("/resaws", { method: "POST", body: JSON.stringify(data) }),
   remove: (id: string) => req<void>(`/resaws/${id}`, { method: "DELETE" }),

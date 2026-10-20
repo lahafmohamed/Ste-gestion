@@ -10,7 +10,7 @@ import type { SizeGroup } from "@ste/shared";
 export type BadgeTone = "parc" | "amber" | "accent" | "brand" | "info";
 
 const TONE: Record<BadgeTone, string> = {
-  parc: "bg-parc-50 text-parc-700",
+  parc: "bg-parc-50 text-parc-800",
   amber: "bg-amber-50 text-amber-700",
   accent: "bg-accent-100 text-accent-700",
   brand: "bg-brand-100 text-brand-600",

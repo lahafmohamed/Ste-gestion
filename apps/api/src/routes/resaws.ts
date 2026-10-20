@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import { classifySize, resawOpCreateSchema, sawnVolumeM3 } from "@ste/shared";
 import { prisma } from "../prisma.js";
-import { ensureContractOpen } from "../contract-lock.js";
 
 // Resciage : bois déjà scié en stock repassé à la scie en sections plus
 // petites. Volumes F3 + classement F4 côté serveur, comme le débitage.
@@ -66,7 +65,6 @@ export async function resawRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
     const d = parsed.data;
-    if (!(await ensureContractOpen(reply, d.contractId))) return;
 
     const consumed = buildLines("CONSUMED", d.consumed);
     const produced = buildLines("PRODUCED", d.produced);
@@ -83,7 +81,6 @@ export async function resawRoutes(app: FastifyInstance) {
 
     const o = await prisma.resawOp.create({
       data: {
-        contractId: d.contractId,
         resawnAt: d.resawnAt,
         note: d.note,
         lines: { create: [...consumed, ...produced] },

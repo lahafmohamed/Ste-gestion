@@ -1,6 +1,6 @@
 import type { ContractCuttingDTO } from "@ste/shared";
 import { SIZE_GROUP_LABELS, type SizeGroup } from "@ste/shared";
-import { fmtNum, fmtPct } from "../lib/format";
+import { fmtNum, fmtPct, fmtM3 } from "../lib/format";
 
 // Palette marque (sève / ambre / teck / stone) alignée sur SIZE_GROUP_TONE.
 // Les teintes vert/brun se rapprochent en vision deutan : écart de luminance
@@ -43,14 +43,14 @@ function GroupDonut({ groups, total }: { groups: Record<SizeGroup, string>; tota
             strokeDasharray={`${a.len} ${C - a.len}`}
             strokeDashoffset={a.offset}
           >
-            <title>{`${SIZE_GROUP_LABELS[a.g]} : ${fmtNum(a.v.toFixed(3))} m³ (${((a.v / total) * 100).toFixed(0)} %)`}</title>
+            <title>{`${SIZE_GROUP_LABELS[a.g]} : ${fmtM3(a.v)} (${((a.v / total) * 100).toFixed(0)} %)`}</title>
           </circle>
         ))}
       </g>
       <text x="60" y="57" textAnchor="middle" className="fill-brand-900" fontSize="13" fontWeight="600">
         {fmtNum(total.toFixed(1))}
       </text>
-      <text x="60" y="71" textAnchor="middle" className="fill-brand-400" fontSize="8">
+      <text x="60" y="71" textAnchor="middle" className="fill-brand-500" fontSize="8">
         m³ débités
       </text>
     </svg>
@@ -73,7 +73,7 @@ function SizeBars({ sizes }: { sizes: ContractCuttingDTO["sizes"] }) {
                 className="h-full rounded-r-sm"
                 style={{ width: `${(v / max) * 100}%`, backgroundColor: GROUP_COLOR[s.group] }}
               >
-                <title>{`${s.code} : ${fmtNum(v.toFixed(3))} m³`}</title>
+                <title>{`${s.code} : ${fmtM3(v)}`}</title>
               </div>
             </div>
             <span className="text-right text-xs tabular-nums text-brand-600">
@@ -104,7 +104,7 @@ export default function CuttingCharts({ data }: { data: ContractCuttingDTO }) {
               className="inline-block h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: GROUP_COLOR[g] }}
             />
-            {SIZE_GROUP_LABELS[g]} · {fmtNum(Number(data.groups[g]).toFixed(3))} m³ (
+            {SIZE_GROUP_LABELS[g]} · {fmtM3(Number(data.groups[g]))} (
             {fmtPct((Number(data.groups[g]) / total) * 100, 0)})
           </span>
         ))}

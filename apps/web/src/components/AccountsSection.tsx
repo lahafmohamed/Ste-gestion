@@ -181,7 +181,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
 
       {can("compta.create") && suggestions.data && suggestions.data.filter((s) => Number(s.delta) > 0).length > 0 && (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
+          <div className="mb-2 text-sm font-semibold text-amber-800">
             Dûs suggérés (dérivés des opérations)
           </div>
           <div className="space-y-1.5">
@@ -246,7 +246,7 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
                     <tbody>
                       {a.entries.map((e) => (
                         <tr key={e.id} className="border-b border-brand-50">
-                          <td className="py-1 text-xs text-brand-400">
+                          <td className="py-1 text-xs text-brand-500">
                             {new Date(e.entryDate).toLocaleDateString("fr-FR")}
                           </td>
                           <td className="py-1">

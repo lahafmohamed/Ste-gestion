@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
+import { IconX } from "../icons";
 
 // Champs de formulaire unifiés.
 // text-base (16px) : sous ce seuil iOS zoome la page au focus.
@@ -89,9 +90,9 @@ export function SearchInput({ value, onChange, className = "", ...rest }: Search
           type="button"
           onClick={() => onChange("")}
           aria-label="Effacer la recherche"
-          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-lg text-brand-400 hover:text-brand-900 active:text-brand-900"
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-brand-500 transition-colors hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 active:text-brand-900"
         >
-          ×
+          <IconX width={18} height={18} />
         </button>
       )}
     </div>

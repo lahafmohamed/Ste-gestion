@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { APP_NAME } from "@ste/shared";
 import { authApi } from "../lib/api";
 import { setSession } from "../lib/auth";
+import LogEnd from "../components/LogEnd";
 import Button from "../components/ui/Button";
 import { FormError } from "../components/ui/Feedback";
 import Input, { Field, inputErrorCls } from "../components/ui/Input";
@@ -59,100 +59,108 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const passwordInvalid = Boolean(fieldErrors.password || error);
 
   return (
-    // Fond papier + deux halos très doux aux couleurs du logo (teck, sève) :
-    // l'écran d'accueil n'est pas un formulaire posé sur du gris.
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-ground px-4 py-8">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-32 -top-32 size-[28rem] rounded-full bg-accent-200/50 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-40 -right-24 size-[26rem] rounded-full bg-parc-200/40 blur-3xl"
-      />
-      <form
-        noValidate
-        onSubmit={submit}
-        className="relative w-full max-w-sm rounded-2xl bg-white p-7 shadow-dialog motion-safe:animate-rise-in"
-      >
-        {/* Logo complet ici seulement : assez de place pour que la tagline soit lisible. */}
-        <img
-          src="/logo-ste.png"
-          alt=""
-          aria-hidden="true"
-          className="mx-auto mb-6 w-full max-w-[260px]"
-        />
-        <h1 className="text-xl font-semibold tracking-tight text-brand-900">{APP_NAME}</h1>
-        <p className="mt-1 text-sm text-brand-500">Connexion à la gestion scierie.</p>
-
-        <Field
-          label="Email"
-          className="mt-6"
-          error={fieldErrors.email}
-          errorId="login-email-error"
-        >
-          <Input
-            ref={emailRef}
-            type="email"
-            autoComplete="username"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
-            }}
-            placeholder="prenom@ste.ci"
-            className={fieldErrors.email ? inputErrorCls : ""}
-            aria-invalid={emailInvalid || undefined}
-            aria-describedby={
-              fieldErrors.email ? "login-email-error" : error ? "login-error" : undefined
-            }
-          />
-        </Field>
-
-        <Field
-          label="Mot de passe"
-          className="mt-4"
-          error={fieldErrors.password}
-          errorId="login-password-error"
-        >
-          <Input
-            ref={passwordRef}
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
-            }}
-            className={fieldErrors.password ? inputErrorCls : ""}
-            aria-invalid={passwordInvalid || undefined}
-            aria-describedby={
-              fieldErrors.password ? "login-password-error" : error ? "login-error" : undefined
-            }
-          />
-        </Field>
-
-        {/* Zone d'annonce stable : présente dès le rendu, le lecteur d'écran
-            annonce le texte quand il apparaît (role="alert" inséré à la volée
-            est ignoré par certains lecteurs). */}
-        <div role="alert" id="login-error" className="mt-4 empty:mt-0">
-          {error && (
-            <div key={errorKey} className="motion-safe:animate-shake">
-              <FormError>{error}</FormError>
-            </div>
-          )}
+    // Deux temps : le bois (panneau teck, une bille vue en bout avec son
+    // numéro peint, comme au parc) et le geste (le formulaire). Téléphone : le
+    // panneau devient un bandeau sous lequel la carte de connexion vient se poser.
+    <main className="min-h-dvh bg-ground lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="relative h-44 overflow-hidden bg-accent-900 sm:h-52 lg:h-auto lg:min-h-dvh">
+        <LogEnd className="pointer-events-none absolute -right-24 -top-28 w-[26rem] max-w-none sm:-right-10 sm:-top-36 sm:w-[30rem] lg:-bottom-56 lg:-left-40 lg:right-auto lg:top-auto lg:w-[50rem] xl:w-[56rem]" />
+        <div className="relative hidden max-w-xl p-12 lg:block xl:p-16">
+          <p className="text-balance text-4xl font-semibold leading-[1.1] tracking-tight text-white xl:text-5xl">
+            Le bois, du camion au conteneur.
+          </p>
+          <p className="mt-4 max-w-sm text-pretty text-base leading-relaxed text-accent-200">
+            Réception, étalage, débitage, stock et empotage — au parc comme au bureau.
+          </p>
         </div>
+      </div>
 
-        <Button type="submit" variant="primary" size="lg" disabled={loading} className="mt-6 w-full">
-          {loading && (
-            <span
-              aria-hidden="true"
-              className="size-4 rounded-full border-2 border-white/40 border-t-white motion-safe:animate-spin"
+      <div className="relative -mt-14 flex justify-center px-4 pb-10 lg:mt-0 lg:items-center lg:bg-white lg:px-12 lg:pb-0">
+        <form
+          noValidate
+          onSubmit={submit}
+          className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-dialog motion-safe:animate-rise-in sm:p-7 lg:rounded-none lg:p-0 lg:shadow-none"
+        >
+          {/* Logo complet ici seulement : assez de place pour que la tagline soit lisible. */}
+          <img
+            src="/logo-ste.png"
+            alt="STE — Sustainable Teck Exports"
+            className="mb-8 w-full max-w-[15rem]"
+          />
+          <h1 className="text-2xl font-semibold tracking-tight text-brand-900">Connexion</h1>
+          <p className="mt-1.5 text-sm text-brand-600">
+            Utilisez l'email et le mot de passe fournis par l'administrateur.
+          </p>
+
+          <Field
+            label="Email"
+            className="mt-6"
+            error={fieldErrors.email}
+            errorId="login-email-error"
+          >
+            <Input
+              ref={emailRef}
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+              }}
+              placeholder="prenom@ste.ci"
+              className={fieldErrors.email ? inputErrorCls : ""}
+              aria-invalid={emailInvalid || undefined}
+              aria-describedby={
+                fieldErrors.email ? "login-email-error" : error ? "login-error" : undefined
+              }
             />
-          )}
-          Se connecter
-        </Button>
-      </form>
+          </Field>
+
+          <Field
+            label="Mot de passe"
+            className="mt-4"
+            error={fieldErrors.password}
+            errorId="login-password-error"
+          >
+            <Input
+              ref={passwordRef}
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+              }}
+              className={fieldErrors.password ? inputErrorCls : ""}
+              aria-invalid={passwordInvalid || undefined}
+              aria-describedby={
+                fieldErrors.password ? "login-password-error" : error ? "login-error" : undefined
+              }
+            />
+          </Field>
+
+          {/* Zone d'annonce stable : présente dès le rendu, le lecteur d'écran
+              annonce le texte quand il apparaît (role="alert" inséré à la volée
+              est ignoré par certains lecteurs). */}
+          <div role="alert" id="login-error" className="mt-4 empty:mt-0">
+            {error && (
+              <div key={errorKey} className="motion-safe:animate-shake">
+                <FormError>{error}</FormError>
+              </div>
+            )}
+          </div>
+
+          <Button type="submit" variant="primary" size="lg" disabled={loading} className="mt-6 w-full">
+            {loading && (
+              <span
+                aria-hidden="true"
+                className="size-4 rounded-full border-2 border-white/40 border-t-white motion-safe:animate-spin"
+              />
+            )}
+            Se connecter
+          </Button>
+        </form>
+      </div>
     </main>
   );
 }

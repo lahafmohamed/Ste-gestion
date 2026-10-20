@@ -164,7 +164,9 @@ export async function previewImport(
         productionRuns: { select: { run: { select: { producedAt: true } } } },
       },
     }),
-    prisma.container.findMany({ where: { contractId }, select: { containerNo: true } }),
+    // Conteneurs : plus de contrat depuis le stock général — un n° déjà empoté
+    // ailleurs reste un doublon, on regarde donc tous les conteneurs.
+    prisma.container.findMany({ select: { containerNo: true } }),
   ]);
 
   // Billes Ø créées par une feuille du même classeur : un billon « 283A » d'une
@@ -499,7 +501,6 @@ export async function applyImport(
       const loadedAt = sheet.meta.date ? new Date(sheet.meta.date) : new Date();
       const c = await prisma.container.create({
         data: {
-          contractId,
           containerNo: sheet.meta.containerNo!,
           sealNo: sheet.meta.sealNo,
           grade: sheet.meta.grade,

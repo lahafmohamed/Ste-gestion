@@ -15,6 +15,7 @@ import Chip from "../components/ui/Chip";
 import { EmptyState, QueryError } from "../components/ui/Feedback";
 import { SearchInput } from "../components/ui/Input";
 import { SkeletonList } from "../components/ui/Skeleton";
+import { IconPlus } from "../components/icons";
 
 function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
   return (
@@ -25,7 +26,10 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-base font-semibold text-brand-900">{c.code}</div>
-          <div className="truncate text-sm text-brand-500">
+          <div
+            className="mt-0.5 line-clamp-2 text-sm text-brand-600"
+            title={[c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ") || undefined}
+          >
             {[c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ") || "—"}
           </div>
         </div>
@@ -53,7 +57,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
         {o ? (
           <QuotaBar brousseM3={o.brousseM3} quotaM3={c.quotaM3} />
         ) : (
-          <div className="h-1.5 w-full animate-pulse rounded-full bg-brand-100" />
+          <div className="h-2 w-full rounded-full bg-brand-100 motion-safe:animate-pulse" />
         )}
       </div>
     </Link>
@@ -147,7 +151,7 @@ export default function ContractsPage() {
         right={
           canCreate && (
             <Button variant="primary" onClick={() => setShowForm((s) => !s)}>
-              {showForm ? "Fermer" : "+ Nouveau contrat"}
+              {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Nouveau contrat</>}
             </Button>
           )
         }
@@ -209,7 +213,8 @@ export default function ContractsPage() {
               action={
                 canCreate && (
                   <Button variant="primary" onClick={() => setShowForm(true)}>
-                    + Créer le premier contrat
+                    <IconPlus width={16} height={16} className="-ml-0.5" />
+                    Créer le premier contrat
                   </Button>
                 )
               }

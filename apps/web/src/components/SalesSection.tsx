@@ -11,7 +11,7 @@ import {
 } from "@ste/shared";
 import { accountsApi, salesApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtFcfa, fmtNum } from "../lib/format";
+import { fmtFcfa, fmtNum, fmtM3 } from "../lib/format";
 import Button from "./ui/Button";
 import { SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
@@ -159,7 +159,7 @@ function SaleForm({
                   <>
                     m³{" "}
                     {dispo !== null && (
-                      <span className="text-brand-400">(dispo {fmtNum(dispo)})</span>
+                      <span className="text-brand-500">(dispo {fmtNum(dispo)})</span>
                     )}
                   </>
                 }
@@ -226,7 +226,7 @@ function SaleForm({
               <button
                 type="button"
                 onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
               >
                 Retirer
               </button>
@@ -357,7 +357,7 @@ export default function SalesSection({
                 {can("ventes.delete") && (
                   <button
                     onClick={() => setDelSale(s)}
-                    className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-400 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                    className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-500 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
                     aria-label="Supprimer la vente"
                   >
                     ×
@@ -366,7 +366,7 @@ export default function SalesSection({
               </div>
             </div>
             <div className="mt-1 text-sm text-brand-500">
-              {fmtNum(saleTotalM3(s).toFixed(3))} m³ ·{" "}
+              {fmtM3(saleTotalM3(s))} ·{" "}
               {s.lines.map((l) => `${l.sizeCode} ${Number(l.volumeM3).toFixed(2)}`).join(" · ")}
             </div>
           </div>

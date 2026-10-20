@@ -4,7 +4,7 @@
 export function SkeletonLine({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`h-3.5 animate-pulse rounded-md bg-brand-100${className ? ` ${className}` : ""}`}
+      className={`h-3.5 rounded-md bg-brand-100 motion-safe:animate-pulse${className ? ` ${className}` : ""}`}
     />
   );
 }

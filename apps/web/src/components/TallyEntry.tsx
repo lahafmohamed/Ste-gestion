@@ -10,7 +10,7 @@ import {
   type MeasurementCreateInput,
   type MeasurementContext,
 } from "@ste/shared";
-import { fmtNum, normalizeDecimal } from "../lib/format";
+import { fmtNum, normalizeDecimal, fmtM3 } from "../lib/format";
 import {
   clearTallyDraft,
   emptyRow,
@@ -22,9 +22,10 @@ import {
 import BillPicker from "./BillPicker";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
-import { FormError } from "./ui/Feedback";
+import { FormError, Notice } from "./ui/Feedback";
 import { inputQuietCls } from "./ui/Input";
 import { useOnline } from "../lib/online";
+import { IconCheck, IconPlus, IconX } from "./icons";
 
 export { clearTallyDraft } from "../lib/tallyDraft";
 
@@ -478,7 +479,7 @@ export default function TallyEntry({
           key={r.id}
           className={`mt-1 ${cols} border-b border-brand-100 pb-2 sm:border-b-0 sm:pb-0`}
         >
-          <span className="text-xs text-brand-400">{i + 1}</span>
+          <span className="text-xs text-brand-500">{i + 1}</span>
           <div className="min-w-0">
             <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
               {KIND[kind].idLabel}
@@ -533,17 +534,17 @@ export default function TallyEntry({
             />
           </div>
           <span className="col-span-3 col-start-2 text-right text-base tabular-nums text-brand-700 sm:col-auto">
-            <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
+            <span className="mr-1 text-xs text-brand-500 sm:hidden">m³</span>
             {volumes[i] !== null ? volumes[i]!.toFixed(3) : "—"}
           </span>
           <button
             type="button"
             onClick={() => removeRow(i)}
             tabIndex={-1}
-            className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
+            className="flex min-h-touch w-full items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
             aria-label={`Supprimer la ligne ${i + 1}`}
           >
-            ×
+            <IconX width={18} height={18} />
           </button>
         </div>
       ))}
@@ -553,14 +554,15 @@ export default function TallyEntry({
       <button
         type="button"
         onClick={() => addRow()}
-        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
+        className="mt-2 flex min-h-touch w-full items-center justify-center gap-2 rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 transition-colors hover:border-brand-500 hover:text-brand-900 active:bg-brand-100"
       >
-        + {isGirth ? "Billon" : "Bille"}
+        <IconPlus width={16} height={16} />
+        {isGirth ? "Billon" : "Bille"}
       </button>
 
       {/* Aide-mémoire clavier : bureau seulement (pas de pavé sur tablette).
           Raccourci oublié = raccourci inutilisé. */}
-      <p className="mt-2 hidden text-xs text-brand-400 sm:block" aria-hidden="true">
+      <p className="mt-2 hidden text-xs text-brand-500 sm:block" aria-hidden="true">
         <kbd>⏎</kbd> suivant · <kbd>+</kbd> {isGirth ? "billon suivant" : "nouvelle ligne"} ·{" "}
         <kbd>*</kbd> = ligne du dessus · <kbd>↑</kbd><kbd>↓</kbd> lignes ·{" "}
         <kbd>Ctrl+⏎</kbd> enregistrer · <kbd>Ctrl+Suppr</kbd> supprimer
@@ -596,9 +598,9 @@ export default function TallyEntry({
               type="button"
               onClick={() => setUndo(null)}
               aria-label="Masquer"
-              className="-my-2 min-h-touch rounded-lg px-2 text-base text-brand-400 hover:text-white active:bg-white/20"
+              className="-my-2 flex min-h-touch items-center rounded-lg px-2 text-brand-300 hover:text-white active:bg-white/20"
             >
-              ×
+              <IconX width={18} height={18} />
             </button>
           </div>
         </div>
@@ -647,7 +649,7 @@ export default function TallyEntry({
                   className="tabular-nums"
                 >
                   {billValidCount === declared.count
-                    ? "compte bon ✓"
+                    ? <>compte bon<IconCheck width={14} height={14} className="-mr-0.5 ml-1 shrink-0" aria-hidden /></>
                     : `écart ${billValidCount - declared.count > 0 ? "+" : ""}${billValidCount - declared.count}`}
                 </Badge>
               </div>
@@ -655,14 +657,14 @@ export default function TallyEntry({
             {declared.m3 != null && declared.m3 > 0 && (
               <div className="flex items-center justify-between">
                 <span className="text-brand-500">
-                  Volume : {fmtNum(total.toFixed(3))} / {fmtNum(declared.m3.toFixed(3))} m³ brousse
+                  Volume : {fmtNum(total.toFixed(3))} / {fmtM3(declared.m3)} brousse
                 </span>
                 <Badge
                   tone={Math.abs(total - declared.m3) / declared.m3 <= 0.05 ? "parc" : "amber"}
                   className="tabular-nums"
                 >
                   {total - declared.m3 >= 0 ? "+" : ""}
-                  {fmtNum((total - declared.m3).toFixed(3))} m³
+                  {fmtM3(total - declared.m3)}
                 </Badge>
               </div>
             )}
@@ -672,10 +674,10 @@ export default function TallyEntry({
 
       {/* N° en double — le total est faux et rien ne le signale après coup. */}
       {dupCount > 0 && (
-        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          ⚠ {dupCount} n° en double (surlignés) — même {KIND[kind].unit} comptée deux fois, ou
+        <Notice tone="warn" className="mt-2">
+          {dupCount} n° en double (surlignés) — même {KIND[kind].unit} comptée deux fois, ou
           faute de frappe.
-        </div>
+        </Notice>
       )}
 
       {/* Lignes commencées mais sans mesure exploitable — écartées à
@@ -683,12 +685,12 @@ export default function TallyEntry({
           valide : sur un relevé prérempli (packing list) toutes les lignes sont
           « incomplètes » à l'ouverture, ce n'est pas une anomalie. */}
       {incompleteCount > 0 && validCount > 0 && (
-        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          ⚠ {incompleteCount} ligne{incompleteCount > 1 ? "s" : ""} incomplète
+        <Notice tone="warn" className="mt-2">
+          {incompleteCount} ligne{incompleteCount > 1 ? "s" : ""} incomplète
           {incompleteCount > 1 ? "s" : ""} ({KIND[kind].aLabel} et {KIND[kind].bLabel} obligatoires)
           {incompleteCount > 1 ? " — elles ne seront pas" : " — elle ne sera pas"} enregistrée
           {incompleteCount > 1 ? "s" : ""}.
-        </div>
+        </Notice>
       )}
 
       {/* Enregistrement échoué (réseau du parc, contrat clôturé…) : la saisie

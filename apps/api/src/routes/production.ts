@@ -8,7 +8,7 @@ import {
   sizeSortIndex,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
-import { ensureContractOpen } from "../contract-lock.js";
+import { LOCK_MSG } from "../contract-lock.js";
 
 const runInclude = {
   lines: { orderBy: { position: "asc" as const } },
@@ -28,20 +28,28 @@ function serializeRun(r: RunWithRel) {
 }
 
 export async function productionRoutes(app: FastifyInstance) {
-  // Liste (filtre par contrat)
-  app.get<{ Querystring: { contractId?: string } }>("/production-runs", async (req) => {
-    const runs = await prisma.productionRun.findMany({
-      where: req.query.contractId ? { contractId: req.query.contractId } : undefined,
-      orderBy: { producedAt: "desc" },
-      include: runInclude,
-    });
-    return runs.map(serializeRun);
-  });
+  // Liste — tout le débitage par défaut, filtrable par contrat ou par camion.
+  app.get<{ Querystring: { contractId?: string; truckId?: string } }>(
+    "/production-runs",
+    async (req) => {
+      const { contractId, truckId } = req.query;
+      const runs = await prisma.productionRun.findMany({
+        where: {
+          ...(contractId ? { contractId } : {}),
+          ...(truckId ? { trucks: { some: { truckId } } } : {}),
+        },
+        orderBy: { producedAt: "desc" },
+        include: runInclude,
+      });
+      return runs.map(serializeRun);
+    }
+  );
 
-  // Agrégat débité par taille (bloc CONTRACTS CUTTING)
-  app.get<{ Params: { id: string } }>("/contracts/:id/cutting", async (req) => {
+  // Agrégat débité par taille (bloc CONTRACTS CUTTING). Sans contrat : tout le
+  // débité, tous contrats confondus — ce que montre la page Débitage.
+  async function cuttingAgg(contractId?: string) {
     const lines = await prisma.sawnLine.findMany({
-      where: { run: { contractId: req.params.id } },
+      where: { run: contractId ? { contractId } : {} },
       select: { sizeCode: true, sizeGroup: true, volumeM3: true, count: true },
     });
 
@@ -85,7 +93,15 @@ export async function productionRoutes(app: FastifyInstance) {
       totalM3: totalM3.toFixed(6),
       totalPieces,
     };
-  });
+  }
+
+  app.get<{ Querystring: { contractId?: string } }>("/cutting", async (req) =>
+    cuttingAgg(req.query.contractId)
+  );
+
+  app.get<{ Params: { id: string } }>("/contracts/:id/cutting", async (req) =>
+    cuttingAgg(req.params.id)
+  );
 
   // Détail
   app.get<{ Params: { id: string } }>("/production-runs/:id", async (req, reply) => {
@@ -104,17 +120,26 @@ export async function productionRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
     const d = parsed.data;
-    if (!(await ensureContractOpen(reply, d.contractId))) return;
 
-    // Vérifier que les camions liés appartiennent bien à ce contrat.
+    // Le contrat ne se choisit plus : le débité part au stock général. On le
+    // recopie depuis les camions sciés pour garder le rendement par contrat —
+    // null si la session mélange deux contrats (aucun ne peut la revendiquer).
     const truckIds = [...new Set(d.truckIds ?? [])];
+    let contractId: string | null = null;
     if (truckIds.length > 0) {
-      const ok = await prisma.truck.count({
-        where: { id: { in: truckIds }, contractId: d.contractId },
+      const trucks = await prisma.truck.findMany({
+        where: { id: { in: truckIds } },
+        select: { contractId: true, contract: { select: { status: true } } },
       });
-      if (ok !== truckIds.length) {
-        return reply.code(400).send({ error: "Camion invalide pour ce contrat" });
+      if (trucks.length !== truckIds.length) {
+        return reply.code(400).send({ error: "Camion introuvable" });
       }
+      // Contrat clôturé : ses camions ne se scient plus.
+      if (trucks.some((t) => t.contract.status !== "OPEN")) {
+        return reply.code(409).send({ error: LOCK_MSG });
+      }
+      const contracts = new Set(trucks.map((t) => t.contractId));
+      contractId = contracts.size === 1 ? trucks[0].contractId : null;
     }
 
     // Billes sciées : billons girth des camions sélectionnés uniquement.
@@ -160,7 +185,7 @@ export async function productionRoutes(app: FastifyInstance) {
 
     const r = await prisma.productionRun.create({
       data: {
-        contractId: d.contractId,
+        contractId,
         producedAt: d.producedAt,
         note: d.note,
         lines: { create: lines },

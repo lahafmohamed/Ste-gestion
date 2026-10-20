@@ -12,10 +12,11 @@ import { clearTallyDraft } from "../lib/tallyDraft";
 import TruckCard from "./TruckCard";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
-import { Kpi, SectionHeading } from "./ui/Card";
+import { Kpi, KpiStrip, SectionHeading } from "./ui/Card";
 import { EmptyState, QueryError } from "./ui/Feedback";
 import { SearchInput } from "./ui/Input";
 import { SkeletonList } from "./ui/Skeleton";
+import { IconArrowRight, IconCheck } from "./icons";
 
 // Étapes 2 et 3 · le travail du parc, sur tablette :
 //   Étalage — les billes sont étalées et mesurées une par une (longueur + Ø).
@@ -110,7 +111,9 @@ export default function EtalageSection({
   useEffect(() => {
     if (parcTruck) {
       setMeasError(null);
-      parcRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Mouvement réduit : saut direct, sans défilement animé.
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      parcRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     }
   }, [parcTruck, parcStep]);
 
@@ -148,10 +151,11 @@ export default function EtalageSection({
     <section id="etalage" className="mt-5 scroll-mt-[4.5rem]">
       {/* Chiffres du parc — « … » tant que la liste n'est pas là, jamais un
           zéro qui se lirait comme « rien de mesuré ». */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Kpi label="Billes étalées" value={trucks.data ? fmtInt(stats.bills) : "…"} />
-        <Kpi label="Volume étalé" value={trucks.data ? fmtM3(stats.m3.toFixed(3)) : "…"} />
+      <KpiStrip cols={3} className="mb-6">
+        <Kpi bare label="Billes étalées" value={trucks.data ? fmtInt(stats.bills) : "…"} />
+        <Kpi bare label="Volume étalé" value={trucks.data ? fmtM3(stats.m3.toFixed(3)) : "…"} />
         <Kpi
+          bare
           label="Écart vs brousse"
           value={
             !trucks.data ? (
@@ -163,12 +167,12 @@ export default function EtalageSection({
             ) : (
               <span className={gapOff ? "text-amber-700" : "text-parc-700"}>
                 {stats.gap >= 0 ? "+" : ""}
-                {fmtNum(stats.gap.toFixed(3))} m³
+                {fmtM3(stats.gap)}
               </span>
             )
           }
         />
-      </div>
+      </KpiStrip>
 
       {/* ── Étapes 2/3 · Étalage des billes puis billonnage ── */}
       {parcTruck && (
@@ -192,23 +196,23 @@ export default function EtalageSection({
           {/* Rappel de l'annoncé — l'objectif du pointage est de le vérifier. */}
           <div className="mb-3 flex flex-wrap gap-1.5 text-sm">
             {parcTruck.deliveryNote && (
-              <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
+              <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
                 B/L {parcTruck.deliveryNote}
               </span>
             )}
             {parcTruck.parcel && (
-              <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
+              <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
                 Parcelle {parcTruck.parcel}
               </span>
             )}
-            <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
+            <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
               Annoncé : {parcDeclared?.count ?? "?"} billes ·{" "}
-              {parcDeclared?.m3 != null ? `${fmtNum(parcDeclared.m3.toFixed(3))} m³` : "? m³"}
+              {parcDeclared?.m3 != null ? fmtM3(parcDeclared.m3) : "? m³"}
             </span>
             {/* Au billonnage, la référence n'est plus la brousse mais l'étalage :
                 l'écart girth − Ø, c'est la perte au nettoyage et au tronçonnage. */}
             {parcStep === "BILLONNAGE" && parcDia && (
-              <span className="rounded-full bg-white px-2 py-0.5 text-brand-600 ring-1 ring-brand-200">
+              <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
                 Étalé : {parcDia.logs.length} billes · {fmtM3(measurementTotalM3(parcDia))}
               </span>
             )}
@@ -231,8 +235,9 @@ export default function EtalageSection({
               const d = parcDeclared!;
               return (
                 <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-parc-200">
-                  <div className="font-medium text-parc-700">
-                    {isEtalage ? "Étalage enregistré ✓" : "Billonnage enregistré ✓"}
+                  <div className="flex items-center gap-1.5 font-medium text-parc-700">
+                    <IconCheck width={16} height={16} className="shrink-0" aria-hidden />
+                    {isEtalage ? "Étalage enregistré" : "Billonnage enregistré"}
                   </div>
                   <div className="mt-1 space-y-0.5 text-brand-600">
                     <div>
@@ -277,7 +282,7 @@ export default function EtalageSection({
                           d.m3 > 0 && (
                             <>
                               {" "}
-                              / {fmtNum(d.m3.toFixed(3))} m³ brousse{" "}
+                              / {fmtM3(d.m3)} brousse{" "}
                               <span
                                 className={
                                   Math.abs(total - d.m3) / d.m3 <= 0.05
@@ -286,7 +291,7 @@ export default function EtalageSection({
                                 }
                               >
                                 ({total - d.m3 >= 0 ? "+" : ""}
-                                {fmtNum((total - d.m3).toFixed(3))} m³)
+                                {fmtM3(total - d.m3)})
                               </span>
                             </>
                           )
@@ -298,7 +303,7 @@ export default function EtalageSection({
                             return (
                               <>
                                 {" "}
-                                / {fmtNum(dia.toFixed(3))} m³ étalés{" "}
+                                / {fmtM3(dia)} étalés{" "}
                                 <span
                                   className={
                                     lossPct <= 25 ? "text-parc-700" : "text-amber-700"
@@ -340,7 +345,8 @@ export default function EtalageSection({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {parcStep === "ETALAGE" && parcDia && !parcGirth && (
               <Button variant="parc" onClick={() => setParcStep("BILLONNAGE")}>
-                Billonner (266 → 266A, 266B…) →
+                Billonner ce camion
+                <IconArrowRight width={16} height={16} className="-mr-0.5" />
               </Button>
             )}
             <Button size="xs" onClick={() => setParcTruck(null)}>
@@ -428,9 +434,8 @@ export default function EtalageSection({
                                 setParcStep(stage === "A_BILLONNER" ? "BILLONNAGE" : "ETALAGE");
                               }}
                             >
-                              {stage === "A_BILLONNER"
-                                ? "Billonner (266 → 266A, 266B…) →"
-                                : "Étaler les billes →"}
+                              {stage === "A_BILLONNER" ? "Billonner" : "Étaler les billes"}
+                              <IconArrowRight width={16} height={16} className="-mr-0.5" />
                             </Button>
                           ) : undefined
                         }

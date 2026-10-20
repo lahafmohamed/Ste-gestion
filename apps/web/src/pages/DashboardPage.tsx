@@ -8,10 +8,11 @@ import { SHOW_MONEY } from "../lib/features";
 import { PageHeader } from "../components/Layout";
 import { QuotaBar } from "../components/QuotaGauge";
 import Badge from "../components/ui/Badge";
-import { Kpi, SectionHeading, cardInteractiveCls } from "../components/ui/Card";
+import { Kpi, KpiStrip, SectionHeading, cardInteractiveCls } from "../components/ui/Card";
 import { EmptyState, QueryError } from "../components/ui/Feedback";
 import { buttonCls } from "../components/ui/Button";
 import { SkeletonLine } from "../components/ui/Skeleton";
+import { IconArrowRight, IconPlus } from "../components/icons";
 
 /** Paire libellé / valeur des cartes contrat — la valeur porte, le libellé guide. */
 function Stat({ label, value }: { label: string; value: string }) {
@@ -32,7 +33,11 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
           <div className="truncate text-base font-semibold tracking-tight text-brand-900">
             {c.code}
           </div>
-          <div className="truncate text-sm text-brand-500">{meta || "—"}</div>
+          {/* Deux lignes au plus, texte complet au survol : tronqué net sur une
+              ligne, le centre de gestion n'était lisible nulle part. */}
+          <div className="mt-0.5 line-clamp-2 text-sm text-brand-600" title={meta || undefined}>
+            {meta || "—"}
+          </div>
         </div>
         <Badge tone={c.status === "OPEN" ? "parc" : "brand"}>
           {c.status === "OPEN" ? "Ouvert" : "Clôturé"}
@@ -59,12 +64,21 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-brand-100 pt-4">
             <Stat label="Sciés" value={`${fmtInt(o.trucksSawn)} camion${o.trucksSawn > 1 ? "s" : ""}`} />
-            <Stat label="Débité" value={`${fmtM3(o.debitedM3)} · ${fmtPct(Number(o.outputPct))}`} />
+            <Stat
+              label="Débité · rendement"
+              value={`${fmtM3(o.debitedM3)} · ${fmtPct(Number(o.outputPct))}`}
+            />
             <Stat label="Stock produits" value={fmtM3(o.stockProductsM3)} />
             {SHOW_MONEY ? (
               <Stat label="Solde" value={fmtFcfa(o.balance)} />
             ) : (
-              <Stat label="Statut" value={c.status === "OPEN" ? "En cours" : "Terminé"} />
+              // Le statut est déjà sur la pastille : ici, ce qui attend la scie.
+              <Stat
+                label="Sur parc"
+                value={`${fmtInt(o.trucksEntered - o.trucksSawn)} camion${
+                  o.trucksEntered - o.trucksSawn > 1 ? "s" : ""
+                }`}
+              />
             )}
             {SHOW_MONEY && <Stat label="Chiffre d'affaires" value={fmtFcfa(o.salesRevenueCfa)} />}
           </div>
@@ -82,7 +96,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
 
 function SkeletonKpi() {
   return (
-    <div className="rounded-xl bg-white px-4 py-3.5 shadow-card" aria-hidden>
+    <div className="bg-white px-4 py-3.5" aria-hidden>
       <SkeletonLine className="w-1/2" />
       <SkeletonLine className="mt-3 h-6 w-2/3" />
     </div>
@@ -172,19 +186,21 @@ export default function DashboardPage() {
           </QueryError>
         )}
 
-        {/* Synthèse des contrats ouverts : quatre chiffres, puis le détail. */}
+        {/* Synthèse des contrats ouverts : quatre chiffres sur une bande,
+            puis le détail. */}
         {!contracts.isError && (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiStrip>
             {ready ? (
               <>
                 <Kpi
+                  bare
                   label="Camions reçus"
                   value={fmtInt(totals.trucks)}
                   hint={`${totals.openCount} contrat${totals.openCount > 1 ? "s" : ""} ouvert${totals.openCount > 1 ? "s" : ""}`}
                 />
-                <Kpi label="Cubage brousse" value={fmtM3(totals.brousse)} hint="décompté du quota" />
-                <Kpi label="Débité" value={fmtM3(totals.debited)} hint="sortie scierie" tone="accent" />
-                <Kpi label="Stock produits" value={fmtM3(totals.stock)} hint="disponible" tone="parc" />
+                <Kpi bare label="Cubage brousse" value={fmtM3(totals.brousse)} hint="décompté du quota" />
+                <Kpi bare label="Débité" value={fmtM3(totals.debited)} hint="sortie scierie" tone="accent" />
+                <Kpi bare label="Stock produits" value={fmtM3(totals.stock)} hint="disponible" tone="parc" />
               </>
             ) : (
               <>
@@ -194,17 +210,18 @@ export default function DashboardPage() {
                 <SkeletonKpi />
               </>
             )}
-          </div>
+          </KpiStrip>
         )}
 
         <SectionHeading
-          className="mt-8"
+          className="mt-10"
           right={
             <Link
               to="/contracts"
-              className="min-h-touch inline-flex items-center rounded-lg px-2 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-50 hover:text-accent-800"
+              className="group -mr-2 inline-flex min-h-touch items-center gap-1 rounded-lg px-2 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-50 hover:text-accent-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
             >
               Tous les contrats
+              <IconArrowRight width={16} height={16} className="transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none" />
             </Link>
           }
         >
@@ -215,7 +232,8 @@ export default function DashboardPage() {
           <EmptyState
             action={
               <Link to="/contracts?nouveau=1" className={buttonCls("primary", "md")}>
-                + Créer un contrat
+                <IconPlus width={16} height={16} className="-ml-0.5" />
+                Créer un contrat
               </Link>
             }
           >

@@ -1,11 +1,14 @@
 import type { FastifyReply } from "fastify";
 import { prisma } from "./prisma.js";
 
-// Contrat clôturé = plus aucune opération métier (camions, étalages, sciage,
-// ventes, conteneurs, compta). Lecture toujours libre. Repasser le contrat en
+// Contrat clôturé = plus aucune opération métier sur SES données (camions,
+// étalages, ventes, compta) ni sur ses camions (sciage). L'empotage et le
+// resciage ne sont plus concernés : ils travaillent sur le stock général, qui
+// n'appartient à aucun contrat. Lecture toujours libre. Repasser le contrat en
 // OPEN pour corriger, puis re-clôturer.
 
-const LOCK_MSG = "Contrat clôturé — opérations verrouillées (repasser le contrat en Ouvert pour modifier)";
+export const LOCK_MSG =
+  "Contrat clôturé — opérations verrouillées (repasser le contrat en Ouvert pour modifier)";
 
 /** 409 si le contrat n'est pas OPEN. Retourne true si l'opération peut continuer. */
 export async function ensureContractOpen(

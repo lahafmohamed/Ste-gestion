@@ -24,7 +24,7 @@ export default function Chip({
     <button
       type={type}
       aria-pressed={selected}
-      className={`inline-flex items-center justify-center rounded-full font-medium ring-1 transition-[background-color,box-shadow,transform,color] duration-150 ease-out active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${SIZE[size]} ${
+      className={`inline-flex items-center justify-center rounded-full font-medium ring-1 transition-[background-color,box-shadow,transform,color] duration-150 ease-out motion-safe:active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${SIZE[size]} ${
         selected
           ? "bg-brand-900 text-white ring-brand-900 active:bg-brand-700"
           : "bg-white text-brand-600 ring-brand-200 hover:ring-brand-400 hover:text-brand-900 active:bg-brand-100"

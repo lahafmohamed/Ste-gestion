@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   classifySize,
+  runSawnGirthM3,
   sawnLongShortM3,
   sawnThicknessBands,
   sawnVolumeM3,
@@ -10,13 +11,14 @@ import {
   type SizeGroup,
   type TruckDTO,
 } from "@ste/shared";
-import { fmtNum, fmtPct, normalizeDecimal, todayISO } from "../lib/format";
-import SawnTruckPicker, { truckBillons, truckGirthM3 } from "./SawnTruckPicker";
+import { fmtNum, fmtPct, normalizeDecimal, todayISO, fmtM3 } from "../lib/format";
+import SawnTruckPicker from "./SawnTruckPicker";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
 import DateField from "./ui/DateField";
 import Input, { Field, inputQuietCls } from "./ui/Input";
 import { useOnline } from "../lib/online";
+import { IconX, IconPlus } from "./icons";
 
 // Une ligne = une dimension, avec sa quantité. Le scieur qui mesure planche
 // par planche laisse Nbr à 1 et enchaîne comme avant ; celui qui sort douze
@@ -45,7 +47,7 @@ function rowInfo(r: RowState) {
 }
 
 type Props = {
-  onSave: (data: Omit<ProductionRunCreateInput, "contractId">) => void;
+  onSave: (data: ProductionRunCreateInput) => void;
   saving: boolean;
   trucks?: TruckDTO[]; // camions du contrat (pour lier les camions sciés)
   runs?: ProductionRunDTO[]; // sessions existantes → billons déjà sciés
@@ -91,21 +93,11 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
     .filter((x): x is { lengthFt: string; thicknessIn: string; volumeM3: number } => x !== null);
   const { longM3, shortM3 } = sawnLongShortM3(splitLines);
   const bands = sawnThicknessBands(splitLines);
-  // Dénominateur du rendement : billons sélectionnés si précisés, sinon tous
-  // les billons des camions cochés.
+  // Dénominateur du rendement, camion par camion : ses billons cochés, ou tout
+  // le camion quand aucun ne l'est (« aucun coché = camion entier »). Avant, un
+  // seul billon coché sur un camion faisait oublier les autres camions entiers.
   const selectedTrucks = (trucks ?? []).filter((t) => truckIds.includes(t.id));
-  const selectedBillonsM3 = selectedTrucks.reduce(
-    (s, t) =>
-      s +
-      truckBillons(t)
-        .filter((l) => logIds.includes(l.id))
-        .reduce((x, l) => x + Number(l.volumeM3), 0),
-    0
-  );
-  const girthSel =
-    logIds.length > 0
-      ? selectedBillonsM3
-      : selectedTrucks.reduce((s, t) => s + truckGirthM3(t), 0);
+  const girthSel = runSawnGirthM3(selectedTrucks, logIds);
   const rendement = girthSel > 0 ? (total / girthSel) * 100 : null;
 
   function setRow(i: number, patch: Partial<RowState>) {
@@ -184,7 +176,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
             key={i}
             className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
           >
-            <span className="text-xs text-brand-400">{i + 1}</span>
+            <span className="text-xs text-brand-500">{i + 1}</span>
             {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
               <div
                 key={k}
@@ -221,16 +213,16 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
               )}
             </div>
             <span className="text-right text-base tabular-nums text-brand-700">
-              <span className="mr-1 text-xs text-brand-400 sm:hidden">m³</span>
+              <span className="mr-1 text-xs text-brand-500 sm:hidden">m³</span>
               {info ? info.volume.toFixed(3) : "—"}
             </span>
             <button
               type="button"
               onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-              className="flex min-h-touch w-full items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500"
+              className="flex min-h-touch w-full items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
               aria-label="Supprimer la ligne"
             >
-              ×
+              <IconX width={18} height={18} />
             </button>
           </div>
         );
@@ -243,7 +235,8 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
         onClick={() => setRows((p) => [...p, emptyRow()])}
         className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
       >
-        + Ligne
+        <IconPlus width={16} height={16} className="-ml-0.5" />
+        Ligne
       </button>
 
       {total > 0 && (
@@ -280,7 +273,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
               .filter((g) => groups[g] > 0)
               .map((g) => (
                 <Badge key={g} tone={SIZE_GROUP_TONE[g]}>
-                  {SIZE_GROUP_LABELS[g]} {fmtNum(groups[g].toFixed(3))} m³
+                  {SIZE_GROUP_LABELS[g]} {fmtM3(groups[g])}
                 </Badge>
               ))}
           </div>
@@ -301,7 +294,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
             <div className="rounded-lg bg-parc-50 px-3 py-1.5 text-sm text-parc-800">
               Rendement live : <strong>{fmtPct(rendement)}</strong>{" "}
               <span className="text-xs text-parc-700">
-                ({fmtNum(total.toFixed(3))} débité ÷ {fmtNum(girthSel.toFixed(3))} m³ de billons{" "}
+                ({fmtNum(total.toFixed(3))} débité ÷ {fmtM3(girthSel)} de billons{" "}
                 {logIds.length > 0
                   ? `(${logIds.length} billon${logIds.length > 1 ? "s" : ""} sélectionné${logIds.length > 1 ? "s" : ""})`
                   : "(camions entiers)"})

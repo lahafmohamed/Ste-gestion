@@ -9,6 +9,18 @@ export const GIRTH_SPLIT_CM = 85;
 /** Seuil LONG/SHORT des avivés (pieds). */
 export const LONG_SPLIT_FT = 6.5;
 
+/**
+ * Seuils d'alerte du Daily Truck Log — repris de la mise en forme
+ * conditionnelle du classeur Excel (cellule rouge). Ils ne bloquent rien et
+ * n'entrent dans aucun calcul : ils signalent la ligne à regarder.
+ */
+export const TRUCK_ALERT = {
+  /** Rendement (débité ÷ billons) sous ce %, camion à vérifier. */
+  outputPct: 58,
+  /** Cubage billons (girth) d'un camion sous ce m³, chargement faible. */
+  girthM3: 25,
+} as const;
+
 /** Bandes d'épaisseur du rapport d'activité (pouces). */
 export const THICKNESS_BANDS = [
   { key: "gte3", label: 'Ép 3" +', test: (t: number) => t >= 3 },

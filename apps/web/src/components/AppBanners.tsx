@@ -46,7 +46,7 @@ export function OfflineBanner() {
   if (!online) {
     return (
       <Banner tone="warn">
-        <span aria-hidden>●</span>
+        <span aria-hidden className="size-2 shrink-0 rounded-full bg-amber-500" />
         Hors ligne — la saisie continue, l'envoi partira au retour du réseau.
       </Banner>
     );

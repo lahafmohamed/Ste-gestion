@@ -93,7 +93,7 @@ export default function UserPermissions({ user }: { user: UserDTO }) {
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
         {PERMISSION_MODULES.map((mod) => (
           <fieldset key={mod.key} className="min-w-0">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-brand-500">
+            <legend className="text-sm font-semibold text-brand-800">
               {mod.label}
             </legend>
             <div className="mt-1 space-y-0.5">

@@ -7,6 +7,7 @@ import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import { inputQuietCls } from "./ui/Input";
 import { TableWrap } from "./ui/Table";
+import { IconPencil, IconPlus, IconX } from "./icons";
 
 // Regroupe les billons d'un relevé girth par bille mère (traçabilité bille→billon).
 function groupByBill(m: MeasurementDTO) {
@@ -108,7 +109,7 @@ export default function MeasurementTable({
           edit?.id === l.id ? (
             <div key={l.id} className="mt-1 rounded-lg bg-brand-50 p-2">
               <div className="grid grid-cols-[1.6rem_1.2fr_1fr_1fr] items-end gap-1">
-                <span className="pb-3 text-xs text-brand-400">{l.position}</span>
+                <span className="pb-3 text-xs text-brand-500">{l.position}</span>
                 <label className="min-w-0">
                   <span className="mb-0.5 block text-xs text-brand-500">N° log</span>
                   <input
@@ -143,7 +144,7 @@ export default function MeasurementTable({
                 <button
                   type="button"
                   onClick={() => setEdit(null)}
-                  className="min-h-touch rounded-lg px-3 text-sm text-brand-400 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
+                  className="min-h-touch rounded-lg px-3 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
                 >
                   Annuler
                 </button>
@@ -160,7 +161,7 @@ export default function MeasurementTable({
           ) : (
             <div key={l.id} className="border-b border-brand-100 py-1.5">
               <div className="flex items-baseline gap-2">
-                <span className="w-6 shrink-0 text-xs text-brand-400">{l.position}</span>
+                <span className="w-6 shrink-0 text-xs text-brand-500">{l.position}</span>
                 <span className="min-w-0 flex-1 truncate">{l.externalId ?? "—"}</span>
                 <span className="tabular-nums text-brand-600">
                   {fmtNum(isDia ? (l.lengthFt ?? 0) : (l.lengthM ?? 0))}
@@ -170,7 +171,7 @@ export default function MeasurementTable({
               </div>
               <div className="flex items-center justify-between pl-8">
                 <span className="tabular-nums text-brand-700">
-                  <span className="mr-1 text-xs text-brand-400">m³</span>
+                  <span className="mr-1 text-xs text-brand-500">m³</span>
                   {fmtNum(l.volumeM3)}
                 </span>
                 <div className="flex items-center">
@@ -179,9 +180,9 @@ export default function MeasurementTable({
                     type="button"
                     onClick={() => startEdit(l)}
                     aria-label={`Corriger la ligne ${l.position}`}
-                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-300 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
+                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
                   >
-                    ✎
+                    <IconPencil width={18} height={18} />
                   </button>
                   )}
                   {canDelete && (
@@ -189,9 +190,9 @@ export default function MeasurementTable({
                     type="button"
                     onClick={() => onDeleteLog(l)}
                     aria-label={`Supprimer la ligne ${l.position}`}
-                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
                   >
-                    ×
+                    <IconX width={18} height={18} />
                   </button>
                   )}
                 </div>
@@ -232,7 +233,7 @@ export default function MeasurementTable({
             edit?.id === l.id ? (
               // Correction : n° + mesures éditables, volume recalculé côté serveur.
               <tr key={l.id} className="border-t border-brand-100 bg-brand-50">
-                <td className="py-1.5 text-brand-400">{l.position}</td>
+                <td className="py-1.5 text-brand-500">{l.position}</td>
                 <td className="py-1.5 pr-1">
                   <input
                     value={edit.externalId}
@@ -274,7 +275,7 @@ export default function MeasurementTable({
                       type="button"
                       onClick={() => setEdit(null)}
                       aria-label="Annuler la correction"
-                      className="min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
+                      className="min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
                     >
                       Annuler
                     </button>
@@ -283,7 +284,7 @@ export default function MeasurementTable({
               </tr>
             ) : (
               <tr key={l.id} className="border-t border-brand-100">
-                <td className="py-1 text-brand-400">{l.position}</td>
+                <td className="py-1 text-brand-500">{l.position}</td>
                 <td className="py-1">{l.externalId ?? "—"}</td>
                 <td className="py-1 tabular-nums">
                   {fmtNum(isDia ? (l.lengthFt ?? 0) : (l.lengthM ?? 0))}
@@ -303,9 +304,9 @@ export default function MeasurementTable({
                       type="button"
                       onClick={() => startEdit(l)}
                       aria-label={`Corriger la ligne ${l.position}`}
-                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-300 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
+                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
                     >
-                      ✎
+                      <IconPencil width={18} height={18} />
                     </button>
                     )}
                     {canDelete && (
@@ -313,9 +314,9 @@ export default function MeasurementTable({
                       type="button"
                       onClick={() => onDeleteLog(l)}
                       aria-label={`Supprimer la ligne ${l.position}`}
-                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
                     >
-                      ×
+                      <IconX width={18} height={18} />
                     </button>
                     )}
                   </div>
@@ -374,13 +375,14 @@ export default function MeasurementTable({
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {onAppend && !adding && (
           <Button variant="primary" onClick={() => setAdding(true)}>
-            + Continuer l'étalage
+            <IconPlus width={16} height={16} className="-ml-0.5" />
+            Continuer l'étalage
           </Button>
         )}
         {canDelete && (
           <button
             onClick={onDelete}
-            className="min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+            className="min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
           >
             Supprimer cet étalage
           </button>
@@ -413,7 +415,7 @@ export default function MeasurementTable({
           <button
             type="button"
             onClick={() => setAdding(false)}
-            className="mt-2 min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
+            className="mt-2 min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
           >
             Annuler
           </button>

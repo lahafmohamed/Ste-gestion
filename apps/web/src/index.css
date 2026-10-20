@@ -25,6 +25,18 @@
     font-feature-settings: "cv11", "ss01";
   }
 
+  /* Sélection et texte d'exemple dans la gamme chaude : le gris froid par
+     défaut de Tailwind (gray-400) détonnait sur le papier stone. */
+  ::selection {
+    background-color: theme(colors.accent.200);
+    color: theme(colors.brand.950);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: theme(colors.brand.400);
+    opacity: 1;
+  }
+
   /* Titres équilibrés (pas de dernier mot orphelin), paragraphes sans veuve. */
   h1,
   h2,

@@ -10,6 +10,7 @@ import { FormError, QueryError } from "../components/ui/Feedback";
 import Input, { Field } from "../components/ui/Input";
 import SelectField from "../components/ui/SelectField";
 import { SkeletonList } from "../components/ui/Skeleton";
+import { IconPlus } from "../components/icons";
 
 const ROLES = UserRole.options;
 
@@ -46,13 +47,13 @@ export default function UsersSection() {
   });
 
   return (
-    <div className="mx-auto max-w-page">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-sm text-brand-500">
+    <div className="max-w-page">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-brand-600">
           Le rôle donne les permissions de base ; « Permissions » ajuste compte par compte.
         </p>
         <Button variant="primary" size="sm" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? "Fermer" : "Nouveau"}
+          {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Compte</>}
         </Button>
       </div>
 
@@ -156,12 +157,12 @@ function UserCard({
 }) {
   const overrides = (u.permissionsGranted?.length ?? 0) + (u.permissionsRevoked?.length ?? 0);
   return (
-    <div className={`rounded-xl bg-white shadow-card ${u.active ? "" : "opacity-60"}`}>
+    <div className="rounded-xl bg-white shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3 p-3">
         <div className="min-w-0">
-          <div className="font-medium text-brand-900">
+          <div className={`font-medium ${u.active ? "text-brand-900" : "text-brand-500"}`}>
             {u.name}
-            {isMe && <span className="ml-2 text-xs text-brand-400">(moi)</span>}
+            {isMe && <span className="ml-2 text-xs text-brand-500">(moi)</span>}
             {!u.active && (
               <Badge tone="brand" className="ml-2">
                 désactivé

@@ -55,7 +55,9 @@ async function main() {
   check("brousseM3 (→ quota)", s.brousseM3, 33.171, 0.01);
   check("quotaUsedPct (brousse/1000)", s.quotaUsedPct, 3.3171, 0.01);
   check("debitedM3", s.debitedM3, 15.9257, 0.01);
-  check("outputPct (rendement/billons)", s.outputPct, 55.17, 0.1);
+  // Camion scié en entier : billons sciés = tout le girth, rendement inchangé.
+  check("sawnGirthM3 (billons sciés)", s.sawnGirthM3, 28.865, 0.01);
+  check("outputPct (rendement/billons sciés)", s.outputPct, 55.17, 0.1);
   check("billonCount (girth)", s.billonCount, 275);
   check("billeCount (étalage Ø)", s.billeCount, 60);
 

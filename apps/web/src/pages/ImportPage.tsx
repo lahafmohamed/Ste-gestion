@@ -18,6 +18,7 @@ import Badge, { type BadgeTone } from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import { FormError } from "../components/ui/Feedback";
 import { TableWrap, Td, Th } from "../components/ui/Table";
+import { IconChevronDown } from "../components/icons";
 
 // Import des classeurs Excel du terrain : le réseau manque en brousse, les
 // relevés finissent dans DIAMETRE / GIRTH / DEBITES / EMPOTAGES. Ici on dépose
@@ -204,10 +205,10 @@ function ImportFlow({ contract }: { contract: ContractDTO }) {
             <FormError>{fileError}</FormError>
           </div>
         )}
-        <p className="mt-4 text-xs text-brand-400">
+        <p className="mt-4 text-xs text-brand-500">
           Classeurs vides : <FileLinks files={TEMPLATES} />
         </p>
-        <p className="mt-1 text-xs text-brand-400">
+        <p className="mt-1 text-xs text-brand-500">
           Exemples remplis : <FileLinks files={EXAMPLES} />
         </p>
       </div>
@@ -304,7 +305,11 @@ function HistoryRow({ batch, contractId }: { batch: ImportBatchDTO; contractId: 
               {batch.createdTrucks > 1 ? "s" : ""}
             </Badge>
           )}
-          <span className="text-brand-400">{open ? "▾" : "▸"}</span>
+          <IconChevronDown
+            width={18}
+            height={18}
+            className={`shrink-0 text-brand-500 transition-transform duration-150 ease-out motion-reduce:transition-none ${open ? "" : "-rotate-90"}`}
+          />
         </span>
       </button>
       {open && (
@@ -496,7 +501,7 @@ function SheetCard({
                 <span className="text-brand-500">Volume app</span>{" "}
                 <strong className="tabular-nums">{fmtNum(sheet.totalM3)} m³</strong>
                 {m.excelTotalM3 && (
-                  <span className="text-brand-400"> · classeur {fmtNum(m.excelTotalM3)} m³</span>
+                  <span className="text-brand-500"> · classeur {fmtNum(m.excelTotalM3)} m³</span>
                 )}
               </span>
             </div>
@@ -550,7 +555,7 @@ function SheetCard({
                     {!isLog && <Td num>{l.c ? fmtNum(l.c) : ""}</Td>}
                     {!isLog && <Td num>{l.count ?? ""}</Td>}
                     <Td num>{Number(l.volumeM3).toFixed(3)}</Td>
-                    <Td num className="text-brand-400">
+                    <Td num className="text-brand-500">
                       {l.excelM3 ? Number(l.excelM3).toFixed(3) : ""}
                     </Td>
                   </tr>

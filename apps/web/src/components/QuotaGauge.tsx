@@ -23,8 +23,11 @@ export function QuotaBar({ brousseM3, quotaM3 }: { brousseM3: string; quotaM3: s
         </span>
         <span className="font-medium text-brand-700">{fmtPct(pct, 0)}</span>
       </div>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-brand-100">
-        <div className={`h-full ${pctColor(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-brand-100">
+        <div
+          className={`h-full rounded-full ${pctColor(pct)}`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
       </div>
     </div>
   );
@@ -61,21 +64,22 @@ export function QuotaGauge({
     <div className="rounded-xl bg-white shadow-card p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-brand-400">
-            Utilisation du quota
-          </div>
-          <div className="mt-1 text-2xl font-semibold text-brand-900">
+          <div className="text-sm font-medium text-brand-600">Utilisation du quota</div>
+          <div className="mt-1 text-2xl font-semibold tracking-tight text-brand-900">
             {fmtM3(brousseM3)}{" "}
-            <span className="text-base font-normal text-brand-400">/ {fmtM3(quotaM3)}</span>
+            <span className="text-base font-normal text-brand-500">/ {fmtM3(quotaM3)}</span>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-semibold text-brand-900">{fmtPct(pct, 1)}</div>
+          <div className="text-2xl font-semibold tracking-tight text-brand-900">{fmtPct(pct, 1)}</div>
           <div className="text-xs text-brand-500">reste {fmtM3(remaining)}</div>
         </div>
       </div>
       <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-brand-100">
-        <div className={`h-full ${pctColor(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+        <div
+          className={`h-full rounded-full ${pctColor(pct)}`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
       </div>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-brand-500">
         <span>
@@ -85,8 +89,8 @@ export function QuotaGauge({
           Cubage billons (rendement) : <strong className="text-brand-900">{fmtM3(girthM3)}</strong>
         </span>
         <span>
-          Camions : <strong className="text-brand-900">{trucksEntered}</strong>
-          {trucksPlanned > 0 ? ` / ${trucksPlanned} prévus` : ""} entrés · {trucksSawn} sciés
+          Camions : <strong className="text-brand-900">{trucksEntered}</strong> entrés
+          {trucksPlanned > 0 ? ` sur ${trucksPlanned} prévus` : ""} · {trucksSawn} sciés
         </span>
       </div>
 

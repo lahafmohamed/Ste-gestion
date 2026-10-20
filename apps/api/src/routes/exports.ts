@@ -9,6 +9,7 @@ import {
   SIZE_GROUP_LABELS,
   billCount,
   sizeSortIndex,
+  truckSawnProgress,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
 
@@ -381,7 +382,7 @@ export async function exportRoutes(app: FastifyInstance) {
     put(ws, "K9", n3(total), true);
     put(ws, "I10", "REND PARC");
     put(ws, "K10", parc > 0 ? Math.round((total / parc) * 1000) / 1000 : "");
-    put(ws, "I12", r.contract.code);
+    put(ws, "I12", r.contract?.code ?? "");
     if (r.note) put(ws, "I13", r.note);
     writeCuttingResume(ws, r.lines, "I", 15);
     widths(ws, [6, 16, 15, 17, 13, 13, 7, 4, 18, 4, 12]);
@@ -419,7 +420,7 @@ export async function exportRoutes(app: FastifyInstance) {
     put(ws, "M9", n3(total), true);
     put(ws, "K11", "Nbre elm");
     put(ws, "M11", pieces);
-    put(ws, "K13", c.contract.code);
+    put(ws, "K13", c.contract?.code ?? "");
     put(ws, "K15", "POIDS");
     put(ws, "M15", n3(total * 0.65));
     if (c.trucks.length) {
@@ -450,7 +451,11 @@ export async function exportRoutes(app: FastifyInstance) {
       }),
       prisma.productionRun.findMany({
         where: { contractId },
-        include: { lines: { select: { volumeM3: true } }, trucks: true },
+        include: {
+          lines: { select: { volumeM3: true } },
+          trucks: true,
+          logs: { select: { logId: true } },
+        },
       }),
       prisma.sawnLine.findMany({
         where: { run: { contractId } },
@@ -482,6 +487,16 @@ export async function exportRoutes(app: FastifyInstance) {
       0
     );
     const debited = sawnLines.reduce((s, l) => s + Number(l.volumeM3), 0);
+    // Rendement (F6) sur les billons passés à la scie : ceux qui attendent au
+    // parc ne le font pas baisser (même règle que la fiche contrat).
+    const runLinks = runs.map((r) => ({
+      truckIds: r.trucks.map((x) => x.truckId),
+      logIds: r.logs.map((x) => x.logId),
+    }));
+    const sawnGirth = trucks.reduce(
+      (s, t) => s + truckSawnProgress(t, runLinks).sawnGirthM3,
+      0
+    );
     const sold = saleLines.reduce((s, l) => s + Number(l.volumeM3), 0);
     const revenue = saleLines.reduce((s, l) => s + Number(l.amountCfa), 0);
     let due = 0;
@@ -498,8 +513,9 @@ export async function exportRoutes(app: FastifyInstance) {
       ["Camions sciés", [...sawnSet].length],
       ["Sur parc non sciés", trucks.length - [...sawnSet].length],
       ["Cubage girth m³", girth],
+      ["Billons sciés m³", sawnGirth],
       ["Débité m³", debited],
-      ["Rendement %", girth > 0 ? (debited / girth) * 100 : 0],
+      ["Rendement %", sawnGirth > 0 ? (debited / sawnGirth) * 100 : 0],
       ["Vendu m³", sold],
       ["CA ventes FCFA", revenue],
       ["Full cost (Σ dûs) FCFA", due],

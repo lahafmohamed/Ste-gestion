@@ -11,7 +11,7 @@ import {
 } from "@ste/shared";
 import { containersApi, contractsApi, downloadFile, trucksApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtM3, fmtNum } from "../lib/format";
+import { fmtDec3, fmtM3, fmtNum } from "../lib/format";
 import { printContainerPackingList } from "../lib/printPacking";
 import EmpotagePicker from "./EmpotagePicker";
 import Badge, { type BadgeTone } from "./ui/Badge";
@@ -21,6 +21,7 @@ import ConfirmDialog from "./ui/ConfirmDialog";
 import Chip from "./ui/Chip";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 import Input, { Field } from "./ui/Input";
+import { IconChevronDown, IconPlus, IconX } from "./icons";
 
 // Puces de sélection multi-camions (origine des débités empotés).
 function TruckChips({
@@ -53,15 +54,7 @@ const STATUS_TONE: Record<ContainerStatus, BadgeTone> = {
 
 const STATUSES: ContainerStatus[] = ["PLANNED", "LOADING", "LOADED", "SHIPPED"];
 
-function CreateForm({
-  contractId,
-  trucks,
-  onDone,
-}: {
-  contractId: string;
-  trucks: TruckDTO[];
-  onDone: () => void;
-}) {
+function CreateForm({ trucks, onDone }: { trucks: TruckDTO[]; onDone: () => void }) {
   const qc = useQueryClient();
   const [v, setV] = useState({
     containerNo: "",
@@ -77,7 +70,7 @@ function CreateForm({
   const create = useMutation({
     mutationFn: containersApi.create,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["containers", contractId] });
+      qc.invalidateQueries({ queryKey: ["containers"] });
       onDone();
     },
     onError: (e: Error) => setError(e.message),
@@ -88,7 +81,6 @@ function CreateForm({
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate({
-          contractId,
           containerNo: v.containerNo.trim(),
           sealNo: v.sealNo.trim() || undefined,
           fauxSealNo: v.fauxSealNo.trim() || undefined,
@@ -151,12 +143,10 @@ function CreateForm({
 
 function ContainerCard({
   c,
-  contractId,
   trucks,
   contractCode,
 }: {
   c: ContainerDTO;
-  contractId: string;
   trucks: TruckDTO[];
   contractCode?: string;
 }) {
@@ -170,9 +160,11 @@ function ContainerCard({
   const [delOpen, setDelOpen] = useState(false);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ["containers", contractId] });
-    // Le panier lit le stock restant : il doit refléter ce qui vient d'être empoté.
-    qc.invalidateQueries({ queryKey: ["sawn-inventory", contractId] });
+    qc.invalidateQueries({ queryKey: ["containers"] });
+    // Le panier lit le stock général restant : il doit refléter ce qui vient
+    // d'être empoté, sur toutes les vues.
+    qc.invalidateQueries({ queryKey: ["stock"] });
+    qc.invalidateQueries({ queryKey: ["summary"] });
   }
 
   const linkedRegs = trucks.filter((t) => c.truckIds.includes(t.id)).map((t) => t.registration);
@@ -205,13 +197,26 @@ function ContainerCard({
 
   return (
     <div className="rounded-xl bg-white shadow-card">
+      {/* En-tête dépliable : le chevron dit qu'il y a un détail dessous (sans
+          lui, rien ne distinguait la carte d'une simple ligne). */}
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-touch w-full items-center justify-between gap-2 p-3 text-left hover:bg-brand-50 active:bg-brand-100"
+        aria-expanded={open}
+        className={`flex min-h-touch w-full items-center justify-between gap-2 p-3 text-left transition-colors hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100 ${
+          open ? "rounded-t-xl" : "rounded-xl"
+        }`}
       >
-        <div>
-          <div className="font-medium text-brand-900">{c.containerNo}</div>
-          <div className="text-sm text-brand-500">
+        {/* Statut à côté du n° : la colonne de droite ne garde que les chiffres,
+            le n° de conteneur ne se coupe plus sur téléphone. */}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="whitespace-nowrap font-semibold text-brand-900">{c.containerNo}</span>
+            <Badge tone={STATUS_TONE[c.status]} className="whitespace-nowrap">
+              {CONTAINER_STATUS_LABELS[c.status]}
+            </Badge>
+          </div>
+          <div className="mt-0.5 text-sm text-brand-600">
             {[
               c.grade,
               c.destination,
@@ -222,20 +227,29 @@ function ContainerCard({
               .join(" · ") || "—"}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-right">
+        <div className="flex shrink-0 items-center gap-2 text-right">
           <div>
-            <div className="text-sm font-semibold text-brand-900">
+            <div className="whitespace-nowrap text-sm font-semibold text-brand-900">
               {fmtM3(containerTotalM3(c))}
             </div>
             {/* Contenu visible sans déplier : pièces + sections l×ép. */}
             {c.items.length > 0 && (
-              <div className="text-xs text-brand-500">
-                {fmtNum(containerPieceCount(c))} pièces · {sections.length} section
-                {sections.length > 1 ? "s" : ""}
+              <div className="whitespace-nowrap text-xs text-brand-500">
+                {fmtNum(containerPieceCount(c))} pièces
+                <span className="hidden sm:inline">
+                  {" "}
+                  · {sections.length} section{sections.length > 1 ? "s" : ""}
+                </span>
               </div>
             )}
           </div>
-          <Badge tone={STATUS_TONE[c.status]}>{CONTAINER_STATUS_LABELS[c.status]}</Badge>
+          <IconChevronDown
+            width={18}
+            height={18}
+            className={`shrink-0 text-brand-500 transition-transform duration-150 ease-out motion-reduce:transition-none ${
+              open ? "rotate-180" : ""
+            }`}
+          />
         </div>
       </button>
 
@@ -282,7 +296,7 @@ function ContainerCard({
             {can("empotage.delete") && (
               <button
                 onClick={() => setDelOpen(true)}
-                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-400 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
               >
                 Supprimer conteneur
               </button>
@@ -320,7 +334,7 @@ function ContainerCard({
                 />
                 <button
                   onClick={() => setEditTrucks(false)}
-                  className="min-h-touch self-start rounded-lg px-2 text-brand-400 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
+                  className="min-h-touch self-start rounded-lg px-2 text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
                 >
                   Fermer
                 </button>
@@ -330,7 +344,7 @@ function ContainerCard({
                 {linkedRegs.length ? (
                   linkedRegs.map((r) => <Badge key={r}>{r}</Badge>)
                 ) : (
-                  <span className="text-brand-400">aucun</span>
+                  <span className="text-brand-500">aucun</span>
                 )}
                 {trucks.length > 0 && canEdit && (
                   <button
@@ -378,19 +392,19 @@ function ContainerCard({
                     </tr>
                     {sec.items.map((it) => (
                       <tr key={it.id} className="border-t border-brand-100">
-                        <td className="py-1 text-brand-400">{it.position}</td>
+                        <td className="py-1 text-brand-500">{it.position}</td>
                         <td className="py-1 tabular-nums">{fmtNum(it.lengthFt)}</td>
                         <td className="py-1">{it.sizeCode}</td>
                         <td className="py-1 text-right tabular-nums">{it.count}</td>
-                        <td className="py-1 text-right tabular-nums">{fmtNum(it.volumeM3)}</td>
+                        <td className="py-1 text-right tabular-nums">{fmtDec3(it.volumeM3)}</td>
                         <td className="py-1 text-right">
                           {can("empotage.delete") && (
                           <button
                             onClick={() => removeItem.mutate(it.id)}
                             aria-label="Retirer la ligne"
-                            className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                            className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
                           >
-                            ×
+                            <IconX width={18} height={18} />
                           </button>
                           )}
                         </td>
@@ -418,14 +432,14 @@ function ContainerCard({
           <div className="mt-3">
             {adding ? (
               <EmpotagePicker
-                contractId={contractId}
                 saving={addItems.isPending}
                 onSave={(items) => addItems.mutate(items)}
               />
             ) : (
               can("empotage.create") && (
                 <Button size="xs" onClick={() => setAdding(true)}>
-                  + Lignes d'empotage
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Lignes d'empotage
                 </Button>
               )
             )}
@@ -436,21 +450,25 @@ function ContainerCard({
   );
 }
 
-export default function ContainersSection({ contractId }: { contractId: string }) {
+// L'empotage puise dans le stock général : la page Empotage ne passe pas de
+// contrat. La fiche contrat en passe un pour ne montrer que ses conteneurs
+// (historique — les nouveaux conteneurs n'en portent plus).
+export default function ContainersSection({ contractId }: { contractId?: string }) {
   const can = useCan();
   const [showForm, setShowForm] = useState(false);
 
   const containers = useQuery({
-    queryKey: ["containers", contractId],
-    queryFn: () => containersApi.listByContract(contractId),
+    queryKey: ["containers", contractId ?? "all"],
+    queryFn: () => containersApi.list(contractId),
   });
   const trucksQ = useQuery({
-    queryKey: ["trucks", contractId],
-    queryFn: () => trucksApi.listByContract(contractId),
+    queryKey: ["trucks", contractId ?? "all"],
+    queryFn: () => (contractId ? trucksApi.listByContract(contractId) : trucksApi.list()),
   });
   const contractQ = useQuery({
     queryKey: ["contracts", contractId],
-    queryFn: () => contractsApi.get(contractId),
+    queryFn: () => contractsApi.get(contractId!),
+    enabled: !!contractId,
   });
   const trucks = trucksQ.data ?? [];
 
@@ -460,7 +478,7 @@ export default function ContainersSection({ contractId }: { contractId: string }
         right={
           can("empotage.create") && (
             <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-              {showForm ? "Fermer" : "+ Conteneur"}
+              {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Conteneur</>}
             </Button>
           )
         }
@@ -468,9 +486,7 @@ export default function ContainersSection({ contractId }: { contractId: string }
         Conteneurs / Empotage ({containers.data?.length ?? 0})
       </SectionHeading>
 
-      {showForm && (
-        <CreateForm contractId={contractId} trucks={trucks} onDone={() => setShowForm(false)} />
-      )}
+      {showForm && <CreateForm trucks={trucks} onDone={() => setShowForm(false)} />}
 
       <div className="space-y-2">
         {containers.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
@@ -481,13 +497,7 @@ export default function ContainersSection({ contractId }: { contractId: string }
         )}
         {containers.data?.length === 0 && !showForm && <EmptyState>Aucun conteneur.</EmptyState>}
         {containers.data?.map((c) => (
-          <ContainerCard
-            key={c.id}
-            c={c}
-            contractId={contractId}
-            trucks={trucks}
-            contractCode={contractQ.data?.code}
-          />
+          <ContainerCard key={c.id} c={c} trucks={trucks} contractCode={contractQ.data?.code} />
         ))}
       </div>
     </section>
