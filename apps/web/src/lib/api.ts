@@ -11,6 +11,9 @@ import type {
   ContainerUpdateInput,
   ContractOverviewDTO,
   ContractSummaryDTO,
+  ContractExpenseCreateInput,
+  ContractExpenseDTO,
+  ContractExpensesDTO,
   ContractUpdateInput,
   DailyReportDTO,
   LoginInput,
@@ -227,6 +230,18 @@ export const accountsApi = {
     req<void>(`/account-entries/${id}`, { method: "DELETE" }),
   suggestions: (contractId: string) =>
     req<AccountSuggestionDTO[]>(`/contracts/${contractId}/account-suggestions`),
+};
+
+/** Dépenses du contrat : lignes calculées (prix × quantités) + dépenses ajoutées. */
+export const expensesApi = {
+  byContract: (contractId: string) =>
+    req<ContractExpensesDTO>(`/contracts/${contractId}/expenses`),
+  add: (data: ContractExpenseCreateInput) =>
+    req<ContractExpenseDTO>("/contract-expenses", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  remove: (id: string) => req<void>(`/contract-expenses/${id}`, { method: "DELETE" }),
 };
 
 export const salesApi = {

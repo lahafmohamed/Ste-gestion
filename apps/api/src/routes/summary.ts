@@ -8,13 +8,15 @@ import {
   sizeSortIndex,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
+import { canSeeFinance, redactSummary } from "../finance.js";
 
 export async function summaryRoutes(app: FastifyInstance) {
   // Vue liste — ce dont les cartes des pages Contrats et Tableau de bord ont
   // besoin, pour tous les contrats d'un coup : 7 requêtes au total, au lieu du
   // résumé complet (7 requêtes) répété une fois par contrat.
   // Route statique : elle passe avant `/contracts/:id` côté routeur Fastify.
-  app.get("/contracts/overview", async () => {
+  app.get("/contracts/overview", async (req) => {
+    const showMoney = await canSeeFinance(req);
     const [contracts, trucks, logs, sawnLines, saleLines, resawLines, entries, runTrucks, runLogs] =
       await Promise.all([
         prisma.contract.findMany({ select: { id: true, quotaM3: true } }),
@@ -140,7 +142,7 @@ export async function summaryRoutes(app: FastifyInstance) {
       if (v > 0) a.measured += 1;
     }
 
-    return contracts.map((c) => {
+    const overview = contracts.map((c) => {
       const a = acc.get(c.id)!;
       const avg = a.measured > 0 ? a.brousse / a.measured : 0;
       const remainingQuota = Math.max(Number(c.quotaM3) - a.brousse, 0);
@@ -162,6 +164,7 @@ export async function summaryRoutes(app: FastifyInstance) {
         balance: ((b?.due ?? 0) - (b?.paid ?? 0)).toFixed(2),
       };
     });
+    return showMoney ? overview : overview.map(redactSummary);
   });
 
   // Résumé dérivé complet du contrat
@@ -438,7 +441,7 @@ export async function summaryRoutes(app: FastifyInstance) {
     const estTrucksTotal =
       estTrucksRemaining !== null ? trucksEntered + estTrucksRemaining : null;
 
-    return {
+    const summary = {
       contractId,
       trucksEntered,
       trucksSawn,
@@ -476,6 +479,7 @@ export async function summaryRoutes(app: FastifyInstance) {
       balance: (fullCost - totalPaid).toFixed(2),
       profitEstimate: (salesRevenueCfa - fullCost).toFixed(2),
     };
+    return (await canSeeFinance(req)) ? summary : redactSummary(summary);
   });
 
   // Suggestions de dûs (attendu vs existant) pour les tiers assignés

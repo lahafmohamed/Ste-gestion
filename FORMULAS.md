@@ -199,6 +199,23 @@ Budgets stockés : Wood 33 812 722 · Company 12 717 450 · Export 9 184 825.
 
 ---
 
+**Dépenses du contrat** (`GET /contracts/:id/expenses`, onglet « Dépenses » — 2026-10-21) :
+chaque paramètre de prix devient une ligne calculée sur les quantités réalisées, plus des
+dépenses libres (`contract_expense`) pour ce que les prix ne prévoient pas.
+
+| Ligne | Quantité × prix |
+|-------|-----------------|
+| SODEFOR | brousse m³ × sodeforPrice |
+| Ibrahim | étalé Ø m³ × ibrahimPrice (`truckCostCfa`) |
+| Transport · Cubage | camions entrés × prix |
+| Company · Export | débité m³ × prix — unité **inférée** (budget ÷ prix = débité), à confirmer |
+| 1" | m³ de 1" × oneInchPrice |
+| SODEFOR & R · SODEFOR + · Reboisement | forfaits fixes |
+
+`total = Σ calculées + Σ ajoutées`. Indépendant des dûs tiers (`fullCost`), qui restent en veille.
+
+---
+
 ## F9 — Taux USD ✅ (résolu)
 
 - `SELLING PRICE` = **570**, `USD CFA RATE` = **575** → deux taux (achat 570 / vente 575).

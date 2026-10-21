@@ -16,6 +16,7 @@ import CuttingSection from "../components/CuttingSection";
 import SalesSection from "../components/SalesSection";
 import ContainersSection from "../components/ContainersSection";
 import AccountsSection from "../components/AccountsSection";
+import ExpensesSection from "../components/ExpensesSection";
 import { IconLock } from "../components/icons";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
@@ -112,6 +113,10 @@ const ALL_TABS = [
   // tourne toujours quand le commercial est en veille.
   { key: "empotage", label: "Empotage", perms: ["empotage.view"] },
   { key: "compta", label: "Comptabilité", enabled: FEATURES.accounting, perms: ["compta.view"] },
+  // Dépenses : les paramètres de prix des termes deviennent des lignes de coût
+  // (prix × quantités réalisées) + dépenses ajoutées à la main. Reste en ligne
+  // quand la compta tiers est en veille — c'est le coût du contrat qu'on suit.
+  { key: "depenses", label: "Dépenses", perms: ["finances.view"] },
   { key: "termes", label: "Termes" },
 ] as const;
 
@@ -136,6 +141,8 @@ export default function ContractDetailPage() {
     (t) => !("perms" in t) || t.perms.some((p) => can(p))
   );
   const canParcWrite = { reception: can("reception.create"), etalage: can("etalage.create") };
+  // KPI argent : modules ventes + compta actifs ET permission Finances.
+  const showMoney = SHOW_MONEY && can("finances.view");
 
   const raw = params.get("onglet");
   const tab: TabKey = TABS.some((t) => t.key === raw) ? (raw as TabKey) : "suivi";
@@ -409,11 +416,11 @@ export default function ContractDetailPage() {
               )}
               {/* Quatre colonnes seulement quand l'argent s'affiche : sans lui,
                   deux tuiles sur une grille de quatre laissaient une demi-rangée vide. */}
-              <div className={`grid grid-cols-2 gap-3 pt-1 ${SHOW_MONEY ? "sm:grid-cols-4" : ""}`}>
+              <div className={`grid grid-cols-2 gap-3 pt-1 ${showMoney ? "sm:grid-cols-4" : ""}`}>
                 <Kpi inset label="Stock produits" value={fmtM3(s.stockProductsM3)} />
                 <Kpi inset label="Stock parc (billons)" value={fmtM3(s.stockParcM3)} />
                 {/* Argent : dépend des ventes et de la compta, en veille tous les deux. */}
-                {SHOW_MONEY && (
+                {showMoney && (
                   <>
                     <Kpi inset label="Vendu" value={fmtM3(s.soldM3)} />
                     <Kpi inset label="CA ventes" value={fmtFcfa(s.salesRevenueCfa)} />
@@ -475,6 +482,10 @@ export default function ContractDetailPage() {
       )}
 
       {tab === "compta" && <AccountsSection contractId={c.id} />}
+
+      {tab === "depenses" && (
+        <ExpensesSection contractId={c.id} onGoToTerms={() => setTab("termes")} />
+      )}
 
       {/* Termes — saisie progressive, chaque carte s'édite et s'enregistre seule */}
       {tab === "termes" && (

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { ContractDTO, ContractOverviewDTO } from "@ste/shared";
 import { contractsApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtFcfa, fmtInt, fmtM3, fmtPct } from "../lib/format";
 import { SHOW_MONEY } from "../lib/features";
 import { PageHeader } from "../components/Layout";
@@ -25,6 +26,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
+  const can = useCan();
+  const showMoney = SHOW_MONEY && can("finances.view");
   const meta = [c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ");
   return (
     <Link to={`/contracts/${c.id}`} className={`${cardInteractiveCls} block p-5`}>
@@ -69,7 +72,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
               value={`${fmtM3(o.debitedM3)} · ${fmtPct(Number(o.outputPct))}`}
             />
             <Stat label="Stock produits" value={fmtM3(o.stockProductsM3)} />
-            {SHOW_MONEY ? (
+            {showMoney ? (
               <Stat label="Solde" value={fmtFcfa(o.balance)} />
             ) : (
               // Le statut est déjà sur la pastille : ici, ce qui attend la scie.
@@ -80,7 +83,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
                 }`}
               />
             )}
-            {SHOW_MONEY && <Stat label="Chiffre d'affaires" value={fmtFcfa(o.salesRevenueCfa)} />}
+            {showMoney && <Stat label="Chiffre d'affaires" value={fmtFcfa(o.salesRevenueCfa)} />}
           </div>
         </>
       ) : (

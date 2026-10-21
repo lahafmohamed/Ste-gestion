@@ -110,6 +110,7 @@ model Contract {
   trucks         Truck[]
   productionRuns ProductionRun[]
   accountEntries AccountEntry[]
+  expenses       ContractExpense[]
   sales          Sale[]
   containers     Container[]
   resawOps       ResawOp[]
@@ -162,6 +163,24 @@ model AccountEntry {
   createdAt   DateTime  @default(now()) @map("created_at")
 
   @@map("account_entry")
+}
+
+// Dépenses libres du contrat — ce que les paramètres de prix ne prévoient pas
+// (réparation, carburant, frais imprévus). Les dépenses « calculées » (prix ×
+// quantités réalisées) ne sont pas stockées : GET /contracts/:id/expenses les
+// dérive à la volée des opérations.
+model ContractExpense {
+  id          String   @id @default(cuid())
+  contractId  String   @map("contract_id")
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  label       String
+  amount      Decimal  @db.Decimal(18, 2)
+  note        String?
+  expenseDate DateTime @default(now()) @map("expense_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([contractId])
+  @@map("contract_expense")
 }
 
 enum MeasurementContext {

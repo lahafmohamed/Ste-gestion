@@ -35,6 +35,7 @@ const RULES: Rule[] = [
     pattern: new RegExp(`^/contracts/${ID}/account-suggestions$`),
     permission: "compta.view",
   },
+  { method: "GET", pattern: new RegExp(`^/contracts/${ID}/expenses$`), permission: "finances.view" },
   { method: "GET", pattern: /^\/parties(\/|$)/, permission: "compta.view" },
   { method: "GET", pattern: /^\/account-entries(\/|$)/, permission: "compta.view" },
   { method: "GET", pattern: /^\/sales(\/|$)/, permission: "ventes.view" },
@@ -113,6 +114,13 @@ const RULES: Rule[] = [
     method: "DELETE",
     pattern: new RegExp(`^/account-entries/${ID}$`),
     permission: "compta.delete",
+  },
+  // Dépenses du contrat (calculées + ajoutées) — module Finances.
+  { method: "POST", pattern: /^\/contract-expenses$/, permission: "finances.edit" },
+  {
+    method: "DELETE",
+    pattern: new RegExp(`^/contract-expenses/${ID}$`),
+    permission: "finances.edit",
   },
 
   // Camions (référentiel)
@@ -210,6 +218,18 @@ export async function permissionsFor(u: {
   if (u.role === "ADMIN") return effectivePermissions("ADMIN", []);
   const matrix = await getRoleMatrix();
   return effectivePermissions(u.role, matrix[u.role], u.permissionsGranted, u.permissionsRevoked);
+}
+
+/**
+ * L'utilisateur (déjà authentifié par le hook) a-t-il cette permission ?
+ * Pour les routes qui filtrent leur réponse au lieu de la refuser : la fiche
+ * contrat se lit sans `finances.view`, mais sans les prix.
+ */
+export async function userHas(userId: string, permission: Permission): Promise<boolean> {
+  const u = await getCachedUser(userId);
+  if (!u) return false;
+  if (u.role === "ADMIN") return true;
+  return (await permissionsFor(u)).includes(permission);
 }
 
 /** Sélection Prisma d'un utilisateur pour le DTO (sans le hash). */

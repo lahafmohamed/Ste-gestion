@@ -31,7 +31,7 @@ export const PERMISSION_MODULES: readonly PermissionModule[] = [
   {
     key: "contracts",
     label: "Contrats",
-    hint: "Fiche contrat, termes et prix, clôture, suppression en cascade, export Excel.",
+    hint: "Fiche contrat, termes (n°, quota, administratif), clôture, suppression en cascade, export Excel. Les prix relèvent du module Finances.",
     actions: ["view", "create", "edit", "delete", "export"],
     actionLabels: { edit: "Modifier / clôturer", export: "Exporter Excel (contrat, camion)" },
   },
@@ -96,6 +96,16 @@ export const PERMISSION_MODULES: readonly PermissionModule[] = [
     actionLabels: { create: "Ajouter tiers / écriture", delete: "Supprimer une écriture" },
   },
   {
+    key: "finances",
+    label: "Finances",
+    hint: "Ce que le contrat coûte et rapporte : paramètres de prix, frais et budgets des termes, onglet Dépenses, chiffre d'affaires et profit. Sans « Voir », l'API masque ces chiffres partout (fiche, résumé, export).",
+    actions: ["view", "edit"],
+    actionLabels: {
+      view: "Voir prix, dépenses, CA et profit",
+      edit: "Modifier les prix, ajouter / supprimer une dépense",
+    },
+  },
+  {
     key: "camions",
     label: "Camions",
     hint: "Référentiel du parc de camions (immatriculation, transporteur, chauffeur).",
@@ -157,6 +167,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     ...mod("empotage", "view"),
     ...mod("ventes", "view"),
     ...full("compta"),
+    ...full("finances"),
     ...full("camions"),
     ...full("rapport"),
   ],
@@ -199,3 +210,40 @@ export function effectivePermissions(
   for (const p of revoked) set.delete(p);
   return ALL_PERMISSIONS.filter((p) => set.has(p));
 }
+
+/**
+ * Champs du contrat réservés à `finances.view` : l'API les renvoie à `null`
+ * aux comptes qui ne l'ont pas (un compte de saisie voit le n°, le quota et
+ * l'administratif, jamais les prix ni ce que rapporte le contrat), et refuse
+ * de les modifier sans `finances.edit`.
+ */
+export const FINANCE_CONTRACT_FIELDS = [
+  "sodeforPrice",
+  "ibrahimPrice",
+  "transportPrice",
+  "cubagePrice",
+  "companyPrice",
+  "exportPrice",
+  "sellingPriceUsd",
+  "usdCfaRate",
+  "oneInchPrice",
+  "feeSodeforR",
+  "feeSodeforPlus",
+  "feeReforestation",
+  "woodBudget",
+  "companyBudget",
+  "exportBudget",
+  "expectedProfit",
+  "sodeforPartyId",
+  "cubagePartyId",
+  "transportPartyId",
+] as const;
+
+/** Champs argent du résumé / de la vue liste, masqués de la même façon. */
+export const FINANCE_SUMMARY_FIELDS = [
+  "salesRevenueCfa",
+  "fullCost",
+  "totalPaid",
+  "balance",
+  "profitEstimate",
+] as const;

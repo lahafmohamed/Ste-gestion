@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ContractDTO, ContractUpdateInput } from "@ste/shared";
 import { accountsApi, contractsApi } from "../lib/api";
+import { useCan } from "../lib/auth";
 import { fmtInt, fmtNum, normalizeDecimal } from "../lib/format";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
@@ -26,7 +27,14 @@ type Field = {
   core?: boolean;
 };
 
-type Section = { id: string; title: string; hint?: string; fields: Field[] };
+type Section = {
+  id: string;
+  title: string;
+  hint?: string;
+  fields: Field[];
+  /** Carte d'argent : visible avec `finances.view`, éditable avec `finances.edit`. */
+  finance?: boolean;
+};
 
 const SECTIONS: Section[] = [
   {
@@ -58,24 +66,26 @@ const SECTIONS: Section[] = [
   },
   {
     id: "prices",
+    finance: true,
     title: "Paramètres de prix",
     // Unités reprises des formules qui les consomment (truckCostCfa,
     // saleLineAmountCfa) : « SODEFOR 55000 » seul ne dit pas par quoi multiplier.
-    hint: "En FCFA sauf mention contraire.",
+    hint: "En FCFA sauf mention contraire. Chaque prix devient une ligne de l'onglet Dépenses.",
     fields: [
       { key: "sodeforPrice", label: "SODEFOR (par m³ brousse)", kind: "decimal", ph: "55000" },
       { key: "ibrahimPrice", label: "Ibrahim (par m³ étalé Ø)", kind: "decimal", ph: "24000" },
       { key: "transportPrice", label: "Transport (par camion)", kind: "decimal", ph: "475000" },
       { key: "cubagePrice", label: "Cubage (par camion)", kind: "decimal", ph: "100000" },
-      { key: "companyPrice", label: "Company", kind: "decimal", ph: "90000" },
-      { key: "exportPrice", label: "Export", kind: "decimal", ph: "65000" },
+      { key: "companyPrice", label: "Company (par m³ débité)", kind: "decimal", ph: "90000" },
+      { key: "exportPrice", label: "Export (par m³ débité)", kind: "decimal", ph: "65000" },
       { key: "sellingPriceUsd", label: "Vente (USD par m³)", kind: "decimal", ph: "570" },
       { key: "usdCfaRate", label: "Taux USD → FCFA", kind: "decimal", ph: "575" },
-      { key: "oneInchPrice", label: '1"', kind: "decimal", ph: "140000" },
+      { key: "oneInchPrice", label: '1" (par m³ de 1")', kind: "decimal", ph: "140000" },
     ],
   },
   {
     id: "fees",
+    finance: true,
     title: "Frais SODEFOR (FCFA)",
     fields: [
       { key: "feeSodeforR", label: "SODEFOR & R", kind: "decimal", ph: "42500000" },
@@ -85,6 +95,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "budgets",
+    finance: true,
     title: "Budgets (FCFA)",
     fields: [
       { key: "woodBudget", label: "Wood budget", kind: "decimal", ph: "33812722" },
@@ -95,6 +106,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "parties",
+    finance: true,
     title: "Tiers assignés",
     hint: "Activent les suggestions de dûs en comptabilité.",
     fields: [
@@ -317,15 +329,20 @@ export function ContractSections({
   onSaved: () => void;
   readOnly?: boolean;
 }) {
+  const can = useCan();
+  // Un compte de saisie voit le n°, le quota et l'administratif ; les prix,
+  // frais, budgets et tiers n'apparaissent qu'avec Finances (l'API les masque
+  // de toute façon). Modifier un prix demande en plus Finances — Modifier.
+  const visible = SECTIONS.filter((s) => !s.finance || can("finances.view"));
   return (
     <div className="space-y-3">
-      {SECTIONS.map((s) => (
+      {visible.map((s) => (
         <SectionCard
           key={s.id}
           section={s}
           contract={contract}
           onSaved={onSaved}
-          readOnly={readOnly}
+          readOnly={readOnly || (Boolean(s.finance) && !can("finances.edit"))}
         />
       ))}
     </div>

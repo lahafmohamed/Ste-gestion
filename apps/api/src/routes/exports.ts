@@ -12,6 +12,7 @@ import {
   truckSawnProgress,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
+import { canSeeFinance } from "../finance.js";
 
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -442,6 +443,8 @@ export async function exportRoutes(app: FastifyInstance) {
     const contract = await prisma.contract.findUnique({ where: { id: req.params.id } });
     if (!contract) return reply.code(404).send({ error: "Contrat introuvable" });
     const contractId = contract.id;
+    // `contracts.export` sort les volumes ; l'argent demande en plus `finances.view`.
+    const showMoney = await canSeeFinance(req);
 
     const [trucks, runs, sawnLines, saleLines, entries] = await Promise.all([
       prisma.truck.findMany({
@@ -517,12 +520,16 @@ export async function exportRoutes(app: FastifyInstance) {
       ["Débité m³", debited],
       ["Rendement %", sawnGirth > 0 ? (debited / sawnGirth) * 100 : 0],
       ["Vendu m³", sold],
-      ["CA ventes FCFA", revenue],
-      ["Full cost (Σ dûs) FCFA", due],
-      ["Payé FCFA", paid],
-      ["Solde FCFA", due - paid],
-      ["Profit estimé FCFA", revenue - due],
     ];
+    if (showMoney) {
+      rows.push(
+        ["CA ventes FCFA", revenue],
+        ["Full cost (Σ dûs) FCFA", due],
+        ["Payé FCFA", paid],
+        ["Solde FCFA", due - paid],
+        ["Profit estimé FCFA", revenue - due]
+      );
+    }
     for (const r of rows) rs.addRow(r);
     rs.columns.forEach((c) => (c.width = 24));
 

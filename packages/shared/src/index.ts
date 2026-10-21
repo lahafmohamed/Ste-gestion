@@ -96,7 +96,8 @@ export const contractCreateSchema = z.object({
   code: z.string().trim().min(1, "Code requis").max(50),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
   status: ContractStatus.optional(),
-  note: z.string().trim().max(500).optional(),
+  // Vidée depuis la carte Termes → null (comme l'administratif).
+  note: z.string().trim().max(500).nullable().optional(),
 
   // Termes du contrat
   quotaM3: decimalString,
@@ -882,6 +883,63 @@ export type ParcTruckDTO = {
   girthM3: string;
   girthGte85M3: string;
   girthLt85M3: string;
+};
+
+// ── Dépenses du contrat ───────────────────────────────────────────────
+// Deux familles : les dépenses « calculées » (paramètres de prix × quantités
+// réalisées, jamais stockées) et les dépenses « ajoutées » à la main (ce que
+// les prix ne prévoient pas). Le total du contrat additionne les deux.
+
+export const contractExpenseCreateSchema = z.object({
+  contractId: z.string().min(1),
+  label: z.string().trim().min(1, "Libellé requis").max(120),
+  amount: decimalString,
+  note: z.string().trim().max(300).optional(),
+  expenseDate: z.coerce.date().optional(),
+});
+export type ContractExpenseCreateInput = z.infer<typeof contractExpenseCreateSchema>;
+
+export type ContractExpenseDTO = {
+  id: string;
+  contractId: string;
+  label: string;
+  amount: string;
+  note: string | null;
+  expenseDate: string;
+  createdAt: string;
+};
+
+/** Ligne dérivée d'un paramètre de prix : quantité réalisée × prix unitaire. */
+export type ComputedExpenseDTO = {
+  key:
+    | "SODEFOR"
+    | "IBRAHIM"
+    | "TRANSPORT"
+    | "CUBAGE"
+    | "COMPANY"
+    | "EXPORT"
+    | "ONE_INCH"
+    | "FEE_SODEFOR_R"
+    | "FEE_SODEFOR_PLUS"
+    | "FEE_REFORESTATION";
+  label: string;
+  /** Quantité réalisée (m³ ou camions) ; null pour un forfait fixe. */
+  quantity: string | null;
+  /** Unité de la quantité (« m³ brousse », « camions »…) ; null pour un forfait. */
+  unit: string | null;
+  unitPrice: string;
+  amount: string;
+  /** false tant que le prix n'est pas renseigné dans les termes (montant 0). */
+  priced: boolean;
+};
+
+export type ContractExpensesDTO = {
+  contractId: string;
+  computed: ComputedExpenseDTO[];
+  computedTotal: string;
+  extra: ContractExpenseDTO[];
+  extraTotal: string;
+  total: string;
 };
 
 export type AccountSuggestionDTO = {

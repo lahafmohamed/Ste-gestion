@@ -9,6 +9,7 @@ import {
   truckSawnProgress,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
+import { canSeeFinance } from "../finance.js";
 
 const pct = (part: number, total: number) =>
   (total > 0 ? (part / total) * 100 : 0).toFixed(2);
@@ -19,6 +20,8 @@ export async function reportRoutes(app: FastifyInstance) {
     const contractId = req.params.id;
     const contract = await prisma.contract.findUnique({ where: { id: contractId } });
     if (!contract) return reply.code(404).send({ error: "Contrat introuvable" });
+    // Colonnes Cost (prix × cubages) : finances seulement.
+    const showMoney = await canSeeFinance(req);
 
     const [trucks, runs] = await Promise.all([
       prisma.truck.findMany({
@@ -174,8 +177,8 @@ export async function reportRoutes(app: FastifyInstance) {
         oneInchPct: pct(split?.lt15 ?? 0, debited),
         longM3: (split?.long ?? 0).toFixed(6),
         shortM3: (split?.short ?? 0).toFixed(6),
-        costPerM3: debited > 0 ? (costTotal / debited).toFixed(0) : null,
-        costMsPerM3: msM3 > 0 ? (costTotal / msM3).toFixed(0) : null,
+        costPerM3: showMoney && debited > 0 ? (costTotal / debited).toFixed(0) : null,
+        costMsPerM3: showMoney && msM3 > 0 ? (costTotal / msM3).toFixed(0) : null,
       };
     });
   });
