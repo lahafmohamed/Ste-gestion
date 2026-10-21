@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { authApi } from "../lib/api";
 import { setSession } from "../lib/auth";
-import LogEnd from "../components/LogEnd";
 import Button from "../components/ui/Button";
 import { FormError } from "../components/ui/Feedback";
 import Input, { Field, inputErrorCls } from "../components/ui/Input";
@@ -59,27 +58,12 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const passwordInvalid = Boolean(fieldErrors.password || error);
 
   return (
-    // Deux temps : le bois (panneau teck, une bille vue en bout avec son
-    // numéro peint, comme au parc) et le geste (le formulaire). Téléphone : le
-    // panneau devient un bandeau sous lequel la carte de connexion vient se poser.
-    <main className="min-h-dvh bg-ground lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      <div className="relative h-44 overflow-hidden bg-accent-900 sm:h-52 lg:h-auto lg:min-h-dvh">
-        <LogEnd className="pointer-events-none absolute -right-24 -top-28 w-[26rem] max-w-none sm:-right-10 sm:-top-36 sm:w-[30rem] lg:-bottom-56 lg:-left-40 lg:right-auto lg:top-auto lg:w-[50rem] xl:w-[56rem]" />
-        <div className="relative hidden max-w-xl p-12 lg:block xl:p-16">
-          <p className="text-balance text-4xl font-semibold leading-[1.1] tracking-tight text-white xl:text-5xl">
-            Le bois, du camion au conteneur.
-          </p>
-          <p className="mt-4 max-w-sm text-pretty text-base leading-relaxed text-accent-200">
-            Réception, étalage, débitage, stock et empotage — au parc comme au bureau.
-          </p>
-        </div>
-      </div>
-
-      <div className="relative -mt-14 flex justify-center px-4 pb-10 lg:mt-0 lg:items-center lg:bg-white lg:px-12 lg:pb-0">
+    <main className="min-h-dvh bg-ground">
+      <div className="flex min-h-dvh items-center justify-center px-4 py-10">
         <form
           noValidate
           onSubmit={submit}
-          className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-dialog motion-safe:animate-rise-in sm:p-7 lg:rounded-none lg:p-0 lg:shadow-none"
+          className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-dialog motion-safe:animate-rise-in sm:p-7"
         >
           {/* Logo complet ici seulement : assez de place pour que la tagline soit lisible. */}
           <img
