@@ -80,11 +80,7 @@ export default function TruckStatsSection({ contract }: { contract: ContractDTO 
     { label: "Ibrahim", value: contract.ibrahimPrice },
     { label: "Transport", value: contract.transportPrice },
     { label: "Cubage", value: contract.cubagePrice },
-    { label: "Company", value: contract.companyPrice },
-    { label: "Export", value: contract.exportPrice },
     { label: "1″", value: contract.oneInchPrice },
-    { label: "Vente $", value: contract.sellingPriceUsd },
-    { label: "Taux USD", value: contract.usdCfaRate },
   ].filter((p) => Number(p.value) > 0);
   const budgets = [
     { label: "Budget bois", value: contract.woodBudget },

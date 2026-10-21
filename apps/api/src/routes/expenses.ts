@@ -13,11 +13,9 @@ import { ensureContractOpen } from "../contract-lock.js";
 //   SODEFOR   × m³ brousse (ce qui sort de la forêt)
 //   Ibrahim   × m³ étalé Ø (cubage parc au diamètre — truckCostCfa)
 //   Transport × camions entrés          Cubage × camions entrés
-//   Company   × m³ débité               Export × m³ débité
 //   1"        × m³ de 1" débité
 //   Frais SODEFOR (R, +, reboisement) : forfaits fixes du contrat.
-// Company / Export / 1" : unité « par m³ débité » inférée des budgets du
-// dashboard (budget ÷ prix = débité total) — à confirmer sur le terrain.
+// Company / Export retirés des paramètres de prix (2026-10-21) : plus de ligne.
 
 /** Quantités réalisées du contrat, mêmes règles que le résumé. */
 async function contractQuantities(contractId: string) {
@@ -58,15 +56,12 @@ async function contractQuantities(contractId: string) {
     brousseM3 += field > 0 ? field : packing > 0 ? packing : Number(t.declaredFieldM3 ?? 0);
   }
 
-  let debitedM3 = 0;
   let oneInchM3 = 0;
   for (const l of sawnLines) {
-    const v = Number(l.volumeM3);
-    debitedM3 += v;
-    if (l.sizeGroup === "ONE_INCH") oneInchM3 += v;
+    if (l.sizeGroup === "ONE_INCH") oneInchM3 += Number(l.volumeM3);
   }
 
-  return { trucksEntered: trucks.length, brousseM3, diaM3, debitedM3, oneInchM3 };
+  return { trucksEntered: trucks.length, brousseM3, diaM3, oneInchM3 };
 }
 
 export async function expenseRoutes(app: FastifyInstance) {
@@ -108,8 +103,6 @@ export async function expenseRoutes(app: FastifyInstance) {
     line("IBRAHIM", "Ibrahim (cubage)", q.diaM3, "m³ étalé Ø", contract.ibrahimPrice);
     line("TRANSPORT", "Transport", q.trucksEntered, "camions", contract.transportPrice);
     line("CUBAGE", "Cubage", q.trucksEntered, "camions", contract.cubagePrice);
-    line("COMPANY", "Company", q.debitedM3, "m³ débité", contract.companyPrice);
-    line("EXPORT", "Export", q.debitedM3, "m³ débité", contract.exportPrice);
     line("ONE_INCH", "1\"", q.oneInchM3, "m³ de 1\"", contract.oneInchPrice);
     line("FEE_SODEFOR_R", "SODEFOR & R", null, null, contract.feeSodeforR);
     line("FEE_SODEFOR_PLUS", "SODEFOR +", null, null, contract.feeSodeforPlus);

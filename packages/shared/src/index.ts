@@ -916,8 +916,6 @@ export type ComputedExpenseDTO = {
     | "IBRAHIM"
     | "TRANSPORT"
     | "CUBAGE"
-    | "COMPANY"
-    | "EXPORT"
     | "ONE_INCH"
     | "FEE_SODEFOR_R"
     | "FEE_SODEFOR_PLUS"
