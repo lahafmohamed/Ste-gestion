@@ -497,10 +497,11 @@ export async function summaryRoutes(app: FastifyInstance) {
       });
       if (!contract) return reply.code(404).send({ error: "Contrat introuvable" });
 
-      const [trucksEntered, girthAgg, dueEntries] = await Promise.all([
+      // Ibrahim est payé au cubage diamètre (étalage parc Ø), pas au girth.
+      const [trucksEntered, diaAgg, dueEntries] = await Promise.all([
         prisma.truck.count({ where: { contractId } }),
         prisma.log.aggregate({
-          where: { measurement: { context: "YARD_GIRTH", truck: { contractId } } },
+          where: { measurement: { context: "YARD_DIAMETER", truck: { contractId } } },
           _sum: { volumeM3: true },
         }),
         prisma.accountEntry.groupBy({
@@ -510,7 +511,7 @@ export async function summaryRoutes(app: FastifyInstance) {
         }),
       ]);
 
-      const girthM3 = Number(girthAgg._sum.volumeM3 ?? 0);
+      const diaM3 = Number(diaAgg._sum.volumeM3 ?? 0);
       const dueByParty = new Map(
         dueEntries.map((e) => [e.partyId, Number(e._sum.amount ?? 0)])
       );
@@ -545,12 +546,12 @@ export async function summaryRoutes(app: FastifyInstance) {
         `Transport ${trucksEntered} camions × ${Number(contract.transportPrice).toLocaleString("fr-FR")}`
       );
 
-      const cubageExpected = girthM3 * Number(contract.ibrahimPrice);
+      const cubageExpected = diaM3 * Number(contract.ibrahimPrice);
       push(
         contract.cubageParty,
         "CUBAGE",
         cubageExpected,
-        `Cubage ${girthM3.toFixed(3)} m³ × ${Number(contract.ibrahimPrice).toLocaleString("fr-FR")}`
+        `Cubage diamètre ${diaM3.toFixed(3)} m³ ×${Number(contract.ibrahimPrice).toLocaleString("fr-FR")}`
       );
 
       const sodeforExpected =

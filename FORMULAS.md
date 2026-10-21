@@ -155,7 +155,7 @@ Vérif : 68.531 + 48.970 + 24.606 = **142.107** ✅
 
 **F6 auto** (refonte 2026-07-13) : `debitedM3`, `outputPct`, camions entrés/sciés/non-sciés, **stock parc** (= girth des camions non liés à une session), **stock produits** (= débité − vendu par taille) et **full cost** (= Σ dûs tiers, plus saisi) sont tous calculés live par `GET /contracts/:id/summary`. Camion « scié » = lié à ≥1 `ProductionRun` (table `production_run_truck`).
 
-**Suggestions de dûs** (`GET /contracts/:id/account-suggestions`) : transport = camions entrés × transportPrice ; cubage = girth m³ × ibrahimPrice ; SODEFOR = feeSodeforR + feeSodeforPlus + feeReforestation. Delta vs dûs existants, ajout sur clic.
+**Suggestions de dûs** (`GET /contracts/:id/account-suggestions`) : transport = camions entrés × transportPrice ; cubage = m³ diamètre (YARD_DIAMETER) × ibrahimPrice ; SODEFOR = feeSodeforR + feeSodeforPlus + feeReforestation. Delta vs dûs existants, ajout sur clic.
 
 ---
 

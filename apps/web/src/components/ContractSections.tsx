@@ -73,7 +73,7 @@ const SECTIONS: Section[] = [
     hint: "En FCFA sauf mention contraire. Chaque prix devient une ligne de l'onglet Dépenses.",
     fields: [
       { key: "sodeforPrice", label: "SODEFOR (par m³ brousse)", kind: "decimal", ph: "55000" },
-      { key: "ibrahimPrice", label: "Ibrahim (par m³ étalé Ø)", kind: "decimal", ph: "24000" },
+      { key: "ibrahimPrice", label: "Ibrahim (par m³ au diamètre)", kind: "decimal", ph: "24000" },
       { key: "transportPrice", label: "Transport (par camion)", kind: "decimal", ph: "475000" },
       { key: "cubagePrice", label: "Cubage (par camion)", kind: "decimal", ph: "100000" },
       { key: "oneInchPrice", label: '1" (par m³ de 1")', kind: "decimal", ph: "140000" },

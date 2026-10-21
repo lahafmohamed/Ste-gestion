@@ -100,7 +100,7 @@ export async function expenseRoutes(app: FastifyInstance) {
     };
 
     line("SODEFOR", "SODEFOR", q.brousseM3, "m³ brousse", contract.sodeforPrice);
-    line("IBRAHIM", "Ibrahim (cubage)", q.diaM3, "m³ étalé Ø", contract.ibrahimPrice);
+    line("IBRAHIM", "Ibrahim (cubage)", q.diaM3, "m³ diamètre", contract.ibrahimPrice);
     line("TRANSPORT", "Transport", q.trucksEntered, "camions", contract.transportPrice);
     line("CUBAGE", "Cubage", q.trucksEntered, "camions", contract.cubagePrice);
     line("ONE_INCH", "1\"", q.oneInchM3, "m³ de 1\"", contract.oneInchPrice);
