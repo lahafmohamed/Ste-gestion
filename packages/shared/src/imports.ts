@@ -45,7 +45,8 @@ export type ImportSheetMeta = {
 
 /** Une ligne telle qu'elle sera créée (volume recalculé par l'app). */
 export type ImportLine = {
-  n: number;
+  /** N° du classeur — absent sur une ligne insérée sans être numérotée. */
+  n?: number;
   /** N° bille / billon (relevés) — vide pour débité/empotage. */
   id?: string;
   a: string;

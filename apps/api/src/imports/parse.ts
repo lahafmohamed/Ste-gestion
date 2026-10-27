@@ -9,14 +9,16 @@ import type { ImportIssue, ImportSheetMeta, ImportSheetType } from "@ste/shared"
 //   EMPOTAGES : N° · PRODUITS · mêmes mesures · FEUIL, titre « EMPOTAGE TECK » + n° conteneur
 // Gabarits 09-2026 : lignes prénumérotées (N° repart à 1 à chaque FEUIL,
 // NBR DELIGNE et FEUIL préremplis) — une ligne sans mesure est une ligne
-// vierge, pas une erreur. Pied de tableau : Total / MAX / MIN.
+// vierge, pas une erreur. Pied de tableau : Total / MAX / MIN. Une ligne
+// insérée sans N° entre deux lignes numérotées compte (avec avertissement).
 // Les métadonnées (immat, B/L, cubage brousse, contrat, plomb, totaux) sont
 // écrites en marge, à droite du tableau : on balaie toutes les cellules.
 
 export type RawRow = {
   /** N° de ligne dans la feuille (pour les messages). */
   row: number;
-  n: number;
+  /** N° du classeur — absent sur une ligne insérée sans être numérotée. */
+  n?: number;
   id?: string;
   a: number;
   b: number;
@@ -301,18 +303,33 @@ function readMeta(
 function readRows(grid: Cell[][], layout: Layout, issues: ImportIssue[]): RawRow[] {
   const rows: RawRow[] = [];
   const { col } = layout;
+  const isFooter = (v: Cell) => typeof v === "string" && /^(total|max|min)$/i.test(v.trim());
+  // Dernière ligne numérotée : une ligne sans n° placée avant a été insérée à
+  // la main sans être numérotée — elle compte ; après, c'est le pied de tableau
+  // (MAX / MIN des DEBITES ont des mesures mais leur libellé hors colonne N°).
+  let lastNumbered = -1;
+  for (let r = layout.headerRow + 1; r < grid.length; r++) {
+    const nCell = grid[r]?.[col.n] ?? null;
+    if (isFooter(nCell)) break;
+    if (num(nCell) !== null) lastNumbered = r;
+  }
+  let prevN: number | undefined;
   for (let r = layout.headerRow + 1; r < grid.length; r++) {
     const line = grid[r];
     if (!line) continue;
     const nCell = line[col.n] ?? null;
     // Pied de tableau (Total / MAX / MIN) : fin des mesures.
-    if (typeof nCell === "string" && /^(total|max|min)$/i.test(nCell.trim())) break;
+    if (isFooter(nCell)) break;
     const n = num(nCell);
     const a = num(line[col.a] ?? null);
     const b = num(line[col.b] ?? null);
     const c = col.c !== undefined ? num(line[col.c] ?? null) : null;
-    // Ligne de total ou vide : pas de n° → ignorée sans bruit.
-    if (n === null) continue;
+    // Messages : le N° du classeur, ou la ligne Excel quand il manque.
+    const after = prevN !== undefined ? `, après le n° ${prevN}` : "";
+    const label = n !== null ? `Ligne ${n}` : `Ligne sans N° (ligne ${r + 1} du classeur${after})`;
+    if (n !== null) prevN = n;
+    // Pied de tableau ou ligne vide : pas de n° → ignorée sans bruit.
+    if (n === null && r > lastNumbered) continue;
     // Ligne prénumérotée du gabarit laissée vierge (NBR / FEUIL préremplis,
     // aucune mesure) : pas une erreur.
     if (a === null && b === null && c === null) continue;
@@ -320,11 +337,12 @@ function readRows(grid: Cell[][], layout: Layout, issues: ImportIssue[]): RawRow
       issues.push({
         level: "warning",
         row: r + 1,
-        message: `Ligne ${n} : mesure manquante, ignorée`,
+        message: `${label} : mesure manquante, ignorée`,
       });
       continue;
     }
-    const row: RawRow = { row: r + 1, n, a, b };
+    const row: RawRow = { row: r + 1, a, b };
+    if (n !== null) row.n = n;
     if (col.id !== undefined) {
       const id = text(line[col.id] ?? null);
       if (id) row.id = id;
@@ -334,7 +352,7 @@ function readRows(grid: Cell[][], layout: Layout, issues: ImportIssue[]): RawRow
         issues.push({
           level: "warning",
           row: r + 1,
-          message: `Ligne ${n} : épaisseur manquante, ignorée`,
+          message: `${label} : épaisseur manquante, ignorée`,
         });
         continue;
       }
@@ -347,7 +365,7 @@ function readRows(grid: Cell[][], layout: Layout, issues: ImportIssue[]): RawRow
         issues.push({
           level: "warning",
           row: r + 1,
-          message: `Ligne ${n} : nombre de pièces nul, ignorée`,
+          message: `${label} : nombre de pièces nul, ignorée`,
         });
         continue;
       }
@@ -368,10 +386,11 @@ function readRows(grid: Cell[][], layout: Layout, issues: ImportIssue[]): RawRow
       issues.push({
         level: "warning",
         row: r + 1,
-        message: `Ligne ${n} : mesure nulle ou négative, ignorée`,
+        message: `${label} : mesure nulle ou négative, ignorée`,
       });
       continue;
     }
+    if (n === null) issues.push({ level: "warning", row: r + 1, message: `${label} : importée` });
     rows.push(row);
   }
   // Ligne de total en bas du tableau : N° = nombre de lignes, mesures = moyennes,

@@ -547,7 +547,7 @@ function SheetCard({
                 {rows.map((l, i) => (
                   <tr key={`${l.page ?? 0}-${l.n}-${i}`} className="border-t border-brand-50">
                     {hasPage && <Td num>{l.page ?? ""}</Td>}
-                    <Td num>{l.n}</Td>
+                    <Td num>{l.n ?? <span className="text-brand-500">—</span>}</Td>
                     {isLog && <Td>{l.id ?? <span className="text-brand-300">—</span>}</Td>}
                     {hasGrade && <Td>{l.grade ?? ""}</Td>}
                     <Td num>{fmtNum(l.a)}</Td>
