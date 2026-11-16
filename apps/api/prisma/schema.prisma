@@ -599,7 +599,8 @@ model SawnLine {
 // Le suivi du stock reprend le classeur du client : dernier inventaire +
 // sciage + nouvelle mesure − empotage − sorties − ancienne mesure. Sciage,
 // resciage et empotage viennent de leurs modules ; cette table porte le reste.
-// L'inventaire est une remise à zéro : il fixe le stock au matin de son jour.
+// L'inventaire est une remise à zéro : comptage de fin de journée, seuls les
+// mouvements datés du lendemain ou après s'y ajoutent.
 
 enum StockMovementKind {
   INVENTAIRE

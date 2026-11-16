@@ -298,9 +298,9 @@ function MovementForm({
       </h3>
       {inventory ? (
         <Notice tone="warn" className="mb-3">
-          L'inventaire remplace le stock calculé : à partir de sa date, le stock repart des pièces
-          comptées ici, et les mouvements antérieurs ne comptent plus. Saisir toutes les
-          dimensions présentes au parc.
+          L'inventaire remplace le stock calculé. C'est un comptage de fin de journée : il contient
+          déjà le sciage, l'empotage et les sorties de sa date, et seuls les mouvements du
+          lendemain ou après s'y ajoutent. Saisir toutes les dimensions présentes au parc.
         </Notice>
       ) : (
         <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Type de sortie">
@@ -458,8 +458,9 @@ function ImportForm({
       </div>
       {kind === "INVENTAIRE" && (
         <Notice tone="warn" className="mb-3">
-          Importé comme inventaire, le classeur remplace le stock à sa date. Les nombres négatifs
-          d'une même dimension se compensent, comme dans le tableau STOCK.
+          Importé comme inventaire, le classeur remplace le stock : comptage de fin de journée,
+          seuls les mouvements du lendemain ou après s'y ajoutent. Les nombres négatifs d'une même
+          dimension se compensent, comme dans le tableau STOCK.
         </Notice>
       )}
 

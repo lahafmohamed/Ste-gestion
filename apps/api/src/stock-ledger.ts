@@ -24,9 +24,10 @@ import { prisma } from "./prisma.js";
 //   − empotage (conteneurs en empotage / empotés / expédiés)
 //   − livraisons, ventes, séchoir, menuiserie, rejets (mouvements saisis)
 //   − ancienne mesure (resciage consommé).
-// L'inventaire fixe le stock au matin de son jour : un mouvement daté du
-// même jour ou après compte, un mouvement antérieur est déjà dans le
-// comptage. Sans inventaire, tout l'historique compte (stock parti de zéro).
+// L'inventaire fixe le stock au SOIR de son jour (comptage de fin de
+// journée, comme le classeur du client : son inventaire du 24/10 contient
+// déjà les sciages du 24/10). Seuls les mouvements datés du lendemain ou
+// après comptent ; ceux du jour même sont déjà dans le comptage. Sans inventaire, tout l'historique compte (stock parti de zéro).
 // Un conteneur encore « Prévu » ne sort pas du stock : ses pièces sont
 // seulement réservées (le panier d'empotage ne peut plus les reprendre).
 
@@ -76,9 +77,14 @@ function piece(l: {
   };
 }
 
-/** Début du jour (UTC = heure d'Abidjan) : l'inventaire vaut au matin. */
+/** Début du jour (UTC = heure d'Abidjan). */
 function startOfDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+/** Lendemain de l'inventaire, 0 h : premier instant qui compte après lui. */
+function dayAfter(d: Date): Date {
+  return new Date(startOfDay(d).getTime() + 24 * 3600 * 1000);
 }
 
 /** Les camions sciés, par leur B/L (le « N° CBG » du suivi), sinon l'immat. */
@@ -102,7 +108,7 @@ export async function ledgerEntries(): Promise<{
   reserved: Piece[];
 }> {
   const inventory = await latestInventory();
-  const cutoff = inventory ? startOfDay(inventory.movedAt) : undefined;
+  const cutoff = inventory ? dayAfter(inventory.movedAt) : undefined;
   const since = cutoff ? { gte: cutoff } : undefined;
 
   const [runs, resaws, containers, movements] = await Promise.all([

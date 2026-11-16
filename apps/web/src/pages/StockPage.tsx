@@ -237,7 +237,8 @@ function StockTab() {
               <span className="font-medium">
                 {new Date(inv.movedAt).toLocaleDateString("fr-FR")}
               </span>{" "}
-              ({fmtM3(inv.totalM3)}), plus les mouvements datés de ce jour ou après.
+              ({fmtM3(inv.totalM3)}, comptage de fin de journée), plus les mouvements datés du lendemain
+              ou après.
             </>
           ) : (
             <>

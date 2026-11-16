@@ -6,8 +6,9 @@
 // Stock = dernier inventaire + sciage + nouvelle mesure (recutting in)
 //       − empotage − livraison − séchoir − menuiserie − rejets
 //       − ancienne mesure (recutting out) − ventes.
-// L'inventaire est une remise à zéro datée : il fixe le stock au matin de
-// son jour, seuls les mouvements datés de ce jour ou après comptent.
+// L'inventaire est une remise à zéro datée : comptage de fin de journée, il
+// contient déjà les mouvements de son jour ; seuls ceux du lendemain ou
+// après comptent en plus.
 
 import { z } from "zod";
 import { cuttingResumeKey } from "./formulas.js";
