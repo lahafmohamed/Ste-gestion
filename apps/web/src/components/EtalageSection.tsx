@@ -1,22 +1,44 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { MeasurementCreateInput, TruckDTO } from "@ste/shared";
 import { measurementTotalM3, truckBillCount, truckBillNos } from "@ste/shared";
 import { trucksApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
+import { fmtInt, fmtM3, fmtPct } from "../lib/format";
 import { declaredOf, diaOf, girthOf, invalidateTrucks, parcStage, truckMatches } from "../lib/trucks";
 import TallyEntry from "./TallyEntry";
 import { clearTallyDraft } from "../lib/tallyDraft";
 import TruckCard from "./TruckCard";
 import Badge from "./ui/Badge";
-import Button from "./ui/Button";
-import { Kpi, KpiStrip, SectionHeading } from "./ui/Card";
-import { EmptyState, QueryError } from "./ui/Feedback";
+import Button, { buttonCls } from "./ui/Button";
+import { Kpi, KpiStrip, SectionHeading, cardCls } from "./ui/Card";
+import { EmptyState, Notice, QueryError } from "./ui/Feedback";
 import { SearchInput } from "./ui/Input";
-import { SkeletonList } from "./ui/Skeleton";
-import { IconArrowRight, IconCheck } from "./icons";
+import { SkeletonLine, SkeletonList } from "./ui/Skeleton";
+import { IconArrowRight, IconCheck, IconChevronRight, IconLock } from "./icons";
+
+// Anneau de focus des liens-texte du poste parc (même tracé que Button).
+const focusCls =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500";
+
+/** Écart compté (billes) avec un vrai signe : « +2 », « −3 », « 0 ». */
+function signed(n: number): string {
+  return n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0";
+}
+
+/** Ligne du récap enregistré : libellé à gauche, chiffre et verdict à droite. */
+function RecapRow({ label, value, badge }: { label: string; value: ReactNode; badge?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <dt className="text-brand-600">{label}</dt>
+      <dd className="flex flex-wrap items-center justify-end gap-2 tabular-nums text-brand-900">
+        {value}
+        {badge}
+      </dd>
+    </div>
+  );
+}
 
 // Étapes 2 et 3 · le travail du parc, sur tablette :
 //   Étalage — les billes sont étalées et mesurées une par une (longueur + Ø).
@@ -137,6 +159,15 @@ export default function EtalageSection({
   })();
   // Même seuil que le récap d'un camion : au-delà de 5 %, l'écart se regarde.
   const gapOff = stats.gap != null && Math.abs(stats.gap) / stats.declared > 0.05;
+  // Valeur d'une tuile : fantôme en vol, « — » en erreur (QueryError plus bas).
+  const kpiValue = (render: () => ReactNode): ReactNode =>
+    trucks.isLoading ? (
+      <SkeletonLine className="my-px h-7 w-20" />
+    ) : trucks.data ? (
+      render()
+    ) : (
+      "—"
+    );
 
   const parcDia = parcTruck ? diaOf(parcTruck) : undefined;
   const parcGirth = parcTruck ? girthOf(parcTruck) : undefined;
@@ -149,18 +180,16 @@ export default function EtalageSection({
     // cohabitent sur une même page (onglet Parc de la fiche contrat).
     // scroll-mt : le header fixe (h-14) mangeait le haut de la section au scroll.
     <section id="etalage" className="mt-5 scroll-mt-[4.5rem]">
-      {/* Chiffres du parc — « … » tant que la liste n'est pas là, jamais un
-          zéro qui se lirait comme « rien de mesuré ». */}
+      {/* Chiffres du parc — bloc fantôme pendant le chargement, « — » si la
+          liste a échoué : jamais un zéro qui se lirait comme « rien de mesuré ». */}
       <KpiStrip cols={3} className="mb-6">
-        <Kpi bare label="Billes étalées" value={trucks.data ? fmtInt(stats.bills) : "…"} />
-        <Kpi bare label="Volume étalé" value={trucks.data ? fmtM3(stats.m3.toFixed(3)) : "…"} />
+        <Kpi bare label="Billes étalées" value={kpiValue(() => fmtInt(stats.bills))} />
+        <Kpi bare label="Volume étalé" value={kpiValue(() => fmtM3(stats.m3))} />
         <Kpi
           bare
           label="Écart vs brousse"
-          value={
-            !trucks.data ? (
-              "…"
-            ) : stats.gap == null ? (
+          value={kpiValue(() =>
+            stats.gap == null ? (
               // Aucun volume annoncé sur les camions étalés : il n'y a rien à
               // comparer, et « 0 » se lirait comme « compte juste ».
               "—"
@@ -170,60 +199,80 @@ export default function EtalageSection({
                 {fmtM3(stats.gap)}
               </span>
             )
+          )}
+          // Le chiffre seul ne dit pas sur quoi porte l'écart : seuls les
+          // camions étalés comptent, pas ceux qui attendent la mesure.
+          hint={
+            trucks.data && stats.gap != null ? `sur ${fmtM3(stats.declared)} annoncés` : undefined
           }
         />
       </KpiStrip>
 
+      {/* Contrat ouvert mais compte sans la saisie : les boutons « Étaler »
+          disparaissent, le dire plutôt que laisser chercher. Le contrat
+          clôturé a déjà son bandeau (StepLayout). */}
+      {!closedProp && closed && (
+        <Notice icon={IconLock} className="mb-4">
+          Consultation seule : votre compte n'a pas la saisie d'étalage.
+        </Notice>
+      )}
+
       {/* ── Étapes 2/3 · Étalage des billes puis billonnage ── */}
       {parcTruck && (
+        // Carte blanche + anneau sève : le poste ouvert se distingue des files
+        // en dessous, et l'en-tête collant de la grille (fond blanc) s'y fond.
         <div
           ref={parcRef}
-          className="mb-3 scroll-mt-[4.5rem] rounded-xl border border-parc-200 bg-parc-50/40 p-4"
+          className={`${cardCls} mb-6 scroll-mt-[4.5rem] p-4 ring-1 ring-inset ring-parc-300`}
         >
-          <div className="mb-1 flex items-center justify-between">
-            <div className="text-sm font-medium text-brand-900">
-              {parcStep === "ETALAGE" ? "Étape 2 · Étalage des billes" : "Étape 3 · Billonnage"} ·{" "}
-              {parcTruck.registration}
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-parc-700">
+                {parcStep === "ETALAGE" ? "Étape 2 · Étalage des billes" : "Étape 3 · Billonnage"}
+              </p>
+              <h2 className="truncate text-lg font-semibold tracking-tight text-brand-900">
+                {parcTruck.registration}
+              </h2>
             </div>
             <Link
               to={`/trucks/${parcTruck.id}`}
-              className="inline-flex min-h-touch items-center rounded-lg px-2 text-sm text-brand-500 underline hover:text-brand-900 active:bg-brand-100"
+              className={`-mr-2 inline-flex min-h-touch shrink-0 items-center gap-0.5 rounded-lg px-2 text-sm font-medium text-brand-600 transition-colors hover:text-brand-900 active:bg-brand-100 ${focusCls}`}
             >
-              Fiche complète
+              Fiche camion
+              <IconChevronRight width={16} height={16} aria-hidden />
             </Link>
           </div>
 
           {/* Rappel de l'annoncé — l'objectif du pointage est de le vérifier. */}
-          <div className="mb-3 flex flex-wrap gap-1.5 text-sm">
+          <div className="mb-4 flex flex-wrap gap-1.5">
             {parcTruck.deliveryNote && (
-              <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
+              <Badge size="md" className="whitespace-nowrap">
                 B/L {parcTruck.deliveryNote}
-              </span>
+              </Badge>
             )}
             {parcTruck.parcel && (
-              <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
+              <Badge size="md" className="whitespace-nowrap">
                 Parcelle {parcTruck.parcel}
-              </span>
+              </Badge>
             )}
-            <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
+            <Badge size="md" className="whitespace-nowrap tabular-nums">
               Annoncé : {parcDeclared?.count ?? "?"} billes ·{" "}
               {parcDeclared?.m3 != null ? fmtM3(parcDeclared.m3) : "? m³"}
-            </span>
+            </Badge>
             {/* Au billonnage, la référence n'est plus la brousse mais l'étalage :
                 l'écart girth − Ø, c'est la perte au nettoyage et au tronçonnage. */}
             {parcStep === "BILLONNAGE" && parcDia && (
-              <span className="whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-brand-700 ring-1 ring-brand-200">
+              <Badge size="md" tone="parc" className="whitespace-nowrap tabular-nums">
                 Étalé : {parcDia.logs.length} billes · {fmtM3(measurementTotalM3(parcDia))}
-              </span>
+              </Badge>
             )}
           </div>
 
           {parcStep === "BILLONNAGE" && !parcGirth && (
-            <p className="mb-2 text-xs text-brand-500">
-              Les billes ne sont pas remesurées : le bois est nettoyé puis tronçonné. Taper une
-              bille crée son billon suivant (266 → 266A, 266B, 266C…), chacun avec sa propre
-              longueur et circonférence.
-            </p>
+            <Notice className="mb-3">
+              La bille n'est pas remesurée : nettoyée puis tronçonnée, elle donne ses billons
+              (266 donne 266A, 266B, 266C…), chacun avec sa longueur et sa circonférence.
+            </Notice>
           )}
 
           {parcDone ? (
@@ -233,95 +282,83 @@ export default function EtalageSection({
               const isEtalage = parcStep === "ETALAGE";
               const billes = truckBillCount(parcTruck);
               const d = parcDeclared!;
+              const n = parcDone.logs.length;
+              const diaM3 = parcDia ? measurementTotalM3(parcDia) : 0;
+              const lossPct = diaM3 > 0 ? ((diaM3 - total) / diaM3) * 100 : null;
               return (
-                <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-parc-200">
-                  <div className="flex items-center gap-1.5 font-medium text-parc-700">
-                    <IconCheck width={16} height={16} className="shrink-0" aria-hidden />
+                <div className="rounded-lg bg-parc-50 p-3 ring-1 ring-inset ring-parc-200/80">
+                  <div className="flex items-center gap-1.5 font-medium text-parc-800">
+                    <IconCheck width={18} height={18} className="shrink-0" aria-hidden />
                     {isEtalage ? "Étalage enregistré" : "Billonnage enregistré"}
                   </div>
-                  <div className="mt-1 space-y-0.5 text-brand-600">
-                    <div>
-                      {isEtalage ? (
-                        <>
-                          Billes : <span className="tabular-nums">{parcDone.logs.length}</span>{" "}
-                          étalées
-                        </>
-                      ) : (
-                        <>
-                          Billons : <span className="tabular-nums">{parcDone.logs.length}</span> issus
-                          de <span className="tabular-nums">{billes ?? "?"}</span> billes
-                        </>
-                      )}
-                      {isEtalage && d.count != null && (
-                        <>
-                          {" "}
-                          / {d.count} annoncées{" "}
-                          <span
-                            className={
-                              parcDone.logs.length === d.count
-                                ? "text-parc-700"
-                                : "text-amber-700"
-                            }
-                          >
-                            (
-                            {parcDone.logs.length === d.count
-                              ? "compte bon"
-                              : `écart ${parcDone.logs.length - d.count > 0 ? "+" : ""}${parcDone.logs.length - d.count}`}
-                            )
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <div>
-                      Volume : <span className="tabular-nums">{fmtM3(total)}</span>
-                      {/* Étalage → référence brousse (quota SODEFOR).
-                          Billonnage → référence étalage : l'écart est la perte
-                          au nettoyage et au tronçonnage, pas un écart de quota. */}
-                      {isEtalage
-                        ? d.m3 != null &&
-                          d.m3 > 0 && (
-                            <>
-                              {" "}
-                              / {fmtM3(d.m3)} brousse{" "}
-                              <span
-                                className={
-                                  Math.abs(total - d.m3) / d.m3 <= 0.05
-                                    ? "text-parc-700"
-                                    : "text-amber-700"
-                                }
-                              >
-                                ({total - d.m3 >= 0 ? "+" : ""}
-                                {fmtM3(total - d.m3)})
-                              </span>
-                            </>
+                  {/* Libellé à gauche, chiffre + verdict à droite : la même
+                      lecture que le pied de saisie, le pointeur ne réapprend rien. */}
+                  <dl className="mt-2 space-y-1.5 text-sm">
+                    {isEtalage ? (
+                      <RecapRow
+                        label="Billes"
+                        value={
+                          <>
+                            {n} étalées{d.count != null && <> / {d.count} annoncées</>}
+                          </>
+                        }
+                        badge={
+                          d.count != null && (
+                            <Badge tone={n === d.count ? "parc" : "amber"} className="tabular-nums">
+                              {n === d.count ? "compte bon" : `écart ${signed(n - d.count)}`}
+                            </Badge>
                           )
-                        : parcDia &&
-                          (() => {
-                            const dia = measurementTotalM3(parcDia);
-                            if (!(dia > 0)) return null;
-                            const lossPct = ((dia - total) / dia) * 100;
-                            return (
-                              <>
-                                {" "}
-                                / {fmtM3(dia)} étalés{" "}
-                                <span
-                                  className={
-                                    lossPct <= 25 ? "text-parc-700" : "text-amber-700"
-                                  }
-                                >
-                                  (perte {fmtPct(lossPct, 1)})
-                                </span>
-                              </>
-                            );
-                          })()}
-                    </div>
-                  </div>
+                        }
+                      />
+                    ) : (
+                      <RecapRow
+                        label="Billons"
+                        value={
+                          <>
+                            {n} issus de {billes ?? "?"} billes
+                          </>
+                        }
+                      />
+                    )}
+                    {/* Étalage → référence brousse (quota SODEFOR).
+                        Billonnage → référence étalage : l'écart est la perte
+                        au nettoyage et au tronçonnage, pas un écart de quota. */}
+                    <RecapRow
+                      label="Volume"
+                      value={
+                        <>
+                          {fmtM3(total)}
+                          {isEtalage
+                            ? d.m3 != null && d.m3 > 0 && <> / {fmtM3(d.m3)} brousse</>
+                            : lossPct != null && <> / {fmtM3(diaM3)} étalés</>}
+                        </>
+                      }
+                      badge={
+                        isEtalage
+                          ? d.m3 != null &&
+                            d.m3 > 0 && (
+                              <Badge
+                                tone={Math.abs(total - d.m3) / d.m3 <= 0.05 ? "parc" : "amber"}
+                                className="tabular-nums"
+                              >
+                                {total - d.m3 >= 0 ? "+" : ""}
+                                {fmtM3(total - d.m3)}
+                              </Badge>
+                            )
+                          : lossPct != null && (
+                              <Badge tone={lossPct <= 25 ? "parc" : "amber"} className="tabular-nums">
+                                perte {fmtPct(lossPct, 1)}
+                              </Badge>
+                            )
+                      }
+                    />
+                  </dl>
 
                   {/* Le relevé enregistré remplace la saisie : sans ce rappel, on
                       ne voit plus comment ajouter une bille oubliée. */}
                   <Link
                     to={`/trucks/${parcTruck.id}`}
-                    className="mt-2 inline-block text-xs text-brand-500 underline hover:text-brand-900"
+                    className={`-mx-2 mt-1 inline-flex min-h-touch items-center rounded-lg px-2 text-sm text-brand-600 underline transition-colors hover:text-brand-900 active:bg-parc-100 ${focusCls}`}
                   >
                     Il manque {isEtalage ? "des billes" : "des billons"} ? Compléter sur la fiche
                     camion
@@ -349,7 +386,9 @@ export default function EtalageSection({
                 <IconArrowRight width={16} height={16} className="-mr-0.5" />
               </Button>
             )}
-            <Button size="xs" onClick={() => setParcTruck(null)}>
+            {/* « Plus tard » ferme le poste sans rien perdre : la saisie en
+                cours reste en brouillon sur la tablette. */}
+            <Button onClick={() => setParcTruck(null)}>
               {parcDone ? "Terminer" : "Plus tard"}
             </Button>
           </div>
@@ -374,12 +413,16 @@ export default function EtalageSection({
         </QueryError>
       )}
       {trucks.data?.length === 0 && (
-        <EmptyState>
-          Aucun camion.{" "}
-          <Link to="/reception" className="underline">
-            Réceptionner
-          </Link>{" "}
-          un camion d'abord.
+        <EmptyState
+          action={
+            !closedProp ? (
+              <Link to="/reception" className={buttonCls("primary", "md")}>
+                Réceptionner un camion
+              </Link>
+            ) : undefined
+          }
+        >
+          Aucun camion reçu sur ce contrat : l'étalage commence après la réception au portail.
         </EmptyState>
       )}
 
@@ -402,12 +445,15 @@ export default function EtalageSection({
                     ) : undefined
                   }
                 >
-                  {col.title} ({inColumn.length})
+                  {col.title}{" "}
+                  <span className="font-normal tabular-nums text-brand-500">
+                    {inColumn.length}
+                  </span>
                 </SectionHeading>
                 <div className="space-y-2">
                   {shown.length === 0 && (
                     <EmptyState>
-                      {needle !== "" ? "Aucun camion ne correspond." : col.empty}
+                      {needle !== "" ? `Aucun camion ne correspond à « ${q.trim()} ».` : col.empty}
                     </EmptyState>
                   )}
                   {shown.map((t) => {
@@ -448,7 +494,6 @@ export default function EtalageSection({
           })}
         </div>
       )}
-
     </section>
   );
 }

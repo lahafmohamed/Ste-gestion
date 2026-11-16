@@ -1,6 +1,6 @@
 import type { ContractCuttingDTO } from "@ste/shared";
 import { SIZE_GROUP_LABELS, type SizeGroup } from "@ste/shared";
-import { fmtNum, fmtPct, fmtM3 } from "../lib/format";
+import { fmtDec3, fmtNum, fmtPct, fmtM3 } from "../lib/format";
 
 // Palette marque (sève / ambre / teck / stone) alignée sur SIZE_GROUP_TONE.
 // Les teintes vert/brun se rapprochent en vision deutan : écart de luminance
@@ -29,7 +29,16 @@ function GroupDonut({ groups, total }: { groups: Record<SizeGroup, string>; tota
   });
 
   return (
-    <svg viewBox="0 0 120 120" className="h-36 w-36 shrink-0" role="img" aria-label="Répartition par groupe">
+    // Nom accessible chiffré : le lecteur d'écran entend la même répartition
+    // que la légende, pas une simple « image ».
+    <svg
+      viewBox="0 0 120 120"
+      className="h-36 w-36 shrink-0"
+      role="img"
+      aria-label={`Répartition par groupe : ${arcs
+        .map((a) => `${SIZE_GROUP_LABELS[a.g]} ${fmtPct((a.v / total) * 100, 0)}`)
+        .join(", ")}`}
+    >
       <g transform="rotate(-90 60 60)">
         {arcs.map((a) => (
           <circle
@@ -43,7 +52,7 @@ function GroupDonut({ groups, total }: { groups: Record<SizeGroup, string>; tota
             strokeDasharray={`${a.len} ${C - a.len}`}
             strokeDashoffset={a.offset}
           >
-            <title>{`${SIZE_GROUP_LABELS[a.g]} : ${fmtM3(a.v)} (${((a.v / total) * 100).toFixed(0)} %)`}</title>
+            <title>{`${SIZE_GROUP_LABELS[a.g]} : ${fmtM3(a.v)} (${fmtPct((a.v / total) * 100, 0)})`}</title>
           </circle>
         ))}
       </g>
@@ -66,19 +75,20 @@ function SizeBars({ sizes }: { sizes: ContractCuttingDTO["sizes"] }) {
       {sizes.map((s) => {
         const v = Number(s.volumeM3);
         return (
-          <div key={s.code} className="grid grid-cols-[3rem_1fr_4.5rem] items-center gap-2">
-            <span className="text-xs font-medium text-brand-700">{s.code}</span>
-            <div className="h-3.5 overflow-hidden rounded-r-sm bg-brand-100">
+          // <title> n'a de sens que dans du SVG : l'info-bulle passe par la ligne.
+          <div
+            key={s.code}
+            className="grid grid-cols-[3rem_1fr_4.5rem] items-center gap-2"
+            title={`${s.code} : ${fmtM3(v)}`}
+          >
+            <span className="text-sm font-medium text-brand-700">{s.code}</span>
+            <div aria-hidden className="h-3.5 overflow-hidden rounded-r-sm bg-brand-100">
               <div
                 className="h-full rounded-r-sm"
                 style={{ width: `${(v / max) * 100}%`, backgroundColor: GROUP_COLOR[s.group] }}
-              >
-                <title>{`${s.code} : ${fmtM3(v)}`}</title>
-              </div>
+              />
             </div>
-            <span className="text-right text-xs tabular-nums text-brand-600">
-              {fmtNum(v.toFixed(2))}
-            </span>
+            <span className="text-right text-sm tabular-nums text-brand-600">{fmtDec3(v)}</span>
           </div>
         );
       })}
@@ -99,8 +109,12 @@ export default function CuttingCharts({ data }: { data: ContractCuttingDTO }) {
       {/* Légende (identité par pastille, valeurs en encre) */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
         {ORDER.filter((g) => Number(data.groups[g]) > 0).map((g) => (
-          <span key={g} className="inline-flex items-center gap-1.5 text-xs text-brand-600">
+          <span
+            key={g}
+            className="inline-flex items-center gap-1.5 text-sm tabular-nums text-brand-600"
+          >
             <span
+              aria-hidden
               className="inline-block h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: GROUP_COLOR[g] }}
             />

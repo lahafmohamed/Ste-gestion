@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import type { TruckDTO } from "@ste/shared";
 import { runPieceCount, runTotalM3, truckSawnProgress } from "@ste/shared";
 import { contractsApi, productionApi } from "../lib/api";
-import { fmtInt, fmtM3, fmtNum, fmtPct } from "../lib/format";
-import Badge from "./ui/Badge";
+import { fmtInt, fmtM3, fmtPct } from "../lib/format";
+import { buttonCls } from "./ui/Button";
 import { SectionHeading } from "./ui/Card";
-import { Notice, QueryError } from "./ui/Feedback";
+import { EmptyState, Notice, QueryError } from "./ui/Feedback";
 import { SkeletonLine } from "./ui/Skeleton";
-import { IconCheck } from "./icons";
+import { IconChevronRight } from "./icons";
 
 // Miroir de la feuille « DEBITE TECK DU … » (docs/pdf5) : elle est tenue PAR
 // CAMION et porte, à côté du tableau de stock, un encadré B/L · cubage brousse ·
@@ -29,12 +29,15 @@ function Line({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1">
-      <span className="text-sm text-brand-500">
+      <span className="text-sm text-brand-600">
         {label}
         {hint && <span className="ml-1.5 text-xs text-brand-500">{hint}</span>}
       </span>
+      {/* Chiffres en text-base : l'encadré se lit sur la tablette du parc. */}
       <span
-        className={`tabular-nums ${strong ? "text-base font-semibold text-brand-900" : "text-sm text-brand-900"}`}
+        className={`shrink-0 text-right text-base tabular-nums text-brand-900 ${
+          strong ? "font-semibold" : ""
+        }`}
       >
         {value}
       </span>
@@ -80,14 +83,16 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
       <SectionHeading
         right={
           debited > 0 ? (
-            <span className="text-sm font-semibold text-brand-900">{fmtM3(debited)}</span>
+            <span className="text-sm font-semibold tabular-nums text-brand-900">
+              {fmtM3(debited)}
+            </span>
           ) : undefined
         }
       >
         Débitage
       </SectionHeading>
 
-      <div className="rounded-xl bg-white shadow-card p-4">
+      <div className="rounded-xl bg-white p-4 shadow-card">
         {stats.isError || runs.isError ? (
           <QueryError
             error={stats.error ?? runs.error}
@@ -105,21 +110,30 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
             <SkeletonLine className="w-1/2" />
           </div>
         ) : debited === 0 ? (
-          <div className="text-sm text-brand-500">
-            Camion pas encore scié.
-            {girth > 0 ? (
-              <>
-                {" "}
-                {s?.billonCount ?? 0} billon{(s?.billonCount ?? 0) > 1 ? "s" : ""} sur parc (
-                {fmtM3(girth)}).{" "}
-                <Link to="/debitage" className="underline hover:text-brand-900">
+          // Pas encore scié : dire ce qui attend et, s'il y a du bois billonné,
+          // le geste suivant — un vrai bouton, plus un lien perdu dans la phrase.
+          <EmptyState
+            action={
+              girth > 0 && (
+                <Link to="/debitage" className={buttonCls("secondary", "sm")}>
                   Ouvrir une session de débitage
                 </Link>
+              )
+            }
+          >
+            {girth > 0 ? (
+              <>
+                Camion pas encore scié :{" "}
+                <span className="tabular-nums">
+                  {s?.billonCount ?? 0} billon{(s?.billonCount ?? 0) > 1 ? "s" : ""} sur parc (
+                  {fmtM3(girth)})
+                </span>
+                .
               </>
             ) : (
-              " Billonner le camion d'abord."
+              "Camion pas encore scié. Le billonner d'abord."
             )}
-          </div>
+          </EmptyState>
         ) : (
           <>
             {/* Encadré de la feuille DEBITE, mêmes intitulés que le papier. */}
@@ -155,32 +169,24 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
             </div>
 
             {/* Où en est le camion — l'info que la feuille papier ne donne pas. */}
-            {progress.total > 0 && (
-              <div
-                className={`mt-2 rounded-lg px-3 py-2 text-sm ${
-                  progress.complete
-                    ? "bg-parc-50 text-parc-800"
-                    : "bg-amber-50 text-amber-800"
-                }`}
-              >
-                {progress.complete ? (
-                  <span className="inline-flex items-center gap-1.5"><IconCheck width={16} height={16} className="shrink-0" aria-hidden />Camion entièrement scié ({progress.total} billons)</span>
-                ) : (
-                  <>
-                    <strong className="tabular-nums">
-                      {progress.sawn}/{progress.total}
-                    </strong>{" "}
-                    billons sciés — restent :{" "}
-                    {progress.remaining
-                      .slice(0, 24)
-                      .map((l) => l.externalId ?? `#${l.position}`)
-                      .join(", ")}
-                    {progress.remaining.length > 24 &&
-                      ` … +${progress.remaining.length - 24}`}
-                  </>
-                )}
-              </div>
-            )}
+            {progress.total > 0 &&
+              (progress.complete ? (
+                <Notice tone="success" className="mt-2">
+                  Camion entièrement scié ({progress.total} billons).
+                </Notice>
+              ) : (
+                <Notice tone="warn" className="mt-2">
+                  <strong className="tabular-nums">
+                    {progress.sawn}/{progress.total}
+                  </strong>{" "}
+                  billons sciés. Restent :{" "}
+                  {progress.remaining
+                    .slice(0, 24)
+                    .map((l) => l.externalId ?? `#${l.position}`)
+                    .join(", ")}
+                  {progress.remaining.length > 24 && ` … +${progress.remaining.length - 24}`}
+                </Notice>
+              ))}
 
             {shared && (
               <Notice tone="warn" className="mt-2">
@@ -190,61 +196,72 @@ export default function TruckDebitageSection({ truck }: { truck: TruckDTO }) {
               </Notice>
             )}
 
-            {/* Splits Daily Truck Log — ce que le débité a donné, par produit. */}
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <Badge tone="info">
-                MS {fmtM3(Number(s!.msM3))}
-                <span className="ml-1 font-normal">
-                  (main {fmtNum(Number(s!.mainM3).toFixed(3))} · 1,5″{" "}
-                  {fmtNum(Number(s!.band15M3).toFixed(3))})
-                </span>
-              </Badge>
-              <Badge tone="accent">
-                1″ {fmtM3(Number(s!.oneInchM3))} ({fmtPct(Number(s!.oneInchPct), 0)}
-                )
-              </Badge>
-              <Badge>
-                Long ≥ 6,5 ft {fmtNum(Number(s!.longM3).toFixed(3))} · court{" "}
-                {fmtM3(Number(s!.shortM3))}
-              </Badge>
-              {s!.costPerM3 && (
-                <Badge>
-                  Coût {fmtInt(s!.costPerM3)} FCFA/m³ débité
-                  {s!.costMsPerM3 ? ` · ${fmtInt(s!.costMsPerM3)} /m³ MS` : ""}
-                </Badge>
-              )}
+            {/* Splits Daily Truck Log — ce que le débité a donné, par produit.
+                Mêmes lignes que l'encadré plutôt qu'une rangée de pastilles à
+                parenthèses imbriquées : les chiffres s'alignent à droite. */}
+            <div className="mt-4 border-t border-brand-100 pt-3">
+              <h3 className="mb-1 text-sm font-medium text-brand-700">Répartition du débité</h3>
+              <div className="divide-y divide-brand-100">
+                <Line
+                  label="MS"
+                  hint={`main ${fmtM3(s!.mainM3)} · 1,5″ ${fmtM3(s!.band15M3)}`}
+                  value={fmtM3(s!.msM3)}
+                />
+                <Line
+                  label="1″"
+                  hint={fmtPct(Number(s!.oneInchPct), 0)}
+                  value={fmtM3(s!.oneInchM3)}
+                />
+                <Line label="Long" hint="≥ 6,5 ft" value={fmtM3(s!.longM3)} />
+                <Line label="Court" value={fmtM3(s!.shortM3)} />
+                {s!.costPerM3 && (
+                  <Line
+                    label="Coût débité"
+                    hint={s!.costMsPerM3 ? `${fmtInt(s!.costMsPerM3)} FCFA/m³ MS` : undefined}
+                    value={`${fmtInt(s!.costPerM3)} FCFA/m³`}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Sessions : la saisie reste par session, on y renvoie pour le détail. */}
             <div className="mt-4 border-t border-brand-100 pt-3">
-              <div className="mb-1.5 text-xs font-medium text-brand-500">
+              <h3 className="mb-2 text-sm font-medium text-brand-700">
                 {myRuns.length} session{myRuns.length > 1 ? "s" : ""} de débitage
-              </div>
+              </h3>
               <div className="space-y-1.5">
                 {myRuns.map((r) => {
                   // logIds vides = camion entier passé à la scie (pas de billes précisées).
                   const mine = r.logIds.filter((id) => billonNoById.has(id));
                   return (
+                    // Tuile posée dans la carte : aplat clair, pas d'ombre empilée
+                    // sur l'ombre de la carte ; le chevron dit « ouvre la session ».
                     <Link
                       key={r.id}
                       to={`/production-runs/${r.id}`}
-                      className="block rounded-lg bg-white p-2.5 shadow-card transition-[box-shadow,transform] duration-200 ease-out hover:shadow-card-hover active:scale-[0.99] active:shadow-card"
+                      className="group block rounded-lg bg-brand-50 p-3 ring-1 ring-inset ring-brand-100 transition-colors duration-150 ease-out hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-brand-900">
+                        <span className="min-w-0 text-base font-medium text-brand-900">
                           {new Date(r.producedAt).toLocaleDateString("fr-FR")}
                           {r.note ? ` · ${r.note}` : ""}
                         </span>
-                        <span className="shrink-0 text-sm tabular-nums text-brand-700">
+                        <span className="flex shrink-0 items-center gap-1 text-base tabular-nums text-brand-800">
                           {fmtM3(runTotalM3(r))}
+                          <IconChevronRight
+                            width={18}
+                            height={18}
+                            aria-hidden
+                            className="text-brand-500 transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none"
+                          />
                         </span>
                       </div>
-                      <div className="mt-0.5 text-sm text-brand-500">
+                      <div className="mt-0.5 text-sm tabular-nums text-brand-600">
                         {fmtInt(runPieceCount(r))} pièces · {r.lines.length} lignes
                         {r.truckIds.length > 1 &&
                           ` · session partagée entre ${r.truckIds.length} camions`}
                       </div>
-                      <div className="mt-1 text-sm text-brand-500">
+                      <div className="mt-1 text-pretty text-sm text-brand-600">
                         {mine.length > 0
                           ? `Billons sciés : ${mine.map((id) => billonNoById.get(id)).join(", ")}`
                           : "Camion entier (billons non précisés)"}

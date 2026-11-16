@@ -2,11 +2,16 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { ContractDTO } from "@ste/shared";
 import { useSelectedContract } from "../hooks/useSelectedContract";
+import { useCan } from "../lib/auth";
 import ContractPicker from "./ContractPicker";
-import { IconContract, IconLock } from "./icons";
+import { IconContract, IconLock, IconPlus } from "./icons";
 import { PageHeader } from "./Layout";
+import Button, { buttonCls } from "./ui/Button";
 import { SkeletonList } from "./ui/Skeleton";
 import { Notice, EmptyState } from "./ui/Feedback";
+
+// Raccourcis du choix de contrat : au-delà, la liste déroulante d'en-tête.
+const QUICK_PICKS = 6;
 
 type Props = {
   title: string;
@@ -32,6 +37,8 @@ export default function StepLayout({
   children,
 }: Props) {
   const { contracts, selectedId, setSelectedId, selected, isLoading } = useSelectedContract();
+  const can = useCan();
+  const open = contracts.filter((c) => c.status === "OPEN");
 
   return (
     <>
@@ -44,7 +51,7 @@ export default function StepLayout({
             contracts={contracts}
             value={selectedId}
             onChange={setSelectedId}
-            emptyLabel={renderAllContracts ? "Tous les contrats" : "— Choisir —"}
+            emptyLabel={renderAllContracts ? "Tous les contrats" : "Choisir un contrat"}
           />
         }
       />
@@ -54,12 +61,19 @@ export default function StepLayout({
         {isLoading ? (
           <SkeletonList count={2} />
         ) : contracts.length === 0 ? (
-          <EmptyState>
-            Aucun contrat.{" "}
-            <Link to="/contracts" className="font-medium text-accent-700 underline hover:text-accent-800">
-              Créer un contrat
-            </Link>{" "}
-            d'abord.
+          <EmptyState
+            action={
+              can("contracts.create") ? (
+                <Link to="/contracts?nouveau=1" className={buttonCls("primary", "md")}>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Créer un contrat
+                </Link>
+              ) : undefined
+            }
+          >
+            {can("contracts.create")
+              ? "Aucun contrat pour l'instant. La saisie se rattache à un contrat : commencez par en créer un."
+              : "Aucun contrat pour l'instant. Demandez au bureau d'en créer un pour commencer la saisie."}
           </EmptyState>
         ) : !selected && renderAllContracts ? (
           renderAllContracts()
@@ -70,25 +84,29 @@ export default function StepLayout({
             <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent-100 text-accent-600">
               <IconContract width={24} height={24} />
             </span>
-            <p className="mt-4 text-base font-semibold text-brand-900">Choisir un contrat</p>
-            <p className="mt-1 text-sm text-brand-500">
-              Le contrat courant se choisit en haut de page, ou directement ici.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              {contracts
-                .filter((c) => c.status === "OPEN")
-                .slice(0, 6)
-                .map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setSelectedId(c.id)}
-                    className="min-h-touch rounded-lg bg-white px-4 text-sm font-medium text-brand-800 shadow-card transition-[box-shadow,transform,background-color] duration-150 ease-out hover:shadow-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 motion-safe:active:scale-[0.96] active:bg-brand-50"
-                  >
-                    {c.code}
-                  </button>
-                ))}
-            </div>
+            <h2 className="mt-4 text-base font-semibold text-brand-900">Choisir un contrat</h2>
+            {open.length > 0 ? (
+              <>
+                <p className="mt-1 text-sm text-brand-600">
+                  {open.length > QUICK_PICKS
+                    ? `Les ${QUICK_PICKS} premiers contrats ouverts ci-dessous ; les autres dans la liste en haut de page.`
+                    : "Touchez un contrat ouvert ci-dessous, ou choisissez-le en haut de page."}
+                </p>
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  {open.slice(0, QUICK_PICKS).map((c) => (
+                    <Button key={c.id} onClick={() => setSelectedId(c.id)} className="px-4">
+                      {c.code}
+                    </Button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              // Tous clôturés : pas de raccourci vide, on dit où regarder.
+              <p className="mt-1 text-sm text-brand-600">
+                Aucun contrat ouvert. Les contrats clôturés restent consultables depuis la liste en
+                haut de page.
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -97,7 +115,10 @@ export default function StepLayout({
             {selected.status === "CLOSED" && (
               <Notice icon={IconLock} className="mb-4">
                 Contrat {selected.code} clôturé — lecture seule.{" "}
-                <Link to={`/contracts/${selected.id}`} className="underline">
+                <Link
+                  to={`/contracts/${selected.id}`}
+                  className="font-medium underline underline-offset-2 hover:text-brand-900"
+                >
                   Le rouvrir
                 </Link>{" "}
                 (Termes du contrat) pour corriger une saisie.

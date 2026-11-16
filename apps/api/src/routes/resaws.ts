@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
-import { classifySize, resawOpCreateSchema, sawnVolumeM3 } from "@ste/shared";
+import { classifySize, resawOpCreateSchema, sawnVolumeM3, type Quality } from "@ste/shared";
 import { prisma } from "../prisma.js";
 
 // Resciage : bois déjà scié en stock repassé à la scie en sections plus
@@ -23,7 +23,13 @@ function serializeOp(o: OpWithLines) {
 
 function buildLines(
   kind: "CONSUMED" | "PRODUCED",
-  lines: { lengthFt: string; widthIn: string; thicknessIn: string; count: number }[]
+  lines: {
+    lengthFt: string;
+    widthIn: string;
+    thicknessIn: string;
+    count: number;
+    quality?: Quality;
+  }[]
 ) {
   return lines.map((l, i) => {
     const size = classifySize(Number(l.widthIn), Number(l.thicknessIn));
@@ -40,6 +46,7 @@ function buildLines(
       widthIn: l.widthIn,
       thicknessIn: l.thicknessIn,
       count: l.count,
+      quality: l.quality ?? "B",
       sizeCode: size.code,
       sizeGroup: size.group,
       volumeM3: vol.toFixed(6),

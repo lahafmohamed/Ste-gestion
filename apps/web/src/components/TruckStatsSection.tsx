@@ -1,14 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import type { ContractDTO } from "@ste/shared";
 import { TRUCK_ALERT } from "@ste/shared";
 import { contractsApi } from "../lib/api";
-import { fmtInt, fmtNum, fmtPct } from "../lib/format";
+import { fmtDec3, fmtInt, fmtPct } from "../lib/format";
 import Badge from "./ui/Badge";
 import Card, { SectionHeading } from "./ui/Card";
 import { QueryError } from "./ui/Feedback";
+import { SkeletonLine } from "./ui/Skeleton";
 import { TableWrap, WideBleed } from "./ui/Table";
 
-const num = (v: string | number) => fmtNum(Number(Number(v).toFixed(3)));
+// Colonnes de m³ : trois décimales fixes, les virgules s'alignent d'une ligne
+// à l'autre (fmtNum rognait les zéros : « 3,2 » sous « 12,345 »).
+const num = fmtDec3;
 const day = (iso: string) =>
   new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
 
@@ -63,6 +67,21 @@ export default function TruckStatsSection({ contract }: { contract: ContractDTO 
       </section>
     );
 
+  // Chargement : la section garde sa place (titre + lignes fantômes) au lieu
+  // d'apparaître d'un bloc sous les yeux quand la requête revient.
+  if (q.isLoading)
+    return (
+      <section className="mt-5" aria-busy="true">
+        <SectionHeading>Analyse par camion</SectionHeading>
+        <Card className="space-y-2.5">
+          <SkeletonLine className="w-1/2" />
+          <SkeletonLine className="w-full" />
+          <SkeletonLine className="w-full" />
+          <SkeletonLine className="w-3/4" />
+        </Card>
+      </section>
+    );
+
   if (!q.data || q.data.length === 0) return null;
 
   // Colonnes A/B/C (billes par relevé d'étalage) — affichées seulement si un
@@ -79,7 +98,7 @@ export default function TruckStatsSection({ contract }: { contract: ContractDTO 
     { label: "SODEFOR", value: contract.sodeforPrice },
     { label: "Ibrahim", value: contract.ibrahimPrice },
     { label: "Transport", value: contract.transportPrice },
-    { label: "Cubage", value: contract.cubagePrice },
+    { label: "Sous-cubage", value: contract.cubagePrice },
     { label: "1″", value: contract.oneInchPrice },
   ].filter((p) => Number(p.value) > 0);
   const budgets = [
@@ -194,18 +213,27 @@ export default function TruckStatsSection({ contract }: { contract: ContractDTO 
               return (
                 <tr key={t.truckId} className="border-t border-brand-100">
                   <td className="py-1 pr-2 whitespace-nowrap">
-                    <span className="mr-1.5 tabular-nums text-xs text-brand-500">{i + 1}</span>
                     {/* B/L d'abord : c'est la clé du suivi (le classeur ne
-                        connaît que lui), l'immatriculation suit. */}
-                    <span className="font-medium">{t.deliveryNote ?? t.registration}</span>
-                    {t.deliveryNote && (
-                      <span className="ml-1.5 text-xs text-brand-500">{t.registration}</span>
-                    )}
-                    {t.sawn && (
-                      <Badge tone="info" className="ml-1.5">
-                        scié
-                      </Badge>
-                    )}
+                        connaît que lui), l'immatriculation suit. La cellule
+                        ouvre la fiche du camion : un chiffre hors seuil se
+                        vérifie d'un tap, sans repasser par la Réception. */}
+                    <Link
+                      to={`/trucks/${t.truckId}`}
+                      className="group -mx-1 inline-flex min-h-touch items-center rounded-md px-1 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
+                    >
+                      <span className="mr-1.5 tabular-nums text-xs text-brand-500">{i + 1}</span>
+                      <span className="font-medium text-brand-900 underline-offset-2 group-hover:underline">
+                        {t.deliveryNote ?? t.registration}
+                      </span>
+                      {t.deliveryNote && (
+                        <span className="ml-1.5 text-xs text-brand-500">{t.registration}</span>
+                      )}
+                      {t.sawn && (
+                        <Badge tone="info" className="ml-1.5">
+                          Scié
+                        </Badge>
+                      )}
+                    </Link>
                   </td>
                   <td className="py-1 pr-2 text-right tabular-nums text-brand-500">
                     {day(t.arrivedAt)}
@@ -289,7 +317,7 @@ export default function TruckStatsSection({ contract }: { contract: ContractDTO 
           </tbody>
           <tfoot>
             <tr className="border-t border-brand-200 font-semibold">
-              <td className="py-1.5 pr-2">TOTAL</td>
+              <td className="py-1.5 pr-2">Total</td>
               <td className="py-1.5 pr-2 text-right tabular-nums text-brand-500">
                 {q.data.length}
               </td>

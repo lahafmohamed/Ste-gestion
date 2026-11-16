@@ -3,15 +3,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EntryKind } from "@ste/shared";
 import { accountsApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtFcfa } from "../lib/format";
+import { fmtFcfa, normalizeDecimal } from "../lib/format";
+import Badge from "./ui/Badge";
 import Button from "./ui/Button";
-import { SectionHeading } from "./ui/Card";
+import { SectionHeading, cardCls } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
 import DateField from "./ui/DateField";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 import Input, { Field } from "./ui/Input";
 import SelectField from "./ui/SelectField";
+import { SkeletonList } from "./ui/Skeleton";
 import { TableWrap } from "./ui/Table";
+import { IconChevronDown, IconPlus, IconX } from "./icons";
 
 function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => void }) {
   const qc = useQueryClient();
@@ -57,10 +60,7 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="mb-3 grid grid-cols-2 gap-3 rounded-xl bg-white shadow-card p-4 sm:grid-cols-3"
-    >
+    <form onSubmit={submit} className={`mb-3 grid grid-cols-2 gap-3 ${cardCls} p-4 sm:grid-cols-3`}>
       <Field label="Tiers">
         <Input
           required
@@ -93,7 +93,7 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
           required
           inputMode="decimal"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => setAmount(normalizeDecimal(e.target.value))}
           placeholder="7317672"
         />
       </Field>
@@ -110,12 +110,18 @@ function EntryForm({ contractId, onDone }: { contractId: string; onDone: () => v
         <DateField value={date} onChange={setDate} />
       </Field>
 
-      <div className="col-span-2 flex items-end justify-between sm:col-span-1">
-        {error && <FormError>{error}</FormError>}
-        <Button type="submit" variant="primary" disabled={saving} className="ml-auto">
-          Ajouter
+      <div className="col-span-2 flex items-end justify-end sm:col-span-1">
+        <Button type="submit" variant="primary" disabled={saving}>
+          {saving ? "Ajout…" : "Ajouter"}
         </Button>
       </div>
+      {/* Erreur sur toute la largeur : coincée à côté du bouton, elle écrasait
+          la colonne sur téléphone. */}
+      {error && (
+        <div className="col-span-2 sm:col-span-3">
+          <FormError>{error}</FormError>
+        </div>
+      )}
     </form>
   );
 }
@@ -151,6 +157,8 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
     onSuccess: invalidateAll,
   });
 
+  const pendingSuggestions = (suggestions.data ?? []).filter((s) => Number(s.delta) > 0);
+
   const applySuggestion = useMutation({
     mutationFn: (s: { partyId: string; delta: string; label: string }) =>
       accountsApi.addEntry({
@@ -168,121 +176,154 @@ export default function AccountsSection({ contractId }: { contractId: string }) 
       <SectionHeading
         right={
           can("compta.create") && (
-            <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-              {showForm ? "Fermer" : "+ Écriture"}
+            <Button size="xs" onClick={() => setShowForm((s) => !s)} aria-expanded={showForm}>
+              {showForm ? (
+                "Fermer"
+              ) : (
+                <>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Écriture
+                </>
+              )}
             </Button>
           )
         }
       >
-        Comptes tiers ({accounts.data?.length ?? 0})
+        Comptes tiers{accounts.data ? ` (${accounts.data.length})` : ""}
       </SectionHeading>
 
       {showForm && <EntryForm contractId={contractId} onDone={() => setShowForm(false)} />}
 
-      {can("compta.create") && suggestions.data && suggestions.data.filter((s) => Number(s.delta) > 0).length > 0 && (
-        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <div className="mb-2 text-sm font-semibold text-amber-800">
-            Dûs suggérés (dérivés des opérations)
+      {/* Dûs suggérés : à regarder, pas une erreur — anneau ambre, pas de
+          bordure pleine. Chaque ligne s'ajoute d'un tap (bouton primitif). */}
+      {can("compta.create") && pendingSuggestions.length > 0 && (
+        <div className="mb-3 rounded-xl bg-amber-50 p-3 ring-1 ring-inset ring-amber-200/80">
+          <div className="mb-2 text-sm font-semibold text-amber-900">
+            Dûs suggérés, dérivés des opérations
           </div>
-          <div className="space-y-1.5">
-            {suggestions.data
-              .filter((s) => Number(s.delta) > 0)
-              .map((s) => (
-                <div key={s.partyId + s.role} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-brand-700">
-                    <span className="font-medium">{s.partyName}</span> — {s.label}
-                  </span>
-                  <button
-                    onClick={() => applySuggestion.mutate(s)}
-                    disabled={applySuggestion.isPending}
-                    className="min-h-touch shrink-0 rounded-lg bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50"
-                  >
-                    + {fmtFcfa(s.delta)}
-                  </button>
-                </div>
-              ))}
+          <div className="divide-y divide-amber-200/60">
+            {pendingSuggestions.map((s) => (
+              <div
+                key={s.partyId + s.role}
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-sm"
+              >
+                <span className="min-w-0 text-brand-700">
+                  <span className="font-medium text-brand-900">{s.partyName}</span> · {s.label}
+                </span>
+                <Button
+                  size="sm"
+                  onClick={() => applySuggestion.mutate(s)}
+                  disabled={applySuggestion.isPending}
+                  aria-label={`Ajouter le dû de ${fmtFcfa(s.delta)} pour ${s.partyName}`}
+                  className="shrink-0 tabular-nums"
+                >
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  {fmtFcfa(s.delta)}
+                </Button>
+              </div>
+            ))}
           </div>
+          {applySuggestion.isError && (
+            <div className="mt-2">
+              <FormError>Ajout échoué : {(applySuggestion.error as Error).message}</FormError>
+            </div>
+          )}
         </div>
       )}
 
       <div className="space-y-2">
-        {accounts.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
+        {accounts.isLoading && <SkeletonList count={2} lines={1} />}
+        {removeEntry.isError && (
+          <FormError>Suppression échouée : {(removeEntry.error as Error).message}</FormError>
+        )}
         {accounts.isError && (
           <QueryError error={accounts.error} onRetry={() => accounts.refetch()}>
             Impossible de charger les comptes
           </QueryError>
         )}
         {accounts.data?.length === 0 && !showForm && (
-          <EmptyState>Aucune écriture.</EmptyState>
+          <EmptyState
+            action={
+              can("compta.create") ? (
+                <Button onClick={() => setShowForm(true)}>Ajouter une écriture</Button>
+              ) : undefined
+            }
+          >
+            Aucune écriture sur ce contrat.
+          </EmptyState>
         )}
         {accounts.data?.map((a) => {
           const balance = Number(a.balance);
           const isOpen = open === a.party.id;
           return (
-            <div key={a.party.id} className="rounded-xl bg-white shadow-card">
+            <div key={a.party.id} className={cardCls}>
+              {/* Téléphone : les montants passent sous le nom au lieu d'écraser
+                  les deux colonnes ; le chevron dit que la ligne se déplie. */}
               <button
+                type="button"
                 onClick={() => setOpen(isOpen ? null : a.party.id)}
-                className="flex min-h-touch w-full items-center justify-between gap-3 p-3 text-left hover:bg-brand-50 active:bg-brand-100"
+                aria-expanded={isOpen}
+                className="flex min-h-touch w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl p-3 text-left transition-colors hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100"
               >
-                <span className="font-medium text-brand-900">{a.party.name}</span>
-                <span className="text-right text-sm">
-                  <span className="text-brand-500">
-                    Dû {fmtFcfa(a.due)} · Payé {fmtFcfa(a.paid)} ·{" "}
+                <span className="min-w-0 font-medium text-brand-900">{a.party.name}</span>
+                <span className="ml-auto flex items-center gap-2 text-right text-sm tabular-nums">
+                  <span>
+                    <span className="text-brand-500">
+                      Dû {fmtFcfa(a.due)} · Payé {fmtFcfa(a.paid)} ·{" "}
+                    </span>
+                    <span
+                      className={`font-semibold ${balance > 0 ? "text-red-700" : "text-parc-700"}`}
+                    >
+                      Solde {fmtFcfa(a.balance)}
+                    </span>
                   </span>
-                  <span
-                    className={`font-semibold ${
-                      balance > 0 ? "text-red-600" : "text-parc-700"
+                  <IconChevronDown
+                    width={18}
+                    height={18}
+                    className={`shrink-0 text-brand-500 transition-transform duration-150 ease-out motion-reduce:transition-none ${
+                      isOpen ? "" : "-rotate-90"
                     }`}
-                  >
-                    Solde {fmtFcfa(a.balance)}
-                  </span>
+                  />
                 </span>
               </button>
 
               {isOpen && (
                 <div className="border-t border-brand-100 p-3">
                   <TableWrap>
-                  <table className="w-full min-w-[520px] text-base">
-                    <tbody>
-                      {a.entries.map((e) => (
-                        <tr key={e.id} className="border-b border-brand-50">
-                          <td className="py-1 text-xs text-brand-500">
-                            {new Date(e.entryDate).toLocaleDateString("fr-FR")}
-                          </td>
-                          <td className="py-1">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-xs ${
-                                e.kind === "DUE"
-                                  ? "bg-red-50 text-red-700"
-                                  : "bg-parc-50 text-parc-700"
-                              }`}
-                            >
-                              {e.kind === "DUE" ? "Dû" : "Payé"}
-                            </span>
-                          </td>
-                          <td className="py-1 text-right tabular-nums">
-                            {fmtFcfa(e.amount)}
-                          </td>
-                          <td className="py-1 pl-3 text-xs text-brand-500">
-                            {e.description ?? ""}
-                          </td>
-                          <td className="py-1 text-right">
-                            {can("compta.delete") && (
-                              <button
-                                onClick={() =>
-                                  setDelEntry({ id: e.id, kind: e.kind, amount: e.amount })
-                                }
-                                className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
-                                aria-label="Supprimer l'écriture"
-                              >
-                                ×
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    <table className="w-full min-w-[520px] text-base">
+                      <tbody>
+                        {a.entries.map((e) => (
+                          <tr key={e.id} className="border-b border-brand-50 last:border-b-0">
+                            <td className="whitespace-nowrap py-1 pr-3 text-sm tabular-nums text-brand-500">
+                              {new Date(e.entryDate).toLocaleDateString("fr-FR")}
+                            </td>
+                            <td className="py-1 pr-3">
+                              <Badge tone={e.kind === "DUE" ? "amber" : "parc"}>
+                                {e.kind === "DUE" ? "Dû" : "Payé"}
+                              </Badge>
+                            </td>
+                            <td className="py-1 text-right tabular-nums">{fmtFcfa(e.amount)}</td>
+                            <td className="py-1 pl-3 text-sm text-brand-600">
+                              {e.description ?? ""}
+                            </td>
+                            <td className="py-1 text-right">
+                              {can("compta.delete") && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDelEntry({ id: e.id, kind: e.kind, amount: e.amount })
+                                  }
+                                  className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-red-100"
+                                  aria-label={`Supprimer l'écriture ${e.kind === "DUE" ? "dû" : "payé"} de ${fmtFcfa(e.amount)}`}
+                                >
+                                  <IconX width={18} height={18} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </TableWrap>
                 </div>
               )}

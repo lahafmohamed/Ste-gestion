@@ -79,7 +79,7 @@ export default function VehiclePicker({
               label: v.registration,
               hint: v.active ? (v.code ?? undefined) : "retiré",
             })),
-            { value: VEHICLE_NEW, label: "Autre camion — saisir l'immatriculation" },
+            { value: VEHICLE_NEW, label: "Autre camion (saisir l'immatriculation)" },
           ]}
         />
       </Field>
@@ -107,12 +107,16 @@ export default function VehiclePicker({
         </p>
       )}
       {manual && (
-        <p className="text-sm text-brand-500">
-          Ce camion rejoint le parc —{" "}
-          <Link to="/camions" className="underline hover:text-brand-900">
+        <p className="text-pretty text-sm text-brand-500">
+          Il rejoint le parc à l'enregistrement. Son code et son chauffeur se complètent
+          ensuite dans{" "}
+          <Link
+            to="/camions"
+            className="rounded-sm font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+          >
             Camions
-          </Link>{" "}
-          pour y ajouter son code et son chauffeur.
+          </Link>
+          .
         </p>
       )}
     </div>

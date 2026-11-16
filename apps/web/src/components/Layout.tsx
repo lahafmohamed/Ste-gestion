@@ -8,6 +8,7 @@ import { buttonCls } from "./ui/Button";
 import { OfflineBanner, UpdateBanner } from "./AppBanners";
 import {
   IconBox,
+  IconChevronDown,
   IconContainer,
   IconContract,
   IconDashboard,
@@ -16,12 +17,14 @@ import {
   IconLedger,
   IconLogout,
   IconLogs,
+  IconMenu,
   IconPlus,
   IconReport,
   IconSales,
   IconSaw,
   IconTruck,
   IconUsers,
+  IconX,
   type IconProps,
 } from "./icons";
 
@@ -67,6 +70,8 @@ const NAV: NavItem[] = (
       end: false,
       anyPerm: ["etalage.create", "debitage.create", "empotage.create"],
     },
+    // Dépenses de tous les contrats : on règle par lot, d'un seul écran.
+    { to: "/depenses", label: "Dépenses", Icon: IconLedger, end: false, perm: "finances.view" },
     {
       to: "/compta",
       label: "Comptabilité",
@@ -129,7 +134,7 @@ function NavList({
 }) {
   return (
     <>
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+      <nav aria-label="Navigation" className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
         {nav.map((n) => (
           <NavLink
             key={n.to}
@@ -168,10 +173,11 @@ function NavList({
             </div>
           </div>
           <button
+            type="button"
             onClick={logout}
-            className="mt-2 flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
+            className="mt-2 flex min-h-touch w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-100 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-200"
           >
-            <IconLogout width={20} height={20} className="text-brand-500" />
+            <IconLogout width={20} height={20} className="shrink-0 text-brand-500" />
             Déconnexion
           </button>
         </div>
@@ -188,6 +194,8 @@ function NavList({
 // libellé à partir de xl, quand la place existe.
 // `className` porte le display : deux utilitaires de display dans la même
 // classe ne se départageraient pas de façon fiable.
+// Cible : le lien fait 44px de haut (tablette paysage = lg, pilotée au doigt),
+// la pastille visible garde ses 36px — l'en-tête ne s'alourdit pas.
 function NavTabs({ nav, className }: { nav: NavItem[]; className: string }) {
   return (
     <nav
@@ -203,23 +211,23 @@ function NavTabs({ nav, className }: { nav: NavItem[]; className: string }) {
           to={n.to}
           end={n.end}
           title={n.label}
-          className={({ isActive }) =>
-            `flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 2xl:px-2.5 ${
-              isActive
-                ? "bg-accent-100/70 text-accent-800"
-                : "text-brand-600 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
-            }`
-          }
+          className="group flex h-11 shrink-0 items-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
         >
           {({ isActive }) => (
-            <>
+            <span
+              className={`flex h-9 items-center gap-2 whitespace-nowrap rounded-lg px-2 text-sm font-medium transition-colors 2xl:px-2.5 ${
+                isActive
+                  ? "bg-accent-100/70 text-accent-800"
+                  : "text-brand-600 group-hover:bg-brand-100 group-hover:text-brand-900 group-active:bg-brand-200"
+              }`}
+            >
               <n.Icon
                 width={20}
                 height={20}
                 className={`hidden shrink-0 xl:block ${isActive ? "text-accent-600" : "text-brand-500"}`}
               />
               {n.label}
-            </>
+            </span>
           )}
         </NavLink>
       ))}
@@ -280,20 +288,14 @@ function ActionsMenu({ user }: { user: ReturnType<typeof getUser> }) {
             manquent à la rangée d'onglets (petit portable 1366px). Il reste
             dans l'en-tête du menu déroulé et dans le libellé accessible. */}
         <span className="hidden max-w-[8rem] truncate 2xl:inline">{user?.name ?? "Compte"}</span>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
+        <IconChevronDown
+          width={16}
+          height={16}
           strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`size-4 shrink-0 text-brand-500 transition-transform duration-150 ease-out ${
+          className={`shrink-0 text-brand-500 transition-transform duration-150 ease-out ${
             open ? "-rotate-180" : ""
           }`}
-          aria-hidden
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        />
       </button>
 
       {open && (
@@ -351,6 +353,8 @@ export default function Layout() {
   const burgerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   // Tiroir fermé = inerte (propriété DOM : React 18 ne connaît pas l'attribut).
   useEffect(() => {
     if (drawerRef.current) drawerRef.current.inert = !menuOpen;
@@ -358,6 +362,16 @@ export default function Layout() {
   // Sur /contracts, la page a déjà son propre bouton de création : deux boutons
   // pour la même action à quelques centimètres l'un de l'autre.
   const onContracts = useLocation().pathname === "/contracts";
+  // Tablette tournée en paysage tiroir ouvert : à partir de lg le tiroir est
+  // masqué — le laisser « ouvert » garderait la page inerte et figée.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => mq.matches && setMenuOpen(false);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [menuOpen]);
   // Drawer ouvert : fond figé (sinon la page défile derrière le voile) + Échap.
   useEffect(() => {
     if (!menuOpen) return;
@@ -367,12 +381,18 @@ export default function Layout() {
       if (e.key === "Escape") setMenuOpen(false);
     };
     window.addEventListener("keydown", onKey);
+    // Page voilée inerte : la tabulation reste dans le tiroir (sinon elle file
+    // vers des liens cachés sous le voile).
+    const behind = [headerRef.current, contentRef.current];
+    for (const el of behind) if (el) el.inert = true;
     // Focus dans le tiroir à l'ouverture, rendu au bouton qui l'a ouvert.
     closeRef.current?.focus();
     const burger = burgerRef.current;
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
+      // Lever l'inertie AVANT de rendre le focus : un élément inerte le refuse.
+      for (const el of behind) if (el) el.inert = false;
       burger?.focus({ preventScroll: true });
     };
   }, [menuOpen]);
@@ -388,7 +408,10 @@ export default function Layout() {
       {/* En-tête STE — une seule rangée, à toutes les tailles d'écran :
           marque, navigation des postes (à partir de lg), actions. Blanc
           plein, séparé de la page par une ombre courte (pas de trait dur). */}
-      <header className="fixed inset-x-0 top-0 z-header flex h-header items-center gap-2 bg-white px-4 shadow-header short:h-header-sm">
+      <header
+        ref={headerRef}
+        className="fixed inset-x-0 top-0 z-header flex h-header items-center gap-2 bg-white px-4 shadow-header short:h-header-sm"
+      >
         <div className="flex shrink-0 items-center gap-1">
           {/* Sous lg, la navigation vit dans le drawer : c'est ce bouton qui l'ouvre. */}
           <button
@@ -398,13 +421,9 @@ export default function Layout() {
             aria-label="Ouvrir le menu"
             aria-expanded={menuOpen}
             aria-controls="tiroir-nav"
-            className="-ml-2.5 rounded-lg p-2.5 text-brand-600 transition-colors hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 active:bg-brand-200 lg:hidden"
+            className="-ml-2.5 flex size-11 items-center justify-center rounded-lg text-brand-600 transition-colors hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 active:bg-brand-200 lg:hidden"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="4" y1="7" x2="20" y2="7" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="17" x2="20" y2="17" />
-            </svg>
+            <IconMenu width={24} height={24} strokeWidth={2} />
           </button>
           {/* Marque compacte : le logo complet (filets + tagline) est illisible
               à 32px. Sans mot-repère à côté — la largeur qu'il prenait revient
@@ -450,6 +469,9 @@ export default function Layout() {
           }`}
         />
         <aside
+          role="dialog"
+          aria-modal={menuOpen || undefined}
+          aria-label="Menu de navigation"
           className={`absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col bg-white px-3 pb-[calc(1rem_+_env(safe-area-inset-bottom))] pt-[calc(0.75rem_+_env(safe-area-inset-top))] shadow-dialog transition-transform duration-200 ease-out motion-reduce:transition-none ${
             // Fermé : poussé au-delà de sa propre ombre, sinon la portée de
             // shadow-dialog dessinait un liseré gris le long du bord gauche.
@@ -463,12 +485,9 @@ export default function Layout() {
               ref={closeRef}
               onClick={() => setMenuOpen(false)}
               aria-label="Fermer le menu"
-              className="rounded-lg p-2.5 text-brand-500 transition-colors hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 active:bg-brand-200"
+              className="-mr-1 flex size-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 active:bg-brand-200"
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="6" y1="6" x2="18" y2="18" />
-                <line x1="18" y1="6" x2="6" y2="18" />
-              </svg>
+              <IconX width={22} height={22} strokeWidth={2} />
             </button>
           </div>
           <NavList nav={nav} user={user} onNavigate={() => setMenuOpen(false)} />
@@ -476,7 +495,7 @@ export default function Layout() {
       </div>
 
       {/* Contenu */}
-      <div className="pt-header short:pt-header-sm">
+      <div ref={contentRef} className="pt-header short:pt-header-sm">
         {/* État réseau et mise à jour : sous l'en-tête fixe, au-dessus de la
             page — jamais par-dessus la zone de saisie. */}
         <UpdateBanner />

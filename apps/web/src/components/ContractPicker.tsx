@@ -18,7 +18,8 @@ export default function ContractPicker({
   if (contracts.length === 0) return null;
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="shrink-0 text-brand-600">Contrat</span>
+      {/* Téléphone : le libellé cède sa place au sélecteur (nom accessible conservé). */}
+      <span className="hidden shrink-0 text-brand-600 sm:inline">Contrat</span>
       <SelectField
         value={value ?? ""}
         onChange={(id) => onChange(id || null)}

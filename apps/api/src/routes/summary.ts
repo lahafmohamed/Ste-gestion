@@ -496,6 +496,10 @@ export async function summaryRoutes(app: FastifyInstance) {
         },
       });
       if (!contract) return reply.code(404).send({ error: "Contrat introuvable" });
+      // Chaque suggestion est un prix × une quantité (et son libellé cite le
+      // prix) : sans `finances.view`, rien à suggérer — `compta.view` seul ne
+      // doit pas faire fuiter les paramètres de prix masqués ailleurs.
+      if (!(await canSeeFinance(req))) return [];
 
       // Ibrahim est payé au cubage diamètre (étalage parc Ø), pas au girth.
       const [trucksEntered, diaAgg, dueEntries] = await Promise.all([

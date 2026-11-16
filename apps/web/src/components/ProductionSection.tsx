@@ -13,14 +13,14 @@ import {
 } from "@ste/shared";
 import { contractsApi, productionApi, trucksApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtInt, fmtM3, fmtNum } from "../lib/format";
+import { fmtInt, fmtM3 } from "../lib/format";
 import { parcStage, truckLabel } from "../lib/trucks";
 import SawnEntry from "./SawnEntry";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
-import { SectionHeading } from "./ui/Card";
+import { cardCls, cardInteractiveCls, SectionHeading } from "./ui/Card";
 import { EmptyState, QueryError } from "./ui/Feedback";
-import { SkeletonList } from "./ui/Skeleton";
+import { SkeletonCard, SkeletonList } from "./ui/Skeleton";
 import { IconCheck, IconPlus } from "./icons";
 
 // Le débité tombe dans le stock général : la page Débitage ne passe pas de
@@ -86,11 +86,16 @@ export default function ProductionSection({ contractId }: { contractId?: string 
           )
         }
       >
-        Débitage ({runs.data?.length ?? 0} sessions)
+        {/* Compteur seulement une fois chargé : « 0 sessions » pendant la requête
+            se lisait comme un débitage vide. */}
+        Sessions de débitage
+        {runs.data && (
+          <span className="ml-1.5 font-normal tabular-nums text-brand-500">{runs.data.length}</span>
+        )}
       </SectionHeading>
 
       {showForm && (
-        <div className="mb-3 rounded-xl bg-white shadow-card p-4">
+        <div className={`mb-3 ${cardCls} p-4`}>
           <SawnEntry
             saving={create.isPending}
             trucks={trucks.data}
@@ -102,17 +107,29 @@ export default function ProductionSection({ contractId }: { contractId?: string 
 
       {/* Avancement par camion — la question du parc est « qu'est-ce qui reste
           à scier ? », pas « quelles sessions ont eu lieu ? ». */}
+      {trucks.isLoading && (
+        <div className="mb-3">
+          <SkeletonCard lines={3} />
+        </div>
+      )}
+      {trucks.isError && (
+        <div className="mb-3">
+          <QueryError error={trucks.error} onRetry={() => trucks.refetch()}>
+            Impossible de charger l'avancement des camions
+          </QueryError>
+        </div>
+      )}
       {sortedProgress.length > 0 && (
-        <div className="mb-3 rounded-xl bg-white shadow-card p-3">
-          <div className="mb-2 text-sm font-semibold text-brand-800">
-            Camions — avancement sciage
-          </div>
-          <div className="divide-y divide-brand-50">
+        <div className={`mb-3 ${cardCls} p-3`}>
+          <h3 className="mb-2 px-1 text-sm font-semibold text-brand-900">
+            Avancement du sciage par camion
+          </h3>
+          <div className="divide-y divide-brand-100">
             {sortedProgress.map(({ truck: t, p }) => (
               <Link
                 key={t.id}
                 to={`/trucks/${t.id}`}
-                className="flex min-h-touch items-center gap-3 rounded-lg px-1 py-1.5 hover:bg-brand-50 active:bg-brand-100"
+                className="flex min-h-touch items-center gap-3 rounded-lg px-1 py-1.5 transition-colors duration-150 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100"
               >
                 {/* Le bordereau en tête — c'est le numéro que porte la feuille
                     DEBITE ; immat et contrat suivent, en seconde ligne. */}
@@ -137,20 +154,34 @@ export default function ProductionSection({ contractId }: { contractId?: string 
                 })()}
                 {p.total > 0 ? (
                   <>
-                    <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-100">
+                    {/* Barre décorative : le compte « 12/20 billons » à côté porte
+                        l'information pour un lecteur d'écran. */}
+                    <div
+                      aria-hidden
+                      className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-brand-100"
+                    >
                       <div
                         className={`h-full rounded-full ${p.complete ? "bg-parc-500" : "bg-amber-400"}`}
                         style={{ width: `${Math.round((p.sawn / p.total) * 100)}%` }}
                       />
                     </div>
-                    <span className="w-28 shrink-0 text-right text-sm tabular-nums text-brand-500">
+                    <span className="w-28 shrink-0 text-right text-sm tabular-nums text-brand-600">
                       {p.sawn}/{p.total} billons
                     </span>
                     <Badge
                       tone={p.complete ? "parc" : p.sawn > 0 ? "amber" : "brand"}
                       className="w-24 shrink-0 justify-center"
                     >
-                      {p.complete ? <><IconCheck width={14} height={14} className="-ml-0.5 mr-1 shrink-0" aria-hidden />Fini</> : p.sawn > 0 ? "En cours" : "À scier"}
+                      {p.complete ? (
+                        <>
+                          <IconCheck width={14} height={14} className="-ml-0.5 mr-1 shrink-0" aria-hidden />
+                          Fini
+                        </>
+                      ) : p.sawn > 0 ? (
+                        "En cours"
+                      ) : (
+                        "À scier"
+                      )}
                     </Badge>
                   </>
                 ) : (
@@ -190,7 +221,19 @@ export default function ProductionSection({ contractId }: { contractId?: string 
           </QueryError>
         )}
         {runs.data?.length === 0 && !showForm && (
-          <EmptyState>Aucune session de débitage.</EmptyState>
+          <EmptyState
+            action={
+              can("debitage.create") && (
+                <Button variant="primary" onClick={() => setShowForm(true)}>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Saisir une session
+                </Button>
+              )
+            }
+          >
+            Aucune session de débitage. Une session relève les avivés sortis de la scie, ligne
+            par ligne.
+          </EmptyState>
         )}
         {runs.data?.map((r) => {
           const groups = runGroupTotals(r);
@@ -199,23 +242,24 @@ export default function ProductionSection({ contractId }: { contractId?: string 
             <Link
               key={r.id}
               to={`/production-runs/${r.id}`}
-              className="block rounded-xl bg-white p-3 shadow-card transition-[box-shadow,transform] duration-200 ease-out hover:shadow-card-hover active:scale-[0.99] active:shadow-card"
+              className={`block p-3 ${cardInteractiveCls}`}
             >
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-brand-900">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="min-w-0 truncate font-medium text-brand-900">
                   {new Date(r.producedAt).toLocaleDateString("fr-FR")}
                   {r.note ? ` · ${r.note}` : ""}
                 </div>
-                <div className="text-sm font-semibold text-brand-900">
+                <div className="shrink-0 text-sm font-semibold tabular-nums text-brand-900">
                   {fmtM3(runTotalM3(r))}
                 </div>
               </div>
-              <div className="mt-1 text-sm text-brand-500">
-                {fmtInt(runPieceCount(r))} pièces · {r.lines.length} lignes
+              <div className="mt-1 text-pretty text-sm tabular-nums text-brand-600">
+                {fmtInt(runPieceCount(r))} pièces · {r.lines.length} ligne
+                {r.lines.length > 1 ? "s" : ""}
                 {(Object.keys(groups) as SizeGroup[])
                   .filter((g) => groups[g] > 0)
                   .map(
-                    (g) => ` · ${SIZE_GROUP_LABELS[g]} ${fmtNum(groups[g].toFixed(3))}`
+                    (g) => ` · ${SIZE_GROUP_LABELS[g]} ${fmtM3(groups[g])}`
                   )
                   .join("")}
               </div>

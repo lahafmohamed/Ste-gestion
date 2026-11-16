@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   billParent,
   truckSawnProgress,
@@ -8,7 +8,7 @@ import {
 } from "@ste/shared";
 import { truckLabel } from "../lib/trucks";
 import Chip from "./ui/Chip";
-import { IconCheck } from "./icons";
+import { IconCheck, IconChevronDown } from "./icons";
 
 // Billons d'un camion — c'est le billon qui part au sciage, pas la bille.
 export function truckBillons(t: TruckDTO) {
@@ -93,6 +93,7 @@ export default function SawnTruckPicker({
   // supprimer, le resciage et les corrections de session en ont besoin. Un
   // camion déjà coché reste visible même replié, sinon la sélection disparaît.
   const [showDone, setShowDone] = useState(false);
+  const labelId = useId();
   const isDone = (t: TruckDTO) =>
     progressByTruck.get(t.id)!.complete && !truckIds.includes(t.id);
   const doneCount = trucks.filter(isDone).length;
@@ -100,10 +101,14 @@ export default function SawnTruckPicker({
 
   return (
     <div className="mb-3">
-      <div className="mb-1 text-xs text-brand-500">
-        Camions sciés (optionnel — définit « sur parc non sciés »)
+      {/* Même libellé que les champs Date / Note au-dessus (Field). */}
+      <div id={labelId} className="mb-1 text-sm font-medium text-brand-600">
+        Camions sciés{" "}
+        <span className="font-normal text-brand-500">
+          (facultatif, sert au calcul du « sur parc non scié »)
+        </span>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-2">
         {visibleTrucks.map((t) => {
           const p = progressByTruck.get(t.id)!;
           const sel = truckIds.includes(t.id);
@@ -145,11 +150,18 @@ export default function SawnTruckPicker({
             type="button"
             onClick={() => setShowDone((v) => !v)}
             aria-expanded={showDone}
-            className="min-h-touch rounded-full px-3 text-sm text-brand-500 underline hover:text-brand-900 active:bg-brand-200"
+            className="inline-flex min-h-touch items-center gap-1 rounded-full px-3 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-100 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-200"
           >
             {showDone
-              ? `Masquer les ${doneCount} camions finis`
-              : `+ ${doneCount} camion${doneCount > 1 ? "s" : ""} déjà fini${doneCount > 1 ? "s" : ""}`}
+              ? "Masquer les camions finis"
+              : `Voir ${doneCount} camion${doneCount > 1 ? "s" : ""} déjà fini${doneCount > 1 ? "s" : ""}`}
+            <IconChevronDown
+              width={16}
+              height={16}
+              className={`shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none ${
+                showDone ? "rotate-180" : ""
+              }`}
+            />
           </button>
         )}
       </div>
@@ -172,11 +184,14 @@ export default function SawnTruckPicker({
         const p = progressByTruck.get(t.id)!;
         return (
           <div key={t.id} className="mt-2 rounded-lg bg-brand-50 p-2">
-            <div className="mb-1 flex items-center justify-between text-xs text-brand-500">
-              <span>
-                Billons sciés de {truckLabel(t)} — {selCount === 0
-                  ? "aucun coché = camion entier"
-                  : `${selCount}/${billons.length}`}
+            <div className="mb-1 flex items-center justify-between gap-2 text-sm text-brand-600">
+              <span className="min-w-0 text-pretty">
+                <span className="font-medium text-brand-900">Billons sciés de {truckLabel(t)}</span>{" "}
+                <span className="tabular-nums">
+                  {selCount === 0
+                    ? "· aucun coché, le camion entier compte"
+                    : `· ${selCount}/${billons.length} cochés`}
+                </span>
                 {p.sawn > 0 && (
                   <span className="ml-1.5 text-parc-700">
                     · {p.complete ? "tout déjà scié" : `${p.sawn} déjà scié${p.sawn > 1 ? "s" : ""}`}
@@ -193,7 +208,7 @@ export default function SawnTruckPicker({
                       : [...new Set([...p, ...ids])];
                   })
                 }
-                className="-my-2 min-h-touch rounded-lg px-2 text-brand-500 underline hover:text-brand-900 active:bg-brand-200"
+                className="-my-2 min-h-touch shrink-0 rounded-lg px-2 font-medium text-brand-600 transition-colors hover:bg-brand-100 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-200"
               >
                 {allSelected ? "Tout décocher" : "Tout cocher"}
               </button>
@@ -215,7 +230,8 @@ export default function SawnTruckPicker({
                             : [...new Set([...p, ...ids])]
                         )
                       }
-                      className={`min-h-touch w-14 shrink-0 rounded px-1.5 py-0.5 text-left text-sm font-medium tabular-nums active:bg-brand-200 ${
+                      aria-label={`Bille ${g.bill} : ${allOfBill ? "décocher" : "cocher"} ses ${ids.length} billons`}
+                      className={`min-h-touch w-14 shrink-0 rounded-lg px-1.5 py-0.5 text-left text-sm font-medium tabular-nums transition-colors hover:bg-brand-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-200 ${
                         selOfBill > 0 ? "text-parc-700" : "text-brand-500"
                       }`}
                     >

@@ -10,7 +10,7 @@ import {
   type MeasurementCreateInput,
   type MeasurementContext,
 } from "@ste/shared";
-import { fmtNum, normalizeDecimal, fmtM3 } from "../lib/format";
+import { fmtDec3, fmtNum, normalizeDecimal, fmtM3 } from "../lib/format";
 import {
   clearTallyDraft,
   emptyRow,
@@ -22,6 +22,7 @@ import {
 import BillPicker from "./BillPicker";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
+import ConfirmDialog from "./ui/ConfirmDialog";
 import { FormError, Notice } from "./ui/Feedback";
 import { inputQuietCls } from "./ui/Input";
 import { useOnline } from "../lib/online";
@@ -29,22 +30,37 @@ import { IconCheck, IconPlus, IconX } from "./icons";
 
 export { clearTallyDraft } from "../lib/tallyDraft";
 
+// aName/bName : les mesures en toutes lettres pour les messages (« L (m) et
+// Ø (cm) obligatoires » entre parenthèses se lisait mal). twice : l'accord
+// change avec la pièce — un billon est « compté », une bille « comptée ».
 const KIND = {
   girth: {
     aLabel: "L (m)",
     bLabel: "Circ (cm)",
+    aName: "longueur",
+    bName: "circonférence",
     idLabel: "N° billon",
     unit: "billon",
+    article: "un billon",
+    twice: "un billon compté deux fois",
     compute: volumeGirthM3,
   },
   dia: {
     aLabel: "L (m)",
     bLabel: "Ø (cm)",
+    aName: "longueur",
+    bName: "diamètre",
     idLabel: "N° bille",
     unit: "bille",
+    article: "une bille",
+    twice: "une bille comptée deux fois",
     compute: volumeDiameterM3,
   },
 } as const;
+
+// Touche du clavier dans l'aide-mémoire (bureau) : pastille discrète, lisible.
+const kbdCls =
+  "rounded border border-brand-200 bg-white px-1 py-px font-sans text-xs font-medium text-brand-700";
 
 function kindOf(ctx: MeasurementContext): keyof typeof KIND {
   return ctx === "YARD_DIAMETER" ? "dia" : "girth";
@@ -103,16 +119,21 @@ export default function TallyEntry({
   const kind = kindOf(context);
   const isGirth = kind === "girth";
   const online = useOnline();
-  // Priorité : brouillon interrompu > n° préremplis > nb annoncé > une ligne vierge.
-  const [rows, setRows] = useState<RowState[]>(() => {
-    const draft = loadDraft(draftKey);
-    if (draft) return draft;
+  // Lignes de départ hors brouillon : n° préremplis > nb annoncé > une ligne
+  // vierge. Aussi la cible de « Repartir à zéro » — repartir sur UNE ligne
+  // faisait perdre les 64 lignes vierges du bordereau.
+  function initialRows(): RowState[] {
     if (initialIds?.length) return initialIds.map((id) => emptyRow(id));
     const n = Math.min(Math.max(Math.floor(initialCount ?? 0), 0), 500);
     return Array.from({ length: n || 1 }, () => emptyRow());
-  });
+  }
+  // Priorité : brouillon interrompu > lignes de départ.
+  const [rows, setRows] = useState<RowState[]>(() => loadDraft(draftKey) ?? initialRows());
   const restored = useRef(loadDraft(draftKey) !== null);
   const [undo, setUndo] = useState<{ row: RowState; index: number } | null>(null);
+  // « Repartir à zéro » efface tout le brouillon d'un tap : à 200 lignes, la
+  // confirmation n'est pas de trop (pas d'annulation possible ensuite).
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // Brouillon : débouncé. À 275 lignes, un JSON.stringify + écriture
   // localStorage synchrone à chaque frappe se sent au doigt sur tablette.
@@ -435,21 +456,38 @@ export default function TallyEntry({
     <div>
       {/* Brouillon restauré après interruption (reload, écran verrouillé…) */}
       {restored.current && (
-        <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          <span>Saisie interrompue restaurée ({validCount} ligne{validCount > 1 ? "s" : ""} valide{validCount > 1 ? "s" : ""})</span>
+        <Notice className="mb-3">
+          Saisie non enregistrée reprise là où elle s'était arrêtée :{" "}
+          <span className="font-medium tabular-nums">
+            {validCount} ligne{validCount > 1 ? "s" : ""} valide{validCount > 1 ? "s" : ""}
+          </span>
+          .{" "}
           <button
             type="button"
-            onClick={() => {
-              restored.current = false;
-              if (draftKey) clearTallyDraft(draftKey);
-              setRows([emptyRow()]);
-            }}
-            className="-my-2 min-h-touch shrink-0 rounded-lg px-2 font-medium text-amber-700 underline hover:text-amber-900 active:bg-amber-100"
+            onClick={() => setConfirmReset(true)}
+            className="-my-2 inline-flex min-h-touch items-center rounded-lg px-1 font-medium underline transition-colors hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-200"
           >
             Repartir à zéro
           </button>
-        </div>
+        </Notice>
       )}
+      <ConfirmDialog
+        open={confirmReset}
+        title="Effacer cette saisie ?"
+        confirmLabel="Effacer la saisie"
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={() => {
+          setConfirmReset(false);
+          restored.current = false;
+          if (draftKey) clearTallyDraft(draftKey);
+          setUndo(null);
+          setRows(initialRows());
+        }}
+      >
+        Les {rows.length} ligne{rows.length > 1 ? "s" : ""} en cours (dont {validCount} valide
+        {validCount > 1 ? "s" : ""}) seront effacées de la tablette. Rien n'a encore été
+        enregistré : elles ne pourront pas être récupérées.
+      </ConfirmDialog>
 
       {isGirth && bills && bills.length > 0 && (
         <BillPicker
@@ -479,7 +517,7 @@ export default function TallyEntry({
           key={r.id}
           className={`mt-1 ${cols} border-b border-brand-100 pb-2 sm:border-b-0 sm:pb-0`}
         >
-          <span className="text-xs text-brand-500">{i + 1}</span>
+          <span className="text-xs tabular-nums text-brand-500">{i + 1}</span>
           <div className="min-w-0">
             <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
               {KIND[kind].idLabel}
@@ -491,11 +529,15 @@ export default function TallyEntry({
               value={r.externalId}
               onChange={(e) => setRow(i, { externalId: e.target.value })}
               placeholder={isGirth ? "266A (opt.)" : "N° (opt.)"}
-              aria-label={`${KIND[kind].idLabel} ligne ${i + 1}`}
+              aria-label={`${KIND[kind].idLabel} ligne ${i + 1}${
+                isDup(r.externalId) ? " (en double)" : ""
+              }`}
               onFocus={onFieldFocus}
               onKeyDown={(e) => onKey(e, i, "id")}
+              // `!` : la bordure ambre doit l'emporter sur celle d'inputQuietCls
+              // (même utilitaire, l'ordre des classes ne décide pas).
               className={`${inputCls} ${
-                isDup(r.externalId) ? "border-amber-400 bg-amber-50 text-amber-900" : ""
+                isDup(r.externalId) ? "!border-amber-400 !bg-amber-50 text-amber-900" : ""
               }`}
             />
           </div>
@@ -535,7 +577,7 @@ export default function TallyEntry({
           </div>
           <span className="col-span-3 col-start-2 text-right text-base tabular-nums text-brand-700 sm:col-auto">
             <span className="mr-1 text-xs text-brand-500 sm:hidden">m³</span>
-            {volumes[i] !== null ? volumes[i]!.toFixed(3) : "—"}
+            {volumes[i] !== null ? fmtDec3(volumes[i]!) : "—"}
           </span>
           <button
             type="button"
@@ -554,18 +596,26 @@ export default function TallyEntry({
       <button
         type="button"
         onClick={() => addRow()}
-        className="mt-2 flex min-h-touch w-full items-center justify-center gap-2 rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 transition-colors hover:border-brand-500 hover:text-brand-900 active:bg-brand-100"
+        // Pointillé : l'emplacement de la prochaine ligne, pas une action de
+        // plus à côté de Valider.
+        className="mt-2 flex min-h-touch w-full items-center justify-center gap-2 rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 transition-colors hover:border-brand-500 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100"
       >
-        <IconPlus width={16} height={16} />
-        {isGirth ? "Billon" : "Bille"}
+        <IconPlus width={16} height={16} aria-hidden />
+        Ajouter {KIND[kind].article}
       </button>
 
       {/* Aide-mémoire clavier : bureau seulement (pas de pavé sur tablette).
-          Raccourci oublié = raccourci inutilisé. */}
-      <p className="mt-2 hidden text-xs text-brand-500 sm:block" aria-hidden="true">
-        <kbd>⏎</kbd> suivant · <kbd>+</kbd> {isGirth ? "billon suivant" : "nouvelle ligne"} ·{" "}
-        <kbd>*</kbd> = ligne du dessus · <kbd>↑</kbd><kbd>↓</kbd> lignes ·{" "}
-        <kbd>Ctrl+⏎</kbd> enregistrer · <kbd>Ctrl+Suppr</kbd> supprimer
+          Raccourci oublié = raccourci inutilisé. Touches en toutes lettres :
+          les glyphes ⏎ ↑ ↓ ne se lisaient pas à côté du texte. */}
+      <p
+        className="mt-2 hidden text-pretty text-xs leading-relaxed text-brand-500 sm:block"
+        aria-hidden="true"
+      >
+        <kbd className={kbdCls}>Entrée</kbd> champ suivant · <kbd className={kbdCls}>+</kbd>{" "}
+        {isGirth ? "billon suivant" : "nouvelle ligne"} · <kbd className={kbdCls}>*</kbd> recopie
+        la ligne du dessus · flèches <kbd className={kbdCls}>Haut</kbd>{" "}
+        <kbd className={kbdCls}>Bas</kbd> changer de ligne · <kbd className={kbdCls}>Ctrl+Entrée</kbd>{" "}
+        enregistrer · <kbd className={kbdCls}>Ctrl+Suppr</kbd> supprimer la ligne
       </p>
 
       {/* Récap + validation collés en bas de l'écran : à la ligne 200 d'un
@@ -576,7 +626,9 @@ export default function TallyEntry({
         className={
           embedded
             ? "mt-3"
-            : "sticky bottom-0 z-10 mt-3 rounded-xl bg-white/95 p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_-8px_24px_-12px_oklch(0_0_0/0.25)] backdrop-blur-sm"
+            : // Fond plein, sans flou : les lignes qui défilent dessous ne
+              // doivent pas brouiller le total qu'on lit.
+              "sticky bottom-0 z-10 mt-3 rounded-xl bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_-8px_24px_-12px_oklch(0_0_0/0.25)]"
         }
       >
       {/* Ligne supprimée par erreur → un tap pour la remettre à sa place. */}
@@ -614,7 +666,7 @@ export default function TallyEntry({
             {isGirth && billValidCount > 0 && ` · ${billValidCount} bille${billValidCount > 1 ? "s" : ""}`}
             )
           </span>
-          <span className="font-semibold text-brand-900">
+          <span className="text-right font-semibold tabular-nums text-brand-900">
             {fmtNum(total.toFixed(6))} m³
             {kind === "dia" && total > 0 && (
               <span className="ml-2 text-xs font-normal text-brand-500">
@@ -624,14 +676,16 @@ export default function TallyEntry({
           </span>
         </div>
         {isGirth && validCount > 0 && (
-          <div className="mt-1 flex items-center justify-between text-sm text-brand-500">
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 text-sm text-brand-500">
             <span>
-              ≥85&nbsp;cm :{" "}
-              <span className="tabular-nums text-brand-700">{fmtNum(ge85.toFixed(3))}</span> m³ ({ge85n})
+              ≥ 85&nbsp;cm :{" "}
+              <span className="tabular-nums text-brand-700">{fmtM3(ge85)}</span>{" "}
+              <span className="tabular-nums">({ge85n})</span>
             </span>
             <span>
-              &lt;85 :{" "}
-              <span className="tabular-nums text-brand-700">{fmtNum(lt85.toFixed(3))}</span> m³ ({lt85n})
+              &lt; 85&nbsp;cm :{" "}
+              <span className="tabular-nums text-brand-700">{fmtM3(lt85)}</span>{" "}
+              <span className="tabular-nums">({lt85n})</span>
             </span>
           </div>
         )}
@@ -641,7 +695,7 @@ export default function TallyEntry({
           <div className="mt-2 space-y-1 border-t border-brand-200 pt-2 text-sm">
             {declared.count != null && (
               <div className="flex items-center justify-between">
-                <span className="text-brand-500">
+                <span className="tabular-nums text-brand-500">
                   Billes : {billValidCount} / {declared.count} annoncées
                 </span>
                 <Badge
@@ -650,14 +704,14 @@ export default function TallyEntry({
                 >
                   {billValidCount === declared.count
                     ? <>compte bon<IconCheck width={14} height={14} className="-mr-0.5 ml-1 shrink-0" aria-hidden /></>
-                    : `écart ${billValidCount - declared.count > 0 ? "+" : ""}${billValidCount - declared.count}`}
+                    : `écart ${billValidCount > declared.count ? "+" : "−"}${Math.abs(billValidCount - declared.count)}`}
                 </Badge>
               </div>
             )}
             {declared.m3 != null && declared.m3 > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-brand-500">
-                  Volume : {fmtNum(total.toFixed(3))} / {fmtM3(declared.m3)} brousse
+                <span className="tabular-nums text-brand-500">
+                  Volume : {fmtM3(total)} / {fmtM3(declared.m3)} brousse
                 </span>
                 <Badge
                   tone={Math.abs(total - declared.m3) / declared.m3 <= 0.05 ? "parc" : "amber"}
@@ -675,8 +729,7 @@ export default function TallyEntry({
       {/* N° en double — le total est faux et rien ne le signale après coup. */}
       {dupCount > 0 && (
         <Notice tone="warn" className="mt-2">
-          {dupCount} n° en double (surlignés) — même {KIND[kind].unit} comptée deux fois, ou
-          faute de frappe.
+          {dupCount} n° en double, surlignés : {KIND[kind].twice} ou une faute de frappe.
         </Notice>
       )}
 
@@ -686,10 +739,9 @@ export default function TallyEntry({
           « incomplètes » à l'ouverture, ce n'est pas une anomalie. */}
       {incompleteCount > 0 && validCount > 0 && (
         <Notice tone="warn" className="mt-2">
-          {incompleteCount} ligne{incompleteCount > 1 ? "s" : ""} incomplète
-          {incompleteCount > 1 ? "s" : ""} ({KIND[kind].aLabel} et {KIND[kind].bLabel} obligatoires)
-          {incompleteCount > 1 ? " — elles ne seront pas" : " — elle ne sera pas"} enregistrée
-          {incompleteCount > 1 ? "s" : ""}.
+          {incompleteCount > 1
+            ? `${incompleteCount} lignes incomplètes (${KIND[kind].aName} ou ${KIND[kind].bName} manquant) : elles ne seront pas enregistrées.`
+            : `1 ligne incomplète (${KIND[kind].aName} ou ${KIND[kind].bName} manquant) : elle ne sera pas enregistrée.`}
         </Notice>
       )}
 
@@ -716,17 +768,40 @@ export default function TallyEntry({
               ? online
                 ? "Enregistrement…"
                 : "En attente du réseau…"
-              : error
-                ? `Réessayer (${validCount})`
-                : `Valider ${isGirth ? "le billonnage" : "l'étalage"} (${validCount})`}
+              : (
+                // Le compte avec son unité (« 64 billes » et non « (64) ») ; l'objet
+                // du relevé se replie sous sm, le titre du poste le dit déjà —
+                // le libellé tient sur une ligne au téléphone.
+                <span className="tabular-nums">
+                  {error ? "Réessayer" : "Valider"}
+                  {!error && (
+                    <span className="hidden sm:inline">
+                      {isGirth ? " le billonnage" : " l'étalage"}
+                    </span>
+                  )}{" "}
+                  · {validCount} {KIND[kind].unit}
+                  {validCount > 1 ? "s" : ""}
+                </span>
+              )}
           </Button>
           {/* Hors ligne, l'envoi est mis en file par react-query et repart tout
               seul. Sans ce mot, le bouton semble tourner dans le vide et le
               pointeur retape Valider — d'où des relevés en double. */}
           {saving && !online && (
-            <p className="mt-2 text-center text-sm text-amber-800">
-              Réseau coupé — l'envoi partira au retour. Garder cette page ouverte.
-            </p>
+            <Notice tone="warn" className="mt-2">
+              Réseau coupé : l'envoi est en attente et partira tout seul au retour. Garder
+              cette page ouverte, inutile de revalider.
+            </Notice>
+          )}
+          {/* Coupure AVANT de valider : le pointeur doit savoir qu'il peut
+              continuer à mesurer, rien n'est perdu (brouillon local). */}
+          {!saving && !online && (
+            <Notice className="mt-2">
+              Hors ligne.{" "}
+              {draftKey
+                ? "La saisie reste gardée sur cette tablette : continuer à mesurer, l'envoi partira au retour du réseau."
+                : "Continuer à mesurer et garder cette page ouverte : l'envoi partira au retour du réseau."}
+            </Notice>
           )}
         </>
       )}

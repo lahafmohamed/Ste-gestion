@@ -1,22 +1,24 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ContractDTO, ContractUpdateInput } from "@ste/shared";
-import { accountsApi, contractsApi } from "../lib/api";
+import { contractsApi } from "../lib/api";
 import { useCan } from "../lib/auth";
 import { fmtInt, fmtNum, normalizeDecimal } from "../lib/format";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
-import Card from "./ui/Card";
+import Card, { cardCls } from "./ui/Card";
+import ConfirmDialog from "./ui/ConfirmDialog";
 import DateField from "./ui/DateField";
 import { FormError } from "./ui/Feedback";
 import Input, { Field } from "./ui/Input";
 import SelectField from "./ui/SelectField";
+import { IconPencil } from "./icons";
 
 // ── Saisie progressive : la fiche contrat est découpée en cartes
 // indépendantes ; chaque carte s'édite et s'enregistre séparément (PATCH
 // partiel). On crée un contrat avec code + quota, le reste vient avec le temps.
 
-type Kind = "text" | "int" | "decimal" | "date" | "status" | "party";
+type Kind = "text" | "int" | "decimal" | "date" | "status";
 type Field = {
   key: string;
   label: string;
@@ -46,7 +48,6 @@ const SECTIONS: Section[] = [
       { key: "status", label: "Statut", kind: "status", core: true },
       { key: "quotaM3", label: "Quota (m³)", kind: "decimal", ph: "1000", core: true },
       { key: "trucksPlanned", label: "Camions prévus", kind: "int", ph: "47" },
-      { key: "note", label: "Note", kind: "text", nullable: true },
     ],
   },
   {
@@ -75,40 +76,8 @@ const SECTIONS: Section[] = [
       { key: "sodeforPrice", label: "SODEFOR (par m³ brousse)", kind: "decimal", ph: "55000" },
       { key: "ibrahimPrice", label: "Ibrahim (par m³ au diamètre)", kind: "decimal", ph: "24000" },
       { key: "transportPrice", label: "Transport (par camion)", kind: "decimal", ph: "475000" },
-      { key: "cubagePrice", label: "Cubage (par camion)", kind: "decimal", ph: "100000" },
+      { key: "cubagePrice", label: "Sous-cubage (par camion)", kind: "decimal", ph: "100000" },
       { key: "oneInchPrice", label: '1" (par m³ de 1")', kind: "decimal", ph: "140000" },
-    ],
-  },
-  {
-    id: "fees",
-    finance: true,
-    title: "Frais SODEFOR (FCFA)",
-    fields: [
-      { key: "feeSodeforR", label: "SODEFOR & R", kind: "decimal", ph: "42500000" },
-      { key: "feeSodeforPlus", label: "SODEFOR +", kind: "decimal", ph: "7500000" },
-      { key: "feeReforestation", label: "Reboisement", kind: "decimal", ph: "2500000" },
-    ],
-  },
-  {
-    id: "budgets",
-    finance: true,
-    title: "Budgets (FCFA)",
-    fields: [
-      { key: "woodBudget", label: "Wood budget", kind: "decimal", ph: "33812722" },
-      { key: "companyBudget", label: "Company budget", kind: "decimal", ph: "12717450" },
-      { key: "exportBudget", label: "Export budget", kind: "decimal", ph: "9184825" },
-      { key: "expectedProfit", label: "Profit attendu (saisi)", kind: "decimal", nullable: true },
-    ],
-  },
-  {
-    id: "parties",
-    finance: true,
-    title: "Tiers assignés",
-    hint: "Activent les suggestions de dûs en comptabilité.",
-    fields: [
-      { key: "transportPartyId", label: "Transport", kind: "party", nullable: true },
-      { key: "cubagePartyId", label: "Cubage (Ibrahim)", kind: "party", nullable: true },
-      { key: "sodeforPartyId", label: "SODEFOR", kind: "party", nullable: true },
     ],
   },
 ];
@@ -132,7 +101,7 @@ function toInput(c: ContractDTO, f: Field): string {
   return String(v);
 }
 
-function display(c: ContractDTO, f: Field, partyName: (id: string) => string): string {
+function display(c: ContractDTO, f: Field): string {
   const v = raw(c, f.key);
   if (v === null || v === "") return "—";
   switch (f.kind) {
@@ -144,8 +113,6 @@ function display(c: ContractDTO, f: Field, partyName: (id: string) => string): s
       return Number(v) === 0 ? "—" : fmtInt(v);
     case "status":
       return v === "OPEN" ? "Ouvert" : "Clôturé";
-    case "party":
-      return partyName(String(v));
     default:
       return String(v);
   }
@@ -167,10 +134,7 @@ function SectionCard({
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
-  const parties = useQuery({ queryKey: ["parties"], queryFn: accountsApi.parties });
-
-  const partyName = (id: string) => parties.data?.find((p) => p.id === id)?.name ?? "?";
-
+  const [discardOpen, setDiscardOpen] = useState(false);
   // Les champs posés à la création (n°, statut, quota) sont toujours remplis :
   // les compter gonflait le badge et « Termes 6/6 » ne voulait plus rien dire.
   const counted = section.fields.filter((f) => !f.core);
@@ -195,10 +159,19 @@ function SectionCard({
     setEditing(true);
   }
 
-  /** Neuf prix retapés puis « Annuler » : demander avant de tout jeter. */
+  /** Neuf prix retapés puis « Annuler » : demander avant de tout jeter
+   * (boîte de l'app, lisible sur tablette, plutôt que window.confirm). */
   function closeEdit() {
     const dirty = section.fields.some((f) => (v[f.key] ?? "") !== toInput(contract, f));
-    if (dirty && !window.confirm("Abandonner les modifications non enregistrées ?")) return;
+    if (dirty) {
+      setDiscardOpen(true);
+      return;
+    }
+    discard();
+  }
+
+  function discard() {
+    setDiscardOpen(false);
     setEditing(false);
     setError(null);
   }
@@ -223,16 +196,24 @@ function SectionCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-brand-900">{section.title}</h3>
-          <Badge tone={filled === total ? "parc" : filled === 0 ? "brand" : "amber"}>
+          <Badge
+            tone={filled === total ? "parc" : filled === 0 ? "brand" : "amber"}
+            className="tabular-nums"
+            title={`${filled} champ${filled > 1 ? "s" : ""} renseigné${filled > 1 ? "s" : ""} sur ${total}`}
+          >
             {filled}/{total}
           </Badge>
         </div>
         {/* min-h-touch : « Modifier » se tape au pouce sur la fiche. */}
         {!readOnly && (
           <button
+            type="button"
             onClick={() => (editing ? closeEdit() : openEdit())}
-            className="-my-1 min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
+            aria-expanded={editing}
+            aria-label={editing ? `Annuler la modification : ${section.title}` : undefined}
+            className="-my-1 -mr-1 inline-flex min-h-touch items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-100 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-200"
           >
+            {!editing && <IconPencil width={16} height={16} />}
             {editing ? "Annuler" : "Modifier"}
           </button>
         )}
@@ -246,7 +227,13 @@ function SectionCard({
           {section.fields.map((f) => (
             <div key={f.key}>
               <dt className="text-xs text-brand-500">{f.label}</dt>
-              <dd className="text-sm text-brand-900">{display(contract, f, partyName)}</dd>
+              <dd
+                className={`text-base text-brand-900${
+                  f.kind === "int" || f.kind === "decimal" ? " tabular-nums" : ""
+                }`}
+              >
+                {display(contract, f)}
+              </dd>
             </div>
           ))}
         </dl>
@@ -264,14 +251,6 @@ function SectionCard({
                       { value: "OPEN", label: "Ouvert" },
                       { value: "CLOSED", label: "Clôturé" },
                     ]}
-                  />
-                ) : f.kind === "party" ? (
-                  <SelectField
-                    value={v[f.key]}
-                    onChange={(val) => setV((p) => ({ ...p, [f.key]: val }))}
-                    placeholder="— aucun —"
-                    aria-label={f.label}
-                    options={(parties.data ?? []).map((p) => ({ value: p.id, label: p.name }))}
                   />
                 ) : f.kind === "date" ? (
                   <DateField
@@ -311,6 +290,16 @@ function SectionCard({
           </div>
         </form>
       )}
+
+      <ConfirmDialog
+        open={discardOpen}
+        title="Abandonner les modifications ?"
+        confirmLabel="Abandonner"
+        onConfirm={discard}
+        onCancel={() => setDiscardOpen(false)}
+      >
+        Les valeurs tapées dans « {section.title} » ne seront pas enregistrées.
+      </ConfirmDialog>
     </Card>
   );
 }
@@ -326,9 +315,8 @@ export function ContractSections({
   readOnly?: boolean;
 }) {
   const can = useCan();
-  // Un compte de saisie voit le n°, le quota et l'administratif ; les prix,
-  // frais, budgets et tiers n'apparaissent qu'avec Finances (l'API les masque
-  // de toute façon). Modifier un prix demande en plus Finances — Modifier.
+  // Un compte de saisie voit le n°, le quota et l'administratif ; les prix
+  // n'apparaissent qu'avec Finances (l'API les masque de toute façon). Modifier un prix demande en plus Finances — Modifier.
   const visible = SECTIONS.filter((s) => !s.finance || can("finances.view"));
   return (
     <div className="space-y-3">
@@ -380,7 +368,7 @@ export function ContractQuickCreate({
         setError(null);
         create.mutate();
       }}
-      className="rounded-xl bg-white shadow-card p-4"
+      className={`${cardCls} p-4`}
     >
       <h3 className="text-sm font-semibold text-brand-900">Nouveau contrat</h3>
       <p className="mt-1 text-xs text-brand-500">

@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { decimalString, signedDecimalString, count } from "./primitives.js";
 import { SizeGroup } from "./sizes.js";
+import { Quality, type StockRowDTO } from "./stock.js";
 import { isPermission, type Permission } from "./permissions.js";
 
 // Modules leaf réexportés (API publique inchangée).
@@ -12,6 +13,7 @@ export * from "./formulas.js";
 export * from "./sizes.js";
 export * from "./permissions.js";
 export * from "./imports.js";
+export * from "./stock.js";
 
 export const APP_NAME = "Ste-gestion";
 
@@ -198,6 +200,8 @@ const sawnLineInput = z.object({
   widthIn: decimalString,
   thicknessIn: decimalString,
   count: z.coerce.number().int().min(1),
+  // Qualité de la pièce (A grade / B / C) — B quand le scieur ne la précise pas.
+  quality: Quality.optional(),
 });
 
 export const productionRunCreateSchema = z.object({
@@ -219,6 +223,7 @@ export type SawnLineDTO = {
   widthIn: string;
   thicknessIn: string;
   count: number;
+  quality: Quality;
   sizeCode: string;
   sizeGroup: SizeGroup;
   volumeM3: string;
@@ -907,6 +912,8 @@ export type ContractExpenseDTO = {
   note: string | null;
   expenseDate: string;
   createdAt: string;
+  /** Règlements cumulés (bons) : montant payé, dernier règlement ; null = rien payé. */
+  payment: { amount: string; paidAt: string } | null;
 };
 
 /** Ligne dérivée d'un paramètre de prix : quantité réalisée × prix unitaire. */
@@ -929,6 +936,8 @@ export type ComputedExpenseDTO = {
   amount: string;
   /** false tant que le prix n'est pas renseigné dans les termes (montant 0). */
   priced: boolean;
+  /** Paiements cumulés (bons) : montant réglé, dernier règlement ; null = rien payé. */
+  payment: { amount: string; paidAt: string } | null;
 };
 
 export type ContractExpensesDTO = {
@@ -938,6 +947,122 @@ export type ContractExpensesDTO = {
   extra: ContractExpenseDTO[];
   extraTotal: string;
   total: string;
+};
+
+// ── Dépenses, tous contrats (page Dépenses) ───────────────────────────
+// Une ligne par dépense : calculée (contrat × poste) ou ajoutée (id). Le
+// paiement passe par un bon : un contrat, plusieurs de ses dépenses.
+
+export const EXPENSE_KEYS = [
+  "SODEFOR",
+  "IBRAHIM",
+  "TRANSPORT",
+  "CUBAGE",
+  "ONE_INCH",
+  "FEE_SODEFOR_R",
+  "FEE_SODEFOR_PLUS",
+  "FEE_REFORESTATION",
+] as const satisfies readonly ComputedExpenseDTO["key"][];
+
+export type ExpenseRowDTO = {
+  /** Identifiant stable de ligne : `c:<contractId>:<key>` ou `x:<expenseId>`. */
+  rowId: string;
+  kind: "computed" | "extra";
+  contractId: string;
+  contractCode: string;
+  contractStatus: "OPEN" | "CLOSED";
+  /** Poste calculé (kind = computed). */
+  key: ComputedExpenseDTO["key"] | null;
+  /** Dépense ajoutée (kind = extra). */
+  expenseId: string | null;
+  label: string;
+  /** Précision : « 412,350 m³ brousse », « forfait », note de la dépense… */
+  detail: string | null;
+  /** Montant actuel (calculé à la volée pour un poste). */
+  amount: string;
+  /** Date de la dépense ajoutée ; null pour un poste calculé. */
+  date: string | null;
+  /** Dernier règlement ; null = jamais payé. */
+  paidAt: string | null;
+  /** Montant réglé (somme des bons) ; null = rien payé. */
+  paidAmount: string | null;
+  /** Reste à payer : montant − réglé. Négatif = payé au-delà du montant. */
+  due: string;
+  /** Bons qui l'ont réglée (traçabilité dépense → bon). */
+  vouchers: { id: string; number: string }[];
+};
+
+/** Modes choisis sur un bon saisi. CREDIT (report) n'est posé que par un transfert. */
+export const PAYMENT_METHODS = ["CASH", "CHEQUE", "TRANSFER", "MOBILE_MONEY"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number] | "CREDIT";
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CASH: "Espèces",
+  CHEQUE: "Chèque",
+  TRANSFER: "Virement",
+  MOBILE_MONEY: "Mobile money",
+  CREDIT: "Report de trop-payé",
+};
+
+/**
+ * Report d'un trop-payé : un contrat où le compte « nous doit » (payé au-delà)
+ * vers un contrat où « on lui doit », même poste. Crée un bon CREDIT.
+ */
+export const expenseTransferSchema = z
+  .object({
+    key: z.enum(EXPENSE_KEYS),
+    fromContractId: z.string().min(1),
+    toContractId: z.string().min(1),
+    amount: decimalString,
+    transferredAt: z.coerce.date(),
+    note: z.string().trim().max(300).optional(),
+  })
+  .refine((d) => d.fromContractId !== d.toContractId, {
+    message: "Le contrat source et le contrat cible doivent différer",
+    path: ["toContractId"],
+  });
+export type ExpenseTransferInput = z.infer<typeof expenseTransferSchema>;
+
+/** Numéro affiché d'un bon : BP-0012. */
+export function voucherNumber(seq: number): string {
+  return `BP-${String(seq).padStart(4, "0")}`;
+}
+
+export const paymentVoucherCreateSchema = z.object({
+  contractId: z.string().min(1),
+  items: z
+    .array(
+      z.union([
+        // amount : ce qui est réellement payé sur la ligne — moins ou plus que le dû.
+        z.object({ key: z.enum(EXPENSE_KEYS), amount: decimalString }),
+        z.object({ expenseId: z.string().min(1), amount: decimalString }),
+      ])
+    )
+    .min(1, "Choisir au moins une dépense")
+    .max(200),
+  paidAt: z.coerce.date(),
+  method: z.enum(PAYMENT_METHODS),
+  /** N° de chèque, de virement, de transaction… */
+  reference: z.string().trim().max(60).optional(),
+  note: z.string().trim().max(300).optional(),
+});
+export type PaymentVoucherCreateInput = z.infer<typeof paymentVoucherCreateSchema>;
+
+export type PaymentVoucherDTO = {
+  id: string;
+  number: string;
+  contractId: string;
+  contractCode: string;
+  paidAt: string;
+  method: PaymentMethod;
+  reference: string | null;
+  note: string | null;
+  total: string;
+  createdBy: string | null;
+  createdAt: string;
+  /** Dépenses réglées par ce bon, montant réglé par ligne. */
+  lines: { label: string; kind: "computed" | "extra"; amount: string }[];
+  /** Bon CREDIT : contrat d'où vient le trop-payé reporté. */
+  creditFrom: { contractId: string; contractCode: string } | null;
 };
 
 export type AccountSuggestionDTO = {
@@ -1034,6 +1159,7 @@ const containerItemInput = z.object({
   widthIn: decimalString,
   thicknessIn: decimalString,
   count: z.coerce.number().int().min(1),
+  quality: Quality.optional(),
 });
 
 export const containerCreateSchema = z.object({
@@ -1076,6 +1202,7 @@ export type ContainerItemDTO = {
   widthIn: string;
   thicknessIn: string;
   count: number;
+  quality: Quality;
   sizeCode: string;
   sizeGroup: SizeGroup;
   volumeM3: string;
@@ -1101,27 +1228,11 @@ export type ContainerDTO = {
   items: ContainerItemDTO[];
 };
 
-// ── Stock d'avivés par dimension exacte (GET /contracts/:id/sawn-inventory) ──
+// ── Stock d'avivés par dimension exacte (GET /stock/sawn-inventory) ──
 // L'empotage se choisit pièce par pièce dans du bois réel : il faut le stock à
-// la granularité L×l×ép (le stock par taille du résumé n'est qu'en m³).
-// Les ventes ne portent ni dimensions ni nombre de pièces : elles ne peuvent
-// pas être déduites ici. Disponible = débité + rescié entrant − rescié sortant
-// − déjà empoté.
-export type SawnInventoryRowDTO = {
-  key: string; // "6.5x6x3" — identifiant de regroupement
-  lengthFt: string;
-  widthIn: string;
-  thicknessIn: string;
-  sizeCode: string;
-  sizeGroup: SizeGroup;
-  producedCount: number;
-  resawnInCount: number;
-  resawnOutCount: number;
-  packedCount: number; // déjà empoté (tous conteneurs du contrat)
-  availableCount: number;
-  unitM3: string; // volume d'une pièce
-  availableM3: string;
-};
+// la granularité L×l×ép×qualité. Même calcul que la page Stock (dernier
+// inventaire + entrées − sorties), voir `StockRowDTO` dans stock.ts.
+export type SawnInventoryRowDTO = StockRowDTO;
 
 export function containerTotalM3(c: ContainerDTO): number {
   return c.items.reduce((s, i) => s + Number(i.volumeM3), 0);

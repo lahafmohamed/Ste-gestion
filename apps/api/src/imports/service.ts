@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import {
   M3_TO_CFT,
   classifySize,
+  qualityFromLabel,
   plateKey,
   sawnVolumeM3,
   volumeDiameterM3,
@@ -457,6 +458,8 @@ export async function applyImport(
           widthIn: l.b,
           thicknessIn: l.c!,
           count: l.count ?? 1,
+          // Colonne GRADE : « A GRADE » → A, « 5X3 C » → C, sinon B.
+          quality: qualityFromLabel(l.grade),
           sizeCode: size.code,
           sizeGroup: size.group,
           volumeM3: l.volumeM3,
@@ -493,6 +496,12 @@ export async function applyImport(
           widthIn: l.b,
           thicknessIn: l.c!,
           count: l.count ?? 1,
+          // PRODUITS de la ligne quand il dit A ou C, sinon grade du conteneur
+          // (titre « … (5X3 C GRADE) »).
+          quality:
+            qualityFromLabel(l.grade) !== "B"
+              ? qualityFromLabel(l.grade)
+              : qualityFromLabel(sheet.meta.grade),
           sizeCode: size.code,
           sizeGroup: size.group,
           volumeM3: l.volumeM3,

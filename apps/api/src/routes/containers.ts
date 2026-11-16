@@ -5,7 +5,9 @@ import {
   containerCreateSchema,
   containerItemsAddSchema,
   containerUpdateSchema,
+  qualityFromLabel,
   sawnVolumeM3,
+  type Quality,
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
 
@@ -34,10 +36,20 @@ async function assertTrucks(truckIds: string[]) {
   return ids;
 }
 
+// Qualité d'une ligne : celle choisie (panier d'empotage = celle du stock),
+// sinon celle du grade écrit sur le conteneur (« 5X3 C GRADE » → C).
 function buildItems(
-  items: { lengthFt: string; widthIn: string; thicknessIn: string; count: number }[],
-  startPos: number
+  items: {
+    lengthFt: string;
+    widthIn: string;
+    thicknessIn: string;
+    count: number;
+    quality?: Quality;
+  }[],
+  startPos: number,
+  grade?: string | null
 ) {
+  const fallback = qualityFromLabel(grade);
   return items.map((l, i) => {
     const size = classifySize(Number(l.widthIn), Number(l.thicknessIn));
     const vol = sawnVolumeM3(
@@ -52,6 +64,7 @@ function buildItems(
       widthIn: l.widthIn,
       thicknessIn: l.thicknessIn,
       count: l.count,
+      quality: l.quality ?? fallback,
       sizeCode: size.code,
       sizeGroup: size.group,
       volumeM3: vol.toFixed(6),
@@ -59,11 +72,20 @@ function buildItems(
   });
 }
 
-// Horodatage auto selon le statut.
-function statusStamp(status?: string) {
+// Horodatage auto selon le statut — au PASSAGE dans ce statut seulement :
+// renvoyer « LOADED » avec le plomb ne doit pas redater le chargement (le
+// rapport du jour le classe à cette date).
+function statusStamp(status?: string, previous?: string) {
+  if (status === previous) return {};
   if (status === "LOADED") return { loadedAt: new Date() };
   if (status === "SHIPPED") return { shippedAt: new Date() };
   return {};
+}
+
+// Client (tiers) choisi : il doit exister, sinon la clé étrangère part en 500.
+async function clientExists(clientId: string | null | undefined) {
+  if (!clientId) return true;
+  return (await prisma.party.count({ where: { id: clientId } })) > 0;
 }
 
 export async function containerRoutes(app: FastifyInstance) {
@@ -96,6 +118,9 @@ export async function containerRoutes(app: FastifyInstance) {
     } catch {
       return reply.code(400).send({ error: "Camion introuvable" });
     }
+    if (!(await clientExists(d.clientId))) {
+      return reply.code(400).send({ error: "Client introuvable" });
+    }
 
     const c = await prisma.container.create({
       data: {
@@ -108,7 +133,7 @@ export async function containerRoutes(app: FastifyInstance) {
         destination: d.destination,
         status: d.status,
         ...statusStamp(d.status),
-        items: d.items ? { create: buildItems(d.items, 1) } : undefined,
+        items: d.items ? { create: buildItems(d.items, 1, d.grade) } : undefined,
         trucks: truckIds.length ? { create: truckIds.map((truckId) => ({ truckId })) } : undefined,
       },
       include: withItems,
@@ -123,29 +148,36 @@ export async function containerRoutes(app: FastifyInstance) {
 
     const existing = await prisma.container.findUnique({
       where: { id: req.params.id },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!existing) return reply.code(404).send({ error: "Conteneur introuvable" });
 
-    // Remplacer les camions liés si fournis.
+    let ids: string[] | undefined;
     if (truckIds) {
       try {
-        const ids = await assertTrucks(truckIds);
-        await prisma.$transaction([
-          prisma.containerTruck.deleteMany({ where: { containerId: req.params.id } }),
-          prisma.containerTruck.createMany({
-            data: ids.map((truckId) => ({ containerId: req.params.id, truckId })),
-          }),
-        ]);
+        ids = await assertTrucks(truckIds);
       } catch {
         return reply.code(400).send({ error: "Camion introuvable" });
       }
     }
+    if (!(await clientExists(fields.clientId))) {
+      return reply.code(400).send({ error: "Client introuvable" });
+    }
 
-    const c = await prisma.container.update({
-      where: { id: req.params.id },
-      data: { ...fields, ...statusStamp(fields.status) },
-      include: withItems,
+    // Camions liés remplacés (si fournis) et champs mis à jour d'un seul bloc :
+    // un échec sur l'un ne laisse pas l'autre à moitié écrit.
+    const c = await prisma.$transaction(async (tx) => {
+      if (ids) {
+        await tx.containerTruck.deleteMany({ where: { containerId: existing.id } });
+        await tx.containerTruck.createMany({
+          data: ids.map((truckId) => ({ containerId: existing.id, truckId })),
+        });
+      }
+      return tx.container.update({
+        where: { id: existing.id },
+        data: { ...fields, ...statusStamp(fields.status, existing.status) },
+        include: withItems,
+      });
     });
     return serialize(c);
   });
@@ -168,12 +200,19 @@ export async function containerRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const container = await prisma.container.findUnique({
       where: { id: req.params.id },
-      select: { id: true, _count: { select: { items: true } } },
+      // Dernière position (et non le nombre de lignes) : après une ligne
+      // supprimée, le compte retomberait sur une position déjà prise.
+      select: {
+        id: true,
+        grade: true,
+        items: { select: { position: true }, orderBy: { position: "desc" }, take: 1 },
+      },
     });
     if (!container) return reply.code(404).send({ error: "Conteneur introuvable" });
 
+    const startPos = (container.items[0]?.position ?? 0) + 1;
     await prisma.containerItem.createMany({
-      data: buildItems(parsed.data.items, container._count.items + 1).map((it) => ({
+      data: buildItems(parsed.data.items, startPos, container.grade).map((it) => ({
         ...it,
         containerId: container.id,
       })),

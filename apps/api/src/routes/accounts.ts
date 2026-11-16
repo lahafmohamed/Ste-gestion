@@ -58,6 +58,13 @@ export async function accountRoutes(app: FastifyInstance) {
   });
 
   app.delete<{ Params: { id: string } }>("/account-entries/:id", async (req, reply) => {
+    // Même verrou que la création : la compta d'un contrat clôturé est figée.
+    const entry = await prisma.accountEntry.findUnique({
+      where: { id: req.params.id },
+      select: { contractId: true },
+    });
+    if (!entry) return reply.code(404).send({ error: "Écriture introuvable" });
+    if (!(await ensureContractOpen(reply, entry.contractId))) return;
     try {
       await prisma.accountEntry.delete({ where: { id: req.params.id } });
       return reply.code(204).send();

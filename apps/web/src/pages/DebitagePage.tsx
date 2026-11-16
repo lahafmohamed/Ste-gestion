@@ -9,7 +9,7 @@ export default function DebitagePage() {
     <>
       <PageHeader
         title="Débitage"
-        subtitle="Billons sciés → avivés par taille. Le débité part au stock général."
+        subtitle="Les billons sciés deviennent des avivés par taille, versés au stock général."
         wide={false}
       />
       <div className="mx-auto max-w-page px-4 py-6 short:py-3">

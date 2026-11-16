@@ -4,6 +4,7 @@ import type { ComputedExpenseDTO, ContractExpenseDTO } from "@ste/shared";
 import { expensesApi } from "../lib/api";
 import { useCan } from "../lib/auth";
 import { fmtFcfa, fmtInt, fmtM3, normalizeDecimal, todayISO } from "../lib/format";
+import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Card, { Kpi, KpiStrip, SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
@@ -12,6 +13,7 @@ import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 import Input, { Field } from "./ui/Input";
 import { SkeletonList } from "./ui/Skeleton";
 import { TableWrap, Td, Th } from "./ui/Table";
+import { IconPlus, IconX } from "./icons";
 
 // ── Dépenses du contrat ─────────────────────────────────────────────────
 // Deux blocs : les lignes calculées (un paramètre de prix × la quantité
@@ -24,6 +26,27 @@ function fmtQty(l: ComputedExpenseDTO): string {
   if (l.quantity === null) return "forfait";
   if (l.unit === "camions") return `${fmtInt(l.quantity)} camions`;
   return fmtM3(l.quantity);
+}
+
+/** Règlement (page Dépenses) : payé, ou partiel avec le reste dû. */
+function PaidBadge({
+  amount,
+  payment,
+}: {
+  amount: string;
+  payment: { amount: string } | null;
+}) {
+  if (!payment) return null;
+  const due = Number(amount) - Number(payment.amount);
+  return due >= 1 ? (
+    <Badge tone="amber" className="ml-2">
+      Reste {fmtFcfa(due)}
+    </Badge>
+  ) : (
+    <Badge tone="parc" className="ml-2">
+      Payé
+    </Badge>
+  );
 }
 
 function ExpenseForm({
@@ -62,7 +85,10 @@ function ExpenseForm({
   }
 
   return (
-    <form onSubmit={submit} className="mb-3 grid grid-cols-2 gap-3 rounded-xl bg-white p-4 shadow-card sm:grid-cols-4">
+    <form
+      onSubmit={submit}
+      className="mb-3 grid grid-cols-2 gap-3 rounded-xl bg-white p-4 shadow-card sm:grid-cols-4"
+    >
       <Field label="Libellé" className="col-span-2">
         <Input
           required
@@ -93,12 +119,18 @@ function ExpenseForm({
           maxLength={300}
         />
       </Field>
-      <div className="col-span-2 flex flex-wrap items-end justify-between gap-2 sm:col-span-1">
-        {error && <FormError>{error}</FormError>}
-        <Button type="submit" variant="primary" disabled={add.isPending} className="ml-auto">
+      <div className="col-span-2 flex items-end justify-end sm:col-span-1">
+        <Button type="submit" variant="primary" disabled={add.isPending}>
           {add.isPending ? "Ajout…" : "Ajouter"}
         </Button>
       </div>
+      {/* Erreur sur toute la largeur, sous la ligne : à côté du bouton elle
+          tenait dans un quart de carte. */}
+      {error && (
+        <div className="col-span-2 sm:col-span-4">
+          <FormError>{error}</FormError>
+        </div>
+      )}
     </form>
   );
 }
@@ -146,9 +178,24 @@ export default function ExpensesSection({
 
   return (
     <div className="mt-4">
-      <KpiStrip cols={3}>
-        <Kpi bare label="Dépenses calculées" value={fmtFcfa(d.computedTotal)} hint="Prix × quantités réalisées" />
-        <Kpi bare label="Dépenses ajoutées" value={fmtFcfa(d.extraTotal)} hint={`${d.extra.length} ligne${d.extra.length > 1 ? "s" : ""}`} />
+      {/* tabular-nums hérité : les trois montants s'alignent chiffre à chiffre. */}
+      <KpiStrip cols={3} className="tabular-nums">
+        <Kpi
+          bare
+          label="Dépenses calculées"
+          value={fmtFcfa(d.computedTotal)}
+          hint={
+            unpriced > 0
+              ? `${unpriced} prix non renseigné${unpriced > 1 ? "s" : ""}`
+              : "prix × quantités réalisées"
+          }
+        />
+        <Kpi
+          bare
+          label="Dépenses ajoutées"
+          value={fmtFcfa(d.extraTotal)}
+          hint={`${d.extra.length} ligne${d.extra.length > 1 ? "s" : ""}`}
+        />
         <Kpi bare label="Total dépenses" value={fmtFcfa(d.total)} tone="accent" />
       </KpiStrip>
 
@@ -182,11 +229,12 @@ export default function ExpensesSection({
                 {d.computed.map((l) => (
                   <tr
                     key={l.key}
-                    className={`border-t border-brand-100${l.priced ? "" : " text-brand-400"}`}
+                    className={`border-t border-brand-100${l.priced ? "" : " text-brand-500"}`}
                   >
                     <Td>
                       <span className={l.priced ? "font-medium text-brand-900" : ""}>{l.label}</span>
                       {l.unit && <span className="ml-2 text-xs text-brand-500">par {l.unit}</span>}
+                      <PaidBadge amount={l.amount} payment={l.payment} />
                     </Td>
                     <Td num>{fmtQty(l)}</Td>
                     <Td num>{l.priced ? fmtFcfa(l.unitPrice) : "non renseigné"}</Td>
@@ -218,8 +266,15 @@ export default function ExpensesSection({
         <SectionHeading
           right={
             can("finances.edit") && (
-              <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-                {showForm ? "Fermer" : "+ Dépense"}
+              <Button size="xs" onClick={() => setShowForm((s) => !s)} aria-expanded={showForm}>
+                {showForm ? (
+                  "Fermer"
+                ) : (
+                  <>
+                    <IconPlus width={16} height={16} className="-ml-0.5" />
+                    Dépense
+                  </>
+                )}
               </Button>
             )
           }
@@ -228,6 +283,12 @@ export default function ExpensesSection({
         </SectionHeading>
 
         {showForm && <ExpenseForm contractId={contractId} onDone={() => setShowForm(false)} />}
+
+        {remove.isError && (
+          <div className="mb-3">
+            <FormError>Suppression échouée : {(remove.error as Error).message}</FormError>
+          </div>
+        )}
 
         {d.extra.length === 0 && !showForm && (
           <EmptyState
@@ -258,12 +319,13 @@ export default function ExpensesSection({
                 <tbody>
                   {d.extra.map((e) => (
                     <tr key={e.id} className="border-t border-brand-100">
-                      <Td className="whitespace-nowrap text-sm text-brand-500">
+                      <Td className="whitespace-nowrap text-sm tabular-nums text-brand-500">
                         {new Date(e.expenseDate).toLocaleDateString("fr-FR")}
                       </Td>
                       <Td>
                         <span className="font-medium text-brand-900">{e.label}</span>
-                        {e.note && <div className="text-xs text-brand-500">{e.note}</div>}
+                        <PaidBadge amount={e.amount} payment={e.payment} />
+                        {e.note && <div className="text-sm text-brand-500">{e.note}</div>}
                       </Td>
                       <Td num className={can("finances.edit") ? "font-medium" : "pr-0 font-medium"}>
                         {fmtFcfa(e.amount)}
@@ -273,10 +335,10 @@ export default function ExpensesSection({
                           <button
                             type="button"
                             onClick={() => setDel(e)}
-                            className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-300 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
+                            className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-red-100"
                             aria-label={`Supprimer la dépense ${e.label}`}
                           >
-                            ×
+                            <IconX width={18} height={18} />
                           </button>
                         </Td>
                       )}

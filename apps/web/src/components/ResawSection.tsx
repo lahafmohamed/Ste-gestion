@@ -1,164 +1,29 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  classifySize,
-  sawnVolumeM3,
-  type ResawOpDTO,
-  type SawnLineDTO,
-  type StockSizeRowDTO,
-} from "@ste/shared";
+import type { ResawOpDTO, SawnLineDTO } from "@ste/shared";
 import { resawApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtDec3, fmtNum, fmtPct, normalizeDecimal, todayISO, fmtM3 } from "../lib/format";
-import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
+import { fmtDec3, fmtPct, todayISO, fmtM3 } from "../lib/format";
+import StockLinesEditor, {
+  emptyLine,
+  lineInfo,
+  toLineInputs,
+  type LineRow,
+} from "./StockLinesEditor";
 import Button from "./ui/Button";
 import Card, { SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
 import DateField from "./ui/DateField";
 import { EmptyState, FormError, QueryError, Notice } from "./ui/Feedback";
-import Input, { Field, inputQuietCls } from "./ui/Input";
+import Input, { Field } from "./ui/Input";
 import { SkeletonCard } from "./ui/Skeleton";
-import { IconX, IconPlus } from "./icons";
+import { IconArrowRight, IconPlus } from "./icons";
 
 // Resciage : du bois déjà scié en stock repasse à la scie pour donner des
 // sections plus petites. Deux blocs symétriques (consommé / produit), même
-// saisie dims + nombre que le débitage — taille et volume calculés en live.
-
-type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
-
-const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "" });
-
-// Mini-libellés des cartes téléphone (< sm) — l'en-tête de colonnes disparaît.
-const COL_LABELS = {
-  lengthFt: "L (ft)",
-  widthIn: "l (in)",
-  thicknessIn: "ép (in)",
-  count: "Nbr",
-} as const;
-
-function rowInfo(r: RowState) {
-  const L = Number(r.lengthFt);
-  const w = Number(r.widthIn);
-  const t = Number(r.thicknessIn);
-  const n = Number(r.count);
-  if (!r.lengthFt || !r.widthIn || !r.thicknessIn || !r.count) return null;
-  if (!(L > 0) || !(w > 0) || !(t > 0) || !Number.isInteger(n) || n < 1) return null;
-  return { volume: sawnVolumeM3(L, w, t, n), size: classifySize(w, t), count: n };
-}
-
-function toLines(rows: RowState[]) {
-  return rows
-    .filter((r) => rowInfo(r) !== null)
-    .map((r) => ({
-      lengthFt: r.lengthFt.trim(),
-      widthIn: r.widthIn.trim(),
-      thicknessIn: r.thicknessIn.trim(),
-      count: Number(r.count),
-    }));
-}
-
-// Éditeur de lignes partagé par les deux blocs.
-function LinesEditor({
-  rows,
-  setRows,
-}: {
-  rows: RowState[];
-  setRows: React.Dispatch<React.SetStateAction<RowState[]>>;
-}) {
-  const infos = rows.map(rowInfo);
-  function setRow(i: number, patch: Partial<RowState>) {
-    setRows((p) => p.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  }
-  return (
-    <div>
-      <div className="overflow-x-auto sm:overflow-visible">
-        <div className="sm:min-w-[560px]">
-          <div className="hidden items-center gap-1 text-xs text-brand-500 sm:grid sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem]">
-            <span>#</span>
-            <span>L (ft)</span>
-            <span>l (in)</span>
-            <span>ép (in)</span>
-            <span>Nbr</span>
-            <span>Taille</span>
-            <span className="text-right">m³</span>
-            <span />
-          </div>
-          {/* Téléphone (< sm) : carte 2 rangées — même motif que EmpotageEntry,
-              ordre DOM inchangé. */}
-          {rows.map((r, i) => {
-            const info = infos[i];
-            return (
-              <div
-                key={i}
-                className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
-              >
-                <span className="text-xs text-brand-500">{i + 1}</span>
-                {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
-                  <div
-                    key={k}
-                    className={`min-w-0${k === "count" ? " col-start-2 sm:col-auto" : ""}`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="mb-0.5 block text-xs text-brand-500 sm:hidden"
-                    >
-                      {COL_LABELS[k]}
-                    </span>
-                    <input
-                      inputMode="decimal"
-                      value={r[k]}
-                      aria-label={`${COL_LABELS[k]} ligne ${i + 1}`}
-                      // Clavier FR : « 6,5 » doit partir en « 6.5 », sinon l'API rejette la ligne.
-                      onChange={(e) => setRow(i, { [k]: normalizeDecimal(e.target.value) })}
-                      onKeyDown={
-                        k === "count"
-                          ? (e) => {
-                              if (e.key === "Enter" && i === rows.length - 1) {
-                                e.preventDefault();
-                                setRows((p) => [...p, emptyRow()]);
-                              }
-                            }
-                          : undefined
-                      }
-                      className={inputQuietCls}
-                    />
-                  </div>
-                ))}
-                {info ? (
-                  <Badge tone={SIZE_GROUP_TONE[info.size.group]} className="justify-self-center">
-                    {info.size.code}
-                  </Badge>
-                ) : (
-                  <span className="text-center text-xs text-brand-300">—</span>
-                )}
-                <span className="text-right text-base tabular-nums text-brand-700">
-                  <span className="mr-1 text-xs text-brand-500 sm:hidden">m³</span>
-                  {info ? info.volume.toFixed(3) : "—"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-                  className="flex min-h-touch w-full items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
-                  aria-label="Supprimer la ligne"
-                >
-                  <IconX width={18} height={18} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={() => setRows((p) => [...p, emptyRow()])}
-        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2 text-base font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
-      >
-        <IconPlus width={16} height={16} className="-ml-0.5" />
-        Ligne
-      </button>
-    </div>
-  );
-}
+// saisie dims + nombre + qualité que les sorties — volume calculé en live.
+// Au suivi : « ancienne mesure (recutting out) » et « nouvelle mesure
+// (recutting in) ».
 
 function linesSummary(lines: SawnLineDTO[]) {
   const bySize = new Map<string, number>();
@@ -170,14 +35,14 @@ function linesSummary(lines: SawnLineDTO[]) {
 
 // Resciage : stock → stock, sans contrat (le bois rescié revient au stock
 // général, quel que soit le contrat qui l'a produit).
-export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRowDTO[] }) {
+export default function ResawSection({ stockByCode }: { stockByCode: Map<string, number> }) {
   const can = useCan();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [note, setNote] = useState("");
-  const [consumedRows, setConsumedRows] = useState<RowState[]>([emptyRow()]);
-  const [producedRows, setProducedRows] = useState<RowState[]>([emptyRow()]);
+  const [consumedRows, setConsumedRows] = useState<LineRow[]>([emptyLine()]);
+  const [producedRows, setProducedRows] = useState<LineRow[]>([emptyLine()]);
   const [toDelete, setToDelete] = useState<ResawOpDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -196,8 +61,8 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
     mutationFn: resawApi.create,
     onSuccess: () => {
       invalidate();
-      setConsumedRows([emptyRow()]);
-      setProducedRows([emptyRow()]);
+      setConsumedRows([emptyLine()]);
+      setProducedRows([emptyLine()]);
       setNote("");
       setDate("");
       setError(null);
@@ -213,14 +78,13 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
     },
   });
 
-  const consumedInfos = consumedRows.map(rowInfo).filter((x) => x !== null);
-  const producedInfos = producedRows.map(rowInfo).filter((x) => x !== null);
+  const consumedInfos = consumedRows.map(lineInfo).filter((x) => x !== null);
+  const producedInfos = producedRows.map(lineInfo).filter((x) => x !== null);
   const inM3 = consumedInfos.reduce((s, x) => s + x!.volume, 0);
   const outM3 = producedInfos.reduce((s, x) => s + x!.volume, 0);
   const lossM3 = inM3 - outM3; // perte de trait de scie (normale, ≥ 0)
 
-  // Stock dispo par taille → alerte si on consomme plus qu'il n'y en a.
-  const stockByCode = new Map(stockBySize.map((r) => [r.code, Number(r.stockM3)]));
+  // Stock par taille → alerte si on consomme plus qu'il n'y en a.
   const consumedByCode = new Map<string, number>();
   for (const x of consumedInfos) {
     consumedByCode.set(x!.size.code, (consumedByCode.get(x!.size.code) ?? 0) + x!.volume);
@@ -230,8 +94,8 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
   );
 
   function save() {
-    const consumed = toLines(consumedRows);
-    const produced = toLines(producedRows);
+    const consumed = toLineInputs(consumedRows);
+    const produced = toLineInputs(producedRows);
     if (consumed.length === 0 || produced.length === 0) return;
     createMut.mutate({
       // Midi local : la date seule ne doit pas glisser d'un jour en UTC.
@@ -272,15 +136,15 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
             </Field>
           </div>
 
-          <div className="mb-1 text-sm font-semibold text-brand-800">
-            Bois consommé (pris du stock)
-          </div>
-          <LinesEditor rows={consumedRows} setRows={setConsumedRows} />
+          <h3 className="mb-1 text-sm font-semibold text-brand-900">
+            Bois consommé <span className="font-normal text-brand-600">(pris du stock)</span>
+          </h3>
+          <StockLinesEditor rows={consumedRows} setRows={setConsumedRows} />
 
-          <div className="mb-1 mt-4 text-sm font-semibold text-brand-800">
-            Bois produit (sections plus petites)
-          </div>
-          <LinesEditor rows={producedRows} setRows={setProducedRows} />
+          <h3 className="mb-1 mt-5 text-sm font-semibold text-brand-900">
+            Bois produit <span className="font-normal text-brand-600">(sections plus petites)</span>
+          </h3>
+          <StockLinesEditor rows={producedRows} setRows={setProducedRows} />
 
           {overStock.length > 0 && (
             <Notice tone="warn" className="mt-3">
@@ -288,33 +152,36 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
               {overStock
                 .map(
                   ([code, v]) =>
-                    `${code} (${fmtNum(v.toFixed(3))} demandé, ${fmtNum(
-                      (stockByCode.get(code) ?? 0).toFixed(3)
-                    )} en stock)`
+                    `${code} (${fmtM3(v)} demandés, ${fmtM3(stockByCode.get(code) ?? 0)} en stock)`
                 )
                 .join(", ")}
               . Vérifier les tailles saisies.
             </Notice>
           )}
           {outM3 > inM3 + 1e-6 && (
-            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Volume produit supérieur au volume consommé — le resciage ne crée pas de matière.
-            </div>
+            <Notice tone="danger" className="mt-3">
+              Le volume produit dépasse le volume consommé : un resciage ne crée pas de bois.
+              Vérifier les dimensions saisies.
+            </Notice>
           )}
 
           {(inM3 > 0 || outM3 > 0) && (
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm">
-              <span className="text-brand-500">
-                Consommé {fmtNum(inM3.toFixed(3))} → produit {fmtM3(outM3)}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg bg-brand-50 px-3 py-2 text-sm tabular-nums">
+              <span className="text-brand-600">
+                Consommé {fmtM3(inM3)}, produit {fmtM3(outM3)}
               </span>
-              <span className="font-medium text-brand-700">
+              <span className="font-medium text-brand-800">
                 Perte {fmtM3(Math.max(lossM3, 0))}
                 {inM3 > 0 && ` (${fmtPct((Math.max(lossM3, 0) / inM3) * 100, 1)})`}
               </span>
             </div>
           )}
 
-          {error && <FormError>{error}</FormError>}
+          {error && (
+            <div className="mt-3">
+              <FormError>{error}</FormError>
+            </div>
+          )}
 
           <Button
             variant="primary"
@@ -339,7 +206,12 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
           Impossible de charger les resciages
         </QueryError>
       )}
-      {ops.data?.length === 0 && !open && <EmptyState>Aucun resciage.</EmptyState>}
+      {ops.data?.length === 0 && !open && (
+        <EmptyState>
+          Aucun resciage. Un resciage repasse du bois en stock à la scie pour en tirer des sections
+          plus petites.
+        </EmptyState>
+      )}
 
       {(ops.data?.length ?? 0) > 0 && (
         <Card className="mb-4">
@@ -354,19 +226,22 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
                       <span className="font-medium">
                         {new Date(o.resawnAt).toLocaleDateString("fr-FR")}
                       </span>{" "}
-                      <span className="text-brand-500">
-                        — {fmtDec3(inTotal)} → {fmtDec3(outTotal)} m³
+                      <span className="tabular-nums text-brand-600">
+                        · {fmtM3(inTotal)} rescié en {fmtM3(outTotal)}
                       </span>
-                      {o.note && <span className="ml-1 text-brand-500">· {o.note}</span>}
+                      {o.note && <span className="ml-1 text-brand-600">· {o.note}</span>}
                     </div>
-                    <div className="mt-0.5 text-xs text-brand-500">
-                      {linesSummary(o.consumed)} <span className="text-brand-500">→</span>{" "}
-                      {linesSummary(o.produced)}
+                    {/* Flèche SVG (pas le glyphe « → ») ; le lecteur d'écran entend « donne ». */}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm tabular-nums text-brand-600">
+                      <span>{linesSummary(o.consumed)}</span>
+                      <IconArrowRight width={14} height={14} className="shrink-0 text-brand-500" />
+                      <span className="sr-only">donne</span>
+                      <span>{linesSummary(o.produced)}</span>
                     </div>
                   </div>
                   {can("stock.delete") && (
                     <Button size="sm" variant="ghost-danger" onClick={() => setToDelete(o)}>
-                      Suppr.
+                      Supprimer
                     </Button>
                   )}
                 </li>
@@ -386,6 +261,14 @@ export default function ResawSection({ stockBySize }: { stockBySize: StockSizeRo
       >
         Le stock des tailles concernées sera recalculé (le bois consommé revient, le bois produit
         repart).
+        {removeMut.isError && (
+          <div className="mt-3">
+            <FormError>
+              Suppression impossible
+              {removeMut.error instanceof Error ? ` : ${removeMut.error.message}` : "."}
+            </FormError>
+          </div>
+        )}
       </ConfirmDialog>
     </>
   );

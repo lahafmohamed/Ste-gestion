@@ -1,153 +1,439 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SIZE_GROUP_LABELS, type SawnInventoryRowDTO } from "@ste/shared";
+import { useSearchParams } from "react-router-dom";
+import {
+  QUALITY_LABELS,
+  suiviColumnIndex,
+  suiviColumnLabel,
+  type SawnInventoryRowDTO,
+} from "@ste/shared";
 import ResawSection from "../components/ResawSection";
+import StockMovementsTab from "../components/stock/StockMovementsTab";
+import StockSuiviTab from "../components/stock/StockSuiviTab";
 import { PageHeader } from "../components/Layout";
-import Badge, { SIZE_GROUP_TONE } from "../components/ui/Badge";
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
 import Card, { Kpi, KpiStrip, SectionHeading } from "../components/ui/Card";
 import { EmptyState, QueryError, Notice } from "../components/ui/Feedback";
 import { SkeletonCard, SkeletonList } from "../components/ui/Skeleton";
 import { TableWrap } from "../components/ui/Table";
-import { stockApi } from "../lib/api";
-import { fmtDec3, fmtM3, fmtNum } from "../lib/format";
+import Tabs from "../components/ui/Tabs";
+import { downloadFile, stockApi } from "../lib/api";
+import { useCan } from "../lib/auth";
+import { fmtDec3, fmtInt, fmtM3, fmtNum } from "../lib/format";
+import { IconChevronRight } from "../components/icons";
 
-// Un seul stock, tous contrats confondus : le débitage y verse, l'empotage et
-// les ventes y puisent. Aucun contrat à choisir.
+// Un seul stock, tous contrats confondus, tenu comme les classeurs du client :
+// dernier inventaire + sciage + nouvelle mesure − empotage − livraisons,
+// ventes, séchoir, menuiserie, rejets − ancienne mesure. L'onglet Stock est
+// le tableau STOCK (pièces par L × l × ép), l'onglet Suivi le SUIVI PAR
+// EPAISSEUR (une ligne par mouvement).
+
+type TabKey = "stock" | "suivi" | "mouvements" | "resciage";
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "stock", label: "Stock" },
+  { key: "suivi", label: "Suivi par épaisseur" },
+  { key: "mouvements", label: "Inventaire et sorties" },
+  { key: "resciage", label: "Resciage" },
+];
+
+function stamp() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`;
+}
+
 export default function StockPage() {
+  const can = useCan();
+  const [params, setParams] = useSearchParams();
+  const raw = params.get("onglet");
+  const tab: TabKey = TABS.some((t) => t.key === raw) ? (raw as TabKey) : "stock";
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
+
+  async function exportFile(path: string, name: string) {
+    setExportError(null);
+    setExporting(path);
+    try {
+      await downloadFile(path, name);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export impossible");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   return (
     <>
       <PageHeader
         title="Stock"
-        subtitle="Parc (billons non sciés) & produits par taille — tous contrats."
+        subtitle="Avivés par dimension et suivi des mouvements, tous contrats confondus."
+        right={
+          can("stock.export") && (
+            <>
+              <Button
+                size="sm"
+                disabled={exporting !== null}
+                onClick={() => exportFile("/stock/stock.xlsx", `STOCK DU ${stamp()}.xlsx`)}
+              >
+                {exporting === "/stock/stock.xlsx" ? "Export…" : "Exporter STOCK"}
+              </Button>
+              <Button
+                size="sm"
+                disabled={exporting !== null}
+                onClick={() =>
+                  exportFile("/stock/suivi.xlsx", `SUIVI SCIAGE PAR EPAISSEUR DU ${stamp()}.xlsx`)
+                }
+              >
+                {exporting === "/stock/suivi.xlsx" ? "Export…" : "Exporter SUIVI"}
+              </Button>
+            </>
+          )
+        }
       />
-      <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
-        <StockInner />
+      <div className="mx-auto max-w-page-wide px-4 pb-6 pt-3 short:py-3">
+        {exportError && (
+          <Notice tone="danger" className="mb-3">
+            Export impossible : {exportError}
+          </Notice>
+        )}
+        <Tabs
+          label="Sections du stock"
+          tabs={TABS}
+          value={tab}
+          onChange={(k) => {
+            const next = new URLSearchParams(params);
+            if (k === "stock") next.delete("onglet");
+            else next.set("onglet", k);
+            setParams(next, { replace: true });
+          }}
+          className="mb-6"
+        />
+        {tab === "stock" && <StockTab />}
+        {tab === "suivi" && <StockSuiviTab />}
+        {tab === "mouvements" && <StockMovementsTab />}
+        {tab === "resciage" && <ResawTab />}
       </div>
     </>
   );
 }
 
-// Retrait d'un code taille sans chevron (16px + gap 6px) : dépliables ou non,
-// les codes restent alignés dans la colonne.
-const CODE_INSET = "pl-[1.375rem]";
-
 // Téléphone : liseré à droite de la colonne figée — sans lui, les chiffres
-// qui défilent dessous paraissent coupés net (« ,200 » pour 4,200). Écrit en
-// mobile-first : l'écran `short` (raw) désactive les variantes max-*.
+// qui défilent dessous paraissent coupés net. Mobile-first : l'écran `short`
+// (raw) désactive les variantes max-*.
 const FROZEN_EDGE =
   "[&_td:first-child]:shadow-[inset_-1px_0_0_theme(colors.brand.200)] " +
   "[&_th:first-child]:shadow-[inset_-1px_0_0_theme(colors.brand.200)] " +
   "sm:[&_td:first-child]:shadow-none sm:[&_th:first-child]:shadow-none";
+
+const CODE_INSET = "pl-[1.375rem]";
+// Colonne masquée sur téléphone (mobile-first : `max-*` inopérant ici).
+const SM_CELL = "hidden sm:table-cell";
+const DETAIL_INSET = "pl-9";
+
+/** Entier signé avec un vrai « − » (pas le tiret ASCII). */
+const minus = (n: number) => (n < 0 ? "−" : "") + fmtNum(Math.abs(n));
 
 // Zéro = tiret clair : seules les valeurs réelles accrochent l'œil.
 function m3OrDash(v: string | number): ReactNode {
   return Math.abs(Number(v)) < 0.0005 ? <span className="text-brand-500">—</span> : fmtDec3(v);
 }
 
-function StockInner() {
-  const summary = useQuery({
-    queryKey: ["stock", "summary"],
-    queryFn: () => stockApi.summary(),
-  });
-  const parc = useQuery({
-    queryKey: ["stock", "parc"],
-    queryFn: () => stockApi.parc(),
-  });
-  // Détail L×l×ép avec nombre de pièces — même source que le panier d'empotage.
+function useStockQueries() {
   const inventory = useQuery({
     queryKey: ["stock", "inventory"],
     queryFn: () => stockApi.sawnInventory(),
   });
-  // Tailles dépliées (détail par longueur).
-  const [openSizes, setOpenSizes] = useState<Set<string>>(new Set());
+  const ledger = useQuery({ queryKey: ["stock", "ledger"], queryFn: () => stockApi.ledger() });
+  return { inventory, ledger };
+}
 
-  // Tri section puis longueur : une taille comme 7"+ regroupe plusieurs
-  // sections (8×6, 9×8…), chacune garde ses longueurs ensemble.
-  const invByCode = useMemo(() => {
-    const m = new Map<string, SawnInventoryRowDTO[]>();
+type ProductRow = {
+  key: string;
+  label: string;
+  inventoryM3: number;
+  inM3: number;
+  outM3: number;
+  stockM3: number;
+  pieces: number;
+  reserved: number;
+  dims: SawnInventoryRowDTO[];
+};
+
+function StockTab() {
+  const { inventory, ledger } = useStockQueries();
+  const parc = useQuery({ queryKey: ["stock", "parc"], queryFn: () => stockApi.parc() });
+  const [open, setOpen] = useState<Set<string>>(new Set());
+
+  // Un produit = une colonne du suivi (8" +, 6X3 B, 1 inch…) ; dépliée, ses
+  // dimensions exactes — le tableau STOCK du client.
+  const products = useMemo(() => {
+    const m = new Map<string, ProductRow>();
     for (const r of inventory.data ?? []) {
-      const list = m.get(r.sizeCode);
-      if (list) list.push(r);
-      else m.set(r.sizeCode, [r]);
+      const u = Number(r.unitM3);
+      let p = m.get(r.suiviKey);
+      if (!p) {
+        p = {
+          key: r.suiviKey,
+          label: suiviColumnLabel(r.suiviKey),
+          inventoryM3: 0,
+          inM3: 0,
+          outM3: 0,
+          stockM3: 0,
+          pieces: 0,
+          reserved: 0,
+          dims: [],
+        };
+        m.set(r.suiviKey, p);
+      }
+      p.inventoryM3 += u * r.inventoryCount;
+      p.inM3 += u * (r.producedCount + r.resawnInCount);
+      p.outM3 += u * (r.packedCount + r.otherOutCount + r.resawnOutCount);
+      p.stockM3 += Number(r.stockM3);
+      p.pieces += r.stockCount;
+      p.reserved += r.reservedCount;
+      if (r.stockCount !== 0 || r.reservedCount !== 0) p.dims.push(r);
     }
-    for (const list of m.values()) {
-      list.sort(
-        (a, b) =>
-          Number(a.widthIn) - Number(b.widthIn) ||
-          Number(a.thicknessIn) - Number(b.thicknessIn) ||
-          Number(a.lengthFt) - Number(b.lengthFt)
-      );
-    }
-    return m;
+    return [...m.values()]
+      .filter((p) => p.dims.length > 0 || Math.abs(p.stockM3) > 0.0005)
+      .sort((a, b) => suiviColumnIndex(a.key) - suiviColumnIndex(b.key));
   }, [inventory.data]);
 
-  if (summary.isError) {
+  if (inventory.isError) {
     return (
-      <QueryError error={summary.error} onRetry={() => summary.refetch()}>
+      <QueryError error={inventory.error} onRetry={() => inventory.refetch()}>
         Impossible de charger le stock
       </QueryError>
     );
   }
-  const s = summary.data;
-  if (!s) return <SkeletonList count={2} />;
+  if (!inventory.data) return <SkeletonList count={3} />;
 
-  const inv = inventory.data ?? [];
-  const availPieces = inv.reduce((sum, r) => sum + r.availableCount, 0);
-  const packedPieces = inv.reduce((sum, r) => sum + r.packedCount, 0);
-  // Pièces : « … » pendant le chargement, « — » si le détail n'a pas pu venir.
-  const pieces = (n: number) => (inventory.data ? fmtNum(n) : inventory.isError ? "—" : "…");
-
-  // Alerte : tailles en stock négatif (plus vendu que produit).
-  const negatives = s.stockBySize.filter((r) => Number(r.stockM3) < 0);
+  const rows = inventory.data;
+  const stockM3 = rows.reduce((s, r) => s + Number(r.stockM3), 0);
+  const pieces = rows.reduce((s, r) => s + r.stockCount, 0);
+  const reserved = rows.reduce((s, r) => s + r.reservedCount, 0);
+  const reservedM3 = rows.reduce((s, r) => s + Number(r.unitM3) * r.reservedCount, 0);
+  const negatives = rows.filter((r) => r.stockCount < 0);
   const parcTrucks = parc.data ?? [];
-  const parcSum = (k: "girthGte85M3" | "girthLt85M3") =>
-    parcTrucks.reduce((sum, t) => sum + Number(t[k]), 0);
+  const parcM3 = parcTrucks.reduce((s, t) => s + Number(t.girthM3), 0);
+  const inv = ledger.data?.inventory;
 
-  function toggleSize(code: string) {
-    setOpenSizes((p) => {
+  function toggle(key: string) {
+    setOpen((p) => {
       const next = new Set(p);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
 
   return (
     <>
+      {ledger.data && (
+        <Notice tone="neutral" className="mb-4">
+          {inv ? (
+            <>
+              Stock compté à partir de l'inventaire du{" "}
+              <span className="font-medium">
+                {new Date(inv.movedAt).toLocaleDateString("fr-FR")}
+              </span>{" "}
+              ({fmtM3(inv.totalM3)}), plus les mouvements datés de ce jour ou après.
+            </>
+          ) : (
+            <>
+              Aucun inventaire saisi : le stock part de zéro et cumule tout l'historique. Saisir ou
+              importer un inventaire dans l'onglet Inventaire et sorties pour repartir du stock
+              compté.
+            </>
+          )}
+        </Notice>
+      )}
       {negatives.length > 0 && (
         <Notice tone="danger" className="mb-4">
-          Stock négatif sur {negatives.length} taille{negatives.length > 1 ? "s" : ""} :{" "}
-          {negatives.map((r) => `${r.code} (${fmtDec3(r.stockM3)} m³)`).join(", ")}. Vérifier
-          les ventes ou saisir le débitage manquant.
+          Stock négatif sur {negatives.length} dimension{negatives.length > 1 ? "s" : ""} :{" "}
+          {negatives
+            .slice(0, 6)
+            .map(
+              (r) =>
+                `${fmtNum(r.lengthFt)}×${fmtNum(r.widthIn)}×${fmtNum(r.thicknessIn)} ${QUALITY_LABELS[r.quality]} (${minus(r.stockCount)})`
+            )
+            .join(", ")}
+          {negatives.length > 6 ? "…" : "."} Il sort plus de pièces qu'il n'en est entré : saisir
+          le sciage manquant ou refaire l'inventaire.
         </Notice>
       )}
 
-      {/* Libellés courts + précision en hint : sur téléphone, un libellé sur
-          deux lignes décalait la valeur de sa voisine. */}
       <KpiStrip className="mb-8">
-        <Kpi bare label="Stock parc" value={fmtM3(s.stockParcM3)} hint="billons non sciés" />
-        <Kpi bare label="Stock produits" value={fmtM3(s.stockProductsM3)} />
-        {/* Pièces physiques : les ventes (en m³, sans nombre) ne s'y déduisent pas. */}
-        <Kpi bare label="Pièces dispo" value={pieces(availPieces)} hint="hors ventes" />
-        <Kpi bare label="Pièces empotées" value={pieces(packedPieces)} />
+        <Kpi
+          bare
+          label="Stock parc"
+          value={<span className="tabular-nums">{parc.data ? fmtM3(parcM3) : "…"}</span>}
+          hint="billons non sciés"
+        />
+        <Kpi
+          bare
+          label="Stock avivés"
+          value={<span className="tabular-nums">{fmtM3(stockM3)}</span>}
+          hint="toutes dimensions"
+        />
+        <Kpi bare label="Pièces" value={<span className="tabular-nums">{fmtNum(pieces)}</span>} />
+        <Kpi
+          bare
+          label="Réservé"
+          value={<span className="tabular-nums">{fmtNum(reserved)}</span>}
+          hint={reserved > 0 ? `${fmtM3(reservedM3)} en conteneur prévu` : "aucun conteneur prévu"}
+        />
       </KpiStrip>
+
+      <section className="mb-8">
+        <SectionHeading>Avivés par produit</SectionHeading>
+        {products.length === 0 ? (
+          <EmptyState>
+            Aucun avivé en stock. Le débitage, le resciage et l'inventaire alimentent ce tableau.
+          </EmptyState>
+        ) : (
+          <Card>
+            <TableWrap stickyFirstCol className={FROZEN_EDGE}>
+              {/* Téléphone : Stock m³ et Pièces seuls à côté du produit ; le
+                  détail inventaire / entrées / sorties revient dès sm. */}
+              <table className="w-full text-base sm:min-w-[640px]">
+                <thead>
+                  <tr className="text-left text-xs text-brand-500">
+                    <th className="py-1 pr-4 font-normal">Produit</th>
+                    <th className={`${SM_CELL} py-1 pr-4 text-right font-normal`}>Inventaire</th>
+                    <th className={`${SM_CELL} py-1 pr-4 text-right font-normal`}>Entrées</th>
+                    <th className={`${SM_CELL} py-1 pr-4 text-right font-normal`}>Sorties</th>
+                    <th className="py-1 pr-4 text-right font-normal">Stock m³</th>
+                    <th className="py-1 text-right font-normal">Pièces</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p) => {
+                    const isOpen = open.has(p.key);
+                    return (
+                      <Fragment key={p.key}>
+                        <tr className="border-t border-brand-100">
+                          <td className="py-1 pr-4 font-medium">
+                            {p.dims.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => toggle(p.key)}
+                                aria-expanded={isOpen}
+                                className="-mx-1 inline-flex min-h-touch items-center gap-1.5 rounded-lg px-1 text-brand-900 transition-colors duration-150 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100"
+                              >
+                                <IconChevronRight
+                                  width={16}
+                                  height={16}
+                                  strokeWidth={2}
+                                  className={`shrink-0 text-brand-500 transition-transform duration-150 ease-out motion-reduce:transition-none ${
+                                    isOpen ? "rotate-90" : ""
+                                  }`}
+                                />
+                                {p.label}
+                                <span className="sr-only"> — détail par dimension</span>
+                              </button>
+                            ) : (
+                              <span
+                                className={`inline-flex min-h-touch items-center text-brand-900 ${CODE_INSET}`}
+                              >
+                                {p.label}
+                              </span>
+                            )}
+                          </td>
+                          <td className={`${SM_CELL} py-1 pr-4 text-right tabular-nums`}>
+                            {m3OrDash(p.inventoryM3)}
+                          </td>
+                          <td className={`${SM_CELL} py-1 pr-4 text-right tabular-nums text-parc-700`}>
+                            {m3OrDash(p.inM3)}
+                          </td>
+                          <td className={`${SM_CELL} py-1 pr-4 text-right tabular-nums text-amber-700`}>
+                            {Math.abs(p.outM3) < 0.0005 ? m3OrDash(0) : fmtDec3(-p.outM3)}
+                          </td>
+                          <td
+                            className={`py-1 pr-4 text-right font-medium tabular-nums ${
+                              p.stockM3 < -0.0005 ? "text-red-600" : "text-brand-900"
+                            }`}
+                          >
+                            {fmtDec3(p.stockM3)}
+                          </td>
+                          <td className="py-1 text-right font-medium tabular-nums">
+                            {minus(p.pieces)}
+                          </td>
+                        </tr>
+                        {isOpen &&
+                          p.dims.map((d) => (
+                            <tr key={d.key} className="border-t border-brand-100 bg-brand-50 text-sm">
+                              <td
+                                className={`py-1 pr-4 tabular-nums text-brand-700 !bg-brand-50 ${DETAIL_INSET}`}
+                              >
+                                {fmtNum(d.lengthFt)} ft · {fmtNum(d.widthIn)}×{fmtNum(d.thicknessIn)}
+                              </td>
+                              <td
+                                colSpan={3}
+                                className={`${SM_CELL} py-1 pr-4 text-right tabular-nums text-brand-600`}
+                              >
+                                {d.reservedCount > 0
+                                  ? `${fmtNum(d.reservedCount)} réservées · ${fmtNum(d.availableCount)} libres`
+                                  : `${fmtNum(d.unitM3)} m³/pièce`}
+                              </td>
+                              <td
+                                className={`py-1 pr-4 text-right tabular-nums ${
+                                  d.stockCount < 0 ? "text-red-600" : "text-brand-700"
+                                }`}
+                              >
+                                {fmtDec3(d.stockM3)}
+                              </td>
+                              <td className="py-1 text-right font-medium tabular-nums text-brand-900">
+                                {minus(d.stockCount)}
+                              </td>
+                            </tr>
+                          ))}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-brand-200 font-semibold">
+                    <td className="py-1.5 pr-4">Total</td>
+                    <td className={`${SM_CELL} py-1.5 pr-4 text-right tabular-nums`}>
+                      {m3OrDash(products.reduce((s, p) => s + p.inventoryM3, 0))}
+                    </td>
+                    <td className={`${SM_CELL} py-1.5 pr-4 text-right tabular-nums text-parc-700`}>
+                      {m3OrDash(products.reduce((s, p) => s + p.inM3, 0))}
+                    </td>
+                    <td className={`${SM_CELL} py-1.5 pr-4 text-right tabular-nums text-amber-700`}>
+                      {fmtDec3(-products.reduce((s, p) => s + p.outM3, 0))}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right tabular-nums">{fmtDec3(stockM3)}</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmtNum(pieces)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </TableWrap>
+            <p className="mt-2 text-xs text-brand-500">
+              Entrées = sciage + nouvelle mesure (resciage). Sorties = empotage, livraisons, ventes,
+              séchoir, menuiserie, rejets, ancienne mesure. Un conteneur prévu réserve ses pièces
+              sans les sortir du stock.
+            </p>
+          </Card>
+        )}
+      </section>
 
       {/* Section toujours visible : un parc vide ou en erreur ne doit pas
           ressembler à une section oubliée. */}
-      <section className="mb-8">
-        <SectionHeading>Parc — billons non sciés</SectionHeading>
+      <section>
+        <SectionHeading>Billons au parc, non sciés</SectionHeading>
         {parc.isLoading && <SkeletonCard lines={3} />}
         {parc.isError && (
           <QueryError error={parc.error} onRetry={() => parc.refetch()}>
             Impossible de charger les camions du parc
           </QueryError>
         )}
-        {parc.data?.length === 0 && <EmptyState>Aucun billon en attente de sciage.</EmptyState>}
+        {parc.data?.length === 0 && (
+          <EmptyState>Aucun billon en attente de sciage : tout le parc est passé à la scie.</EmptyState>
+        )}
         {parcTrucks.length > 0 && (
           <Card>
-            {/* 1re colonne figée : on garde l'immat sous les yeux en défilant.
-                Téléphone : contrat et B/L passent sous l'immat, les volumes
-                restent à l'écran au lieu de partir à droite. */}
             <TableWrap stickyFirstCol className={FROZEN_EDGE}>
               <table className="w-full min-w-[26rem] text-base sm:min-w-[680px]">
                 <thead>
@@ -155,16 +441,16 @@ function StockInner() {
                     <th className="py-1 pr-4 font-normal">Camion</th>
                     <th className="hidden py-1 pr-4 font-normal sm:table-cell">Contrat</th>
                     <th className="hidden py-1 pr-4 font-normal sm:table-cell">B/L</th>
-                    <th className="py-1 pr-4 text-right font-normal"># Billons</th>
-                    <th className="py-1 pr-4 text-right font-normal">Billons m³</th>
-                    <th className="py-1 pr-4 text-right font-normal">≥85 cm</th>
-                    <th className="py-1 text-right font-normal">&lt;85 cm</th>
+                    <th className="py-1 pr-4 text-right font-normal">Billons</th>
+                    <th className="py-1 pr-4 text-right font-normal">m³</th>
+                    <th className="py-1 pr-4 text-right font-normal">≥ 85 cm</th>
+                    <th className="py-1 text-right font-normal">&lt; 85 cm</th>
                   </tr>
                 </thead>
                 <tbody>
                   {parcTrucks.map((t) => (
                     <tr key={t.truckId} className="border-t border-brand-100">
-                      <td className="py-1 pr-4 font-medium">
+                      <td className="py-1 pr-4 font-medium text-brand-900">
                         {t.registration}
                         <div className="whitespace-nowrap text-sm font-normal text-brand-500 sm:hidden">
                           {t.contractCode}
@@ -178,7 +464,7 @@ function StockInner() {
                         {t.deliveryNote ?? "—"}
                       </td>
                       <td className="py-1 pr-4 text-right tabular-nums">
-                        {t.billonCount || "—"}
+                        {t.billonCount ? fmtInt(t.billonCount) : "—"}
                       </td>
                       <td className="py-1 pr-4 text-right tabular-nums">{fmtDec3(t.girthM3)}</td>
                       <td className="py-1 pr-4 text-right tabular-nums text-parc-700">
@@ -199,16 +485,14 @@ function StockInner() {
                         décalerait les totaux sur téléphone. */}
                     <td colSpan={2} className="hidden sm:table-cell" />
                     <td className="py-1.5 pr-4 text-right tabular-nums">
-                      {parcTrucks.reduce((s2, t) => s2 + t.billonCount, 0)}
+                      {fmtInt(parcTrucks.reduce((s2, t) => s2 + t.billonCount, 0))}
                     </td>
-                    <td className="py-1.5 pr-4 text-right tabular-nums">
-                      {fmtDec3(s.stockParcM3)}
-                    </td>
+                    <td className="py-1.5 pr-4 text-right tabular-nums">{fmtDec3(parcM3)}</td>
                     <td className="py-1.5 pr-4 text-right tabular-nums text-parc-700">
-                      {fmtDec3(parcSum("girthGte85M3"))}
+                      {fmtDec3(parcTrucks.reduce((s2, t) => s2 + Number(t.girthGte85M3), 0))}
                     </td>
                     <td className="py-1.5 text-right tabular-nums text-brand-500">
-                      {fmtDec3(parcSum("girthLt85M3"))}
+                      {fmtDec3(parcTrucks.reduce((s2, t) => s2 + Number(t.girthLt85M3), 0))}
                     </td>
                   </tr>
                 </tfoot>
@@ -217,160 +501,31 @@ function StockInner() {
           </Card>
         )}
       </section>
+    </>
+  );
+}
 
-      <section>
-        <SectionHeading>Produits par taille</SectionHeading>
-        {inventory.isError && (
-          <div className="mb-3">
-            <QueryError error={inventory.error} onRetry={() => inventory.refetch()}>
-              Impossible de charger le détail des pièces
-            </QueryError>
-          </div>
-        )}
-        {s.stockBySize.length === 0 ? (
-          <EmptyState>Aucun produit débité.</EmptyState>
-        ) : (
-          <Card>
-            {/* Taille figée comme l'immat du parc : sur téléphone, Stock et
-                Pièces se lisent en défilant sans perdre la ligne. */}
-            <TableWrap stickyFirstCol className={FROZEN_EDGE}>
-              <table className="w-full min-w-[640px] text-base">
-                <thead>
-                  <tr className="text-left text-xs text-brand-500">
-                    <th className="py-1 pr-4 font-normal">Taille</th>
-                    <th className="py-1 pr-4 font-normal">Groupe</th>
-                    <th className="py-1 pr-4 text-right font-normal">Produit</th>
-                    <th className="py-1 pr-4 text-right font-normal">Rescié</th>
-                    <th className="py-1 pr-4 text-right font-normal">Vendu</th>
-                    <th className="py-1 text-right font-normal">Stock</th>
-                    <th className="py-1 pl-4 text-right font-normal">Pièces dispo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.stockBySize.map((r) => {
-                    // Effet net du resciage sur la taille : + = reçoit du bois
-                    // rescié plus petit, − = part à la scie pour être rescié.
-                    const resawNet = Number(r.resawnInM3) - Number(r.resawnOutM3);
-                    const dims = invByCode.get(r.code) ?? [];
-                    const sizePieces = dims.reduce((sum, d) => sum + d.availableCount, 0);
-                    const open = openSizes.has(r.code);
-                    // Plusieurs sections sous un même code (7"+, 2"…) : la
-                    // longueur seule ne suffit plus à distinguer les lignes.
-                    const multiSection =
-                      new Set(dims.map((d) => `${d.widthIn}x${d.thicknessIn}`)).size > 1;
-                    return (
-                      <Fragment key={r.code}>
-                        <tr className="border-t border-brand-100">
-                          <td className="py-1 pr-4 font-medium">
-                            {dims.length > 0 ? (
-                              // Dépliable : détail par longueur (planches de chaque L).
-                              <button
-                                type="button"
-                                onClick={() => toggleSize(r.code)}
-                                aria-expanded={open}
-                                className="-mx-1 inline-flex min-h-touch items-center gap-1.5 rounded-lg px-1 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100"
-                              >
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className={`size-4 shrink-0 text-brand-500 transition-transform duration-150 ease-out motion-reduce:transition-none ${
-                                    open ? "rotate-90" : ""
-                                  }`}
-                                  aria-hidden
-                                >
-                                  <path d="M9 6l6 6-6 6" />
-                                </svg>
-                                {r.code}
-                                <span className="sr-only"> — détail par longueur</span>
-                              </button>
-                            ) : (
-                              <span className={`inline-flex min-h-touch items-center ${CODE_INSET}`}>
-                                {r.code}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-1 pr-4">
-                            <Badge tone={SIZE_GROUP_TONE[r.group]}>
-                              {SIZE_GROUP_LABELS[r.group]}
-                            </Badge>
-                          </td>
-                          <td className="py-1 pr-4 text-right tabular-nums">
-                            {m3OrDash(r.producedM3)}
-                          </td>
-                          <td
-                            className={`py-1 pr-4 text-right tabular-nums ${
-                              resawNet > 0 ? "text-parc-700" : "text-amber-700"
-                            }`}
-                          >
-                            {Math.abs(resawNet) < 0.0005
-                              ? m3OrDash(0)
-                              : `${resawNet > 0 ? "+" : ""}${fmtDec3(resawNet)}`}
-                          </td>
-                          <td className="py-1 pr-4 text-right tabular-nums">
-                            {m3OrDash(r.soldM3)}
-                          </td>
-                          <td
-                            className={`py-1 text-right font-medium tabular-nums ${
-                              Number(r.stockM3) < 0 ? "text-red-600" : "text-brand-900"
-                            }`}
-                          >
-                            {fmtDec3(r.stockM3)}
-                          </td>
-                          <td className="py-1 pl-4 text-right font-medium tabular-nums">
-                            {dims.length > 0
-                              ? fmtNum(sizePieces)
-                              : inventory.isPending
-                                ? "…"
-                                : "—"}
-                          </td>
-                        </tr>
-                        {open &&
-                          dims.map((d) => (
-                            <tr key={d.key} className="border-t border-brand-100 bg-brand-50 text-sm">
-                              {/* !bg : la colonne figée est peinte en blanc par TableWrap. */}
-                              <td
-                                className={`py-1 pr-4 tabular-nums text-brand-700 !bg-brand-50 ${CODE_INSET}`}
-                              >
-                                ↳ {fmtNum(d.lengthFt)} ft
-                                {multiSection && (
-                                  <span className="text-brand-500">
-                                    {" "}
-                                    · {fmtNum(d.widthIn)}×{fmtNum(d.thicknessIn)}
-                                  </span>
-                                )}
-                              </td>
-                              <td colSpan={5} className="py-1 pr-4 text-right text-brand-500">
-                                {fmtNum(d.producedCount)} produites
-                                {d.packedCount > 0 && ` · ${fmtNum(d.packedCount)} empotées`}
-                                {" · "}
-                                {fmtDec3(d.availableM3)} m³ dispo
-                              </td>
-                              <td className="py-1 pl-4 text-right font-medium tabular-nums text-brand-900">
-                                {fmtNum(d.availableCount)}
-                              </td>
-                            </tr>
-                          ))}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </TableWrap>
-            {/* Les ventes sont saisies en m³ par taille, sans nombre de pièces : le
-                compteur « pièces » reste donc le bois physiquement empotable. */}
-            <p className="mt-2 text-xs text-brand-500">
-              Stock = produit ± rescié − vendu (m³). Pièces dispo = produit ± rescié −
-              empoté (hors ventes, saisies en m³ sans nombre de pièces).
-            </p>
-          </Card>
-        )}
-      </section>
-
-      <ResawSection stockBySize={s.stockBySize} />
+function ResawTab() {
+  const inventory = useQuery({
+    queryKey: ["stock", "inventory"],
+    queryFn: () => stockApi.sawnInventory(),
+  });
+  // Contrôle « consommé au-delà du stock » : m³ en stock par taille (6x4, 7"+…).
+  const stockByCode = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of inventory.data ?? []) m.set(r.sizeCode, (m.get(r.sizeCode) ?? 0) + Number(r.stockM3));
+    return m;
+  }, [inventory.data]);
+  return (
+    <>
+      <p className="mb-2 text-sm text-brand-600">
+        Le bois consommé sort du stock en « ancienne mesure (recutting out) », le bois produit y
+        rentre en « nouvelle mesure (recutting in) ».
+      </p>
+      <ResawSection stockByCode={stockByCode} />
+      {inventory.isError && (
+        <Badge tone="amber">Stock indisponible : le contrôle de dépassement est désactivé</Badge>
+      )}
     </>
   );
 }

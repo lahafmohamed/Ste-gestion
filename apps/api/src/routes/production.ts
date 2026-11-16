@@ -177,6 +177,7 @@ export async function productionRoutes(app: FastifyInstance) {
         widthIn: l.widthIn,
         thicknessIn: l.thicknessIn,
         count: l.count,
+        quality: l.quality ?? "B",
         sizeCode: size.code,
         sizeGroup: size.group,
         volumeM3: vol.toFixed(6),
@@ -198,7 +199,21 @@ export async function productionRoutes(app: FastifyInstance) {
   });
 
   // Suppression
+  // Une session qui a scié un camion d'un contrat clôturé est figée comme sa
+  // création l'aurait été : la supprimer réécrirait le rendement du contrat.
   app.delete<{ Params: { id: string } }>("/production-runs/:id", async (req, reply) => {
+    const run = await prisma.productionRun.findUnique({
+      where: { id: req.params.id },
+      select: {
+        contract: { select: { status: true } },
+        trucks: { select: { truck: { select: { contract: { select: { status: true } } } } } },
+      },
+    });
+    if (!run) return reply.code(404).send({ error: "Session introuvable" });
+    const closed =
+      (run.contract && run.contract.status !== "OPEN") ||
+      run.trucks.some((t) => t.truck.contract.status !== "OPEN");
+    if (closed) return reply.code(409).send({ error: LOCK_MSG });
     try {
       await prisma.productionRun.delete({ where: { id: req.params.id } });
       return reply.code(204).send();

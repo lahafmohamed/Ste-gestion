@@ -20,12 +20,23 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <div className="text-xs text-brand-500">{label}</div>
-      <div className="mt-0.5 truncate text-sm font-semibold text-brand-900">{value}</div>
+      <div className="mt-0.5 truncate text-sm font-semibold tabular-nums text-brand-900">
+        {value}
+      </div>
     </div>
   );
 }
 
-function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
+function ContractCard({
+  c,
+  o,
+  ovFailed = false,
+}: {
+  c: ContractDTO;
+  o?: ContractOverviewDTO;
+  /** Résumés en échec : la carte le dit au lieu de pulser indéfiniment. */
+  ovFailed?: boolean;
+}) {
   const can = useCan();
   const showMoney = SHOW_MONEY && can("finances.view");
   const meta = [c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ");
@@ -52,7 +63,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
           <div className="mt-4">
             <div className="mb-1.5 text-xs text-brand-500">
               Quota brousse ·{" "}
-              <span className="font-medium text-brand-700">
+              <span className="font-medium tabular-nums text-brand-700">
                 {fmtInt(o.trucksEntered)}
                 {/* Total projeté depuis la moyenne des arrivées ; à défaut le prévu saisi. */}
                 {o.estTrucksTotal != null
@@ -86,6 +97,8 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
             {showMoney && <Stat label="Chiffre d'affaires" value={fmtFcfa(o.salesRevenueCfa)} />}
           </div>
         </>
+      ) : ovFailed ? (
+        <p className="mt-4 text-sm text-brand-500">Indicateurs indisponibles.</p>
       ) : (
         <div className="mt-4 space-y-2.5" aria-hidden>
           <SkeletonLine className="w-2/3" />
@@ -174,6 +187,9 @@ export default function DashboardPage() {
   }, [contracts.data, overview.data]);
 
   const ready = !!contracts.data && !!overview.data;
+  // Résumés en échec, contrats chargés : sans ce cas la bande et les cartes
+  // restaient en squelette pour toujours.
+  const ovFailed = overview.isError && !overview.data;
   const dateLabel = today.format(new Date());
 
   return (
@@ -191,8 +207,14 @@ export default function DashboardPage() {
 
         {/* Synthèse des contrats ouverts : quatre chiffres sur une bande,
             puis le détail. */}
-        {!contracts.isError && (
-          <KpiStrip>
+        {!contracts.isError && ovFailed && (
+          <QueryError error={overview.error} onRetry={() => overview.refetch()}>
+            Impossible de calculer les chiffres des contrats
+          </QueryError>
+        )}
+        {!contracts.isError && !ovFailed && (
+          // tabular-nums hérité : les chiffres des quatre tuiles s'alignent.
+          <KpiStrip className="tabular-nums">
             {ready ? (
               <>
                 <Kpi
@@ -201,9 +223,26 @@ export default function DashboardPage() {
                   value={fmtInt(totals.trucks)}
                   hint={`${totals.openCount} contrat${totals.openCount > 1 ? "s" : ""} ouvert${totals.openCount > 1 ? "s" : ""}`}
                 />
-                <Kpi bare label="Cubage brousse" value={fmtM3(totals.brousse)} hint="décompté du quota" />
-                <Kpi bare label="Débité" value={fmtM3(totals.debited)} hint="sortie scierie" tone="accent" />
-                <Kpi bare label="Stock produits" value={fmtM3(totals.stock)} hint="disponible" tone="parc" />
+                <Kpi
+                  bare
+                  label="Cubage brousse"
+                  value={fmtM3(totals.brousse)}
+                  hint="décompté du quota"
+                />
+                <Kpi
+                  bare
+                  label="Débité"
+                  value={fmtM3(totals.debited)}
+                  hint="sortie scierie"
+                  tone="accent"
+                />
+                <Kpi
+                  bare
+                  label="Stock produits"
+                  value={fmtM3(totals.stock)}
+                  hint="disponible"
+                  tone="parc"
+                />
               </>
             ) : (
               <>
@@ -224,7 +263,11 @@ export default function DashboardPage() {
               className="group -mr-2 inline-flex min-h-touch items-center gap-1 rounded-lg px-2 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-50 hover:text-accent-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500"
             >
               Tous les contrats
-              <IconArrowRight width={16} height={16} className="transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none" />
+              <IconArrowRight
+                width={16}
+                height={16}
+                className="transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none"
+              />
             </Link>
           }
         >
@@ -252,7 +295,7 @@ export default function DashboardPage() {
             </>
           )}
           {list.map((c) => (
-            <ContractCard key={c.id} c={c} o={ovById.get(c.id)} />
+            <ContractCard key={c.id} c={c} o={ovById.get(c.id)} ovFailed={ovFailed} />
           ))}
         </div>
       </div>

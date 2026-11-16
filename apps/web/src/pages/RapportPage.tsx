@@ -4,15 +4,14 @@ import type { DailyReportDTO } from "@ste/shared";
 import { MEASUREMENT_CONTEXT_LABELS } from "@ste/shared";
 import StepLayout from "../components/StepLayout";
 import { contractsApi } from "../lib/api";
-import { fmtNum, fmtPct } from "../lib/format";
+import { fmtNum, todayISO } from "../lib/format";
 import Button from "../components/ui/Button";
+import { cardCls } from "../components/ui/Card";
 import DateField from "../components/ui/DateField";
-import { QueryError } from "../components/ui/Feedback";
+import { FormError, QueryError } from "../components/ui/Feedback";
 import { Field } from "../components/ui/Input";
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { SkeletonLine } from "../components/ui/Skeleton";
+import { IconCheck } from "../components/icons";
 
 const n3 = (v: string) => fmtNum(Number(v).toFixed(3));
 
@@ -101,6 +100,8 @@ function reportText(r: DailyReportDTO): string {
 }
 
 export default function RapportPage() {
+  // Date du jour locale (lib/format) : toISOString() donnait la date UTC, donc
+  // la veille en début de nuit sur un fuseau en avance.
   const [date, setDate] = useState(todayISO());
 
   return (
@@ -120,6 +121,7 @@ function RapportInner({
   setDate: (d: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const q = useQuery({
     queryKey: ["daily-report", contractId, date],
     queryFn: () => contractsApi.dailyReport(contractId, date),
@@ -127,10 +129,17 @@ function RapportInner({
 
   const text = q.data ? reportText(q.data) : "";
 
+  // Presse-papiers refusé (navigateur ancien, permission) : le dire au lieu
+  // d'un bouton qui ne fait rien ; le texte reste sélectionnable à la main.
   async function copy() {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setCopyError(false);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopyError(true);
+    }
   }
 
   // Impression / PDF : fenêtre autonome avec le rapport monospace + print().
@@ -157,28 +166,59 @@ function RapportInner({
   return (
     <>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <Field label="Date" className="w-48">
-          <DateField value={date} onChange={setDate} />
+        <Field label="Date" className="w-full sm:w-48">
+          <DateField value={date} onChange={setDate} max={todayISO()} />
         </Field>
         <div className="flex flex-wrap gap-2">
           <Button onClick={printReport} disabled={!text}>
             Imprimer / PDF
           </Button>
-          <Button variant="primary" onClick={copy} disabled={!text}>
-            {copied ? "Copié ✓" : "Copier le rapport"}
+          {/* Largeur fixe : « Copié » ne rétrécit pas le bouton sous le doigt. */}
+          <Button variant="primary" onClick={copy} disabled={!text} className="min-w-[11rem]">
+            {copied ? (
+              <>
+                <IconCheck width={16} height={16} className="-ml-0.5" />
+                Copié
+              </>
+            ) : (
+              "Copier le rapport"
+            )}
           </Button>
         </div>
       </div>
 
-      {q.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
+      {copyError && (
+        <div className="mb-3">
+          <FormError hint="Sélectionner le texte du rapport et le copier à la main.">
+            Copie automatique refusée par le navigateur.
+          </FormError>
+        </div>
+      )}
+
+      {/* Annonce discrète pour lecteur d'écran : la copie n'a pas d'autre retour. */}
+      <span className="sr-only" aria-live="polite">
+        {copied ? "Rapport copié" : ""}
+      </span>
+
+      {q.isLoading && (
+        <div className={`${cardCls} space-y-2.5 p-4`} aria-busy="true">
+          <SkeletonLine className="w-2/3" />
+          <SkeletonLine className="w-1/3" />
+          <SkeletonLine className="mt-5 w-3/4" />
+          <SkeletonLine className="w-1/2" />
+          <SkeletonLine className="w-2/3" />
+        </div>
+      )}
       {q.isError && (
         <QueryError error={q.error} onRetry={() => q.refetch()}>
-          Erreur de chargement
+          Impossible de générer le rapport du jour
         </QueryError>
       )}
 
       {q.data && (
-        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl bg-white shadow-card p-4 font-mono text-sm leading-6 text-brand-800">
+        <pre
+          className={`${cardCls} overflow-x-auto whitespace-pre-wrap p-4 font-mono text-sm leading-6 tabular-nums text-brand-800`}
+        >
           {text}
         </pre>
       )}

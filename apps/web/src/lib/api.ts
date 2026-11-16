@@ -14,12 +14,22 @@ import type {
   ContractExpenseCreateInput,
   ContractExpenseDTO,
   ContractExpensesDTO,
+  ExpenseRowDTO,
+  ExpenseTransferInput,
+  PaymentVoucherCreateInput,
+  PaymentVoucherDTO,
   ContractUpdateInput,
   DailyReportDTO,
   LoginInput,
   LoginResponse,
   ParcTruckDTO,
   SawnInventoryRowDTO,
+  StockImportApplyInput,
+  StockImportPreviewDTO,
+  StockImportPreviewInput,
+  StockLedgerDTO,
+  StockMovementCreateInput,
+  StockMovementDTO,
   StockSummaryDTO,
   TruckStatDTO,
   UserCreateInput,
@@ -175,6 +185,19 @@ export const stockApi = {
     req<SawnInventoryRowDTO[]>("/stock/sawn-inventory" + qs({ contractId })),
   /** Camions ayant encore des billons au parc. */
   parc: (contractId?: string) => req<ParcTruckDTO[]>("/stock/parc" + qs({ contractId })),
+  /** Suivi par épaisseur : une ligne par mouvement depuis le dernier inventaire. */
+  ledger: () => req<StockLedgerDTO>("/stock/ledger"),
+  movements: () => req<StockMovementDTO[]>("/stock/movements"),
+  createMovement: (data: StockMovementCreateInput) =>
+    req<StockMovementDTO>("/stock/movements", { method: "POST", body: JSON.stringify(data) }),
+  deleteMovement: (id: string) => req<void>(`/stock/movements/${id}`, { method: "DELETE" }),
+  importPreview: (data: StockImportPreviewInput) =>
+    req<StockImportPreviewDTO>("/stock/import/preview", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  importApply: (data: StockImportApplyInput) =>
+    req<StockMovementDTO>("/stock/import/apply", { method: "POST", body: JSON.stringify(data) }),
 };
 
 export const trucksApi = {
@@ -242,6 +265,25 @@ export const expensesApi = {
       body: JSON.stringify(data),
     }),
   remove: (id: string) => req<void>(`/contract-expenses/${id}`, { method: "DELETE" }),
+  /** Toutes les dépenses, tous contrats (page Dépenses). */
+  all: () => req<ExpenseRowDTO[]>("/expenses"),
+};
+
+/** Bons de paiement : un contrat, plusieurs de ses dépenses réglées d'un coup. */
+export const vouchersApi = {
+  list: () => req<PaymentVoucherDTO[]>("/payment-vouchers"),
+  create: (data: PaymentVoucherCreateInput) =>
+    req<{ id: string; number: string }>("/payment-vouchers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  remove: (id: string) => req<void>(`/payment-vouchers/${id}`, { method: "DELETE" }),
+  /** Report d'un trop-payé d'un contrat vers un autre (même compte). */
+  transfer: (data: ExpenseTransferInput) =>
+    req<{ id: string; number: string }>("/expense-transfers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
 export const salesApi = {

@@ -11,14 +11,23 @@ import {
   type ImportSheetPreview,
 } from "@ste/shared";
 import { importsApi } from "../lib/api";
-import { fmtInt, fmtNum } from "../lib/format";
+import { fmtDec3, fmtInt, fmtNum } from "../lib/format";
 import CuttingResume from "../components/CuttingResume";
 import StepLayout from "../components/StepLayout";
 import Badge, { type BadgeTone } from "../components/ui/Badge";
 import Button from "../components/ui/Button";
-import { FormError } from "../components/ui/Feedback";
+import { cardCls } from "../components/ui/Card";
+import { EmptyState, FormError, Notice, QueryError } from "../components/ui/Feedback";
+import { SkeletonLine } from "../components/ui/Skeleton";
 import { TableWrap, Td, Th } from "../components/ui/Table";
-import { IconChevronDown } from "../components/icons";
+import { IconChevronDown, IconLock } from "../components/icons";
+
+// Lien d'action dans une ligne de résultat (ouvrir le camion, la session…) :
+// cible tactile pleine hauteur, teck comme les autres liens de l'app.
+const rowLinkCls =
+  "inline-flex min-h-touch items-center rounded-lg px-1.5 text-sm font-medium text-accent-700 " +
+  "underline-offset-2 hover:underline hover:text-accent-800 focus-visible:outline " +
+  "focus-visible:outline-2 focus-visible:outline-accent-500";
 
 // Import des classeurs Excel du terrain : le réseau manque en brousse, les
 // relevés finissent dans DIAMETRE / GIRTH / DEBITES / EMPOTAGES. Ici on dépose
@@ -41,22 +50,23 @@ const EXAMPLES = [
   { file: "EMPOTAGES DEBITES DU 08-05-2026.xlsx", label: "Empotage" },
 ];
 
-function FileLinks({ files }: { files: { file: string; label: string }[] }) {
+/** Classeurs à télécharger : un libellé, puis des liens tapables (≥ 44px). */
+function FileLinks({ title, files }: { title: string; files: { file: string; label: string }[] }) {
   return (
-    <>
-      {files.map((ex, i) => (
-        <span key={ex.file}>
-          {i > 0 && " · "}
-          <a
-            href={`/gabarits/${encodeURIComponent(ex.file)}`}
-            download
-            className="underline hover:text-brand-700"
-          >
-            {ex.label}
-          </a>
-        </span>
+    <div className="flex flex-wrap items-center justify-center gap-x-1 text-sm">
+      <span className="mr-1 text-brand-600">{title}</span>
+      {files.map((ex) => (
+        <a
+          key={ex.file}
+          href={`/gabarits/${encodeURIComponent(ex.file)}`}
+          download
+          title={ex.file}
+          className={rowLinkCls}
+        >
+          {ex.label}
+        </a>
       ))}
-    </>
+    </div>
   );
 }
 
@@ -125,7 +135,7 @@ function ImportFlow({ contract }: { contract: ContractDTO }) {
         "summary",
         "containers",
         "production-runs",
-        "sawn-inventory",
+        "stock",
         "contracts",
         "import-history",
       ]) {
@@ -159,6 +169,13 @@ function ImportFlow({ contract }: { contract: ContractDTO }) {
 
   return (
     <div className="space-y-5">
+      {/* Bouton grisé sans raison sur un contrat clôturé : dire pourquoi. */}
+      {closed && (
+        <Notice icon={IconLock}>
+          Contrat clôturé : l'import est fermé. Le repasser en « Ouvert » dans les termes du
+          contrat pour importer un classeur.
+        </Notice>
+      )}
       {/* Zone de dépôt — grande cible, marche aussi au doigt (tap = sélecteur). */}
       <div
         onDragOver={(e) => {
@@ -205,15 +222,21 @@ function ImportFlow({ contract }: { contract: ContractDTO }) {
             <FormError>{fileError}</FormError>
           </div>
         )}
-        <p className="mt-4 text-xs text-brand-500">
-          Classeurs vides : <FileLinks files={TEMPLATES} />
-        </p>
-        <p className="mt-1 text-xs text-brand-500">
-          Exemples remplis : <FileLinks files={EXAMPLES} />
-        </p>
+        <div className="mt-5 space-y-1 border-t border-brand-100 pt-4">
+          <FileLinks title="Classeurs vides :" files={TEMPLATES} />
+          <FileLinks title="Exemples remplis :" files={EXAMPLES} />
+        </div>
       </div>
 
-      {previewMut.isPending && <p className="text-sm text-brand-500">Lecture du classeur…</p>}
+      {previewMut.isPending && (
+        <div className={`${cardCls} space-y-2.5 p-4`} aria-busy="true">
+          <p className="text-sm text-brand-600" aria-live="polite">
+            Lecture du classeur…
+          </p>
+          <SkeletonLine className="w-1/2" />
+          <SkeletonLine className="w-3/4" />
+        </div>
+      )}
       {previewMut.isError && (
         <FormError>Aperçu impossible : {(previewMut.error as Error).message}</FormError>
       )}
@@ -254,20 +277,33 @@ function fmtDateTime(iso: string): string {
 /** Journal des classeurs déjà enregistrés sur le contrat — le plus récent en
     haut, chaque ligne dépliable sur le détail des feuilles. */
 function HistoryPanel({ contractId }: { contractId: string }) {
-  const { data, isPending, isError } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ["import-history", contractId],
     queryFn: () => importsApi.history(contractId),
   });
 
   return (
-    <section className="rounded-xl bg-white p-4 shadow-card">
-      <h2 className="text-sm font-semibold text-brand-900">Imports enregistrés</h2>
-      {isPending && <p className="mt-2 text-sm text-brand-500">Chargement de l'historique…</p>}
-      {isError && <FormError>Historique indisponible.</FormError>}
+    <section className={`${cardCls} p-4`}>
+      <h2 className="text-base font-semibold tracking-tight text-brand-900">
+        Imports enregistrés
+      </h2>
+      {isPending && (
+        <div className="mt-3 space-y-2.5" aria-busy="true">
+          <SkeletonLine className="w-3/4" />
+          <SkeletonLine className="w-1/2" />
+        </div>
+      )}
+      {isError && (
+        <div className="mt-3">
+          <QueryError error={error} onRetry={() => refetch()}>
+            Impossible de charger l'historique des imports
+          </QueryError>
+        </div>
+      )}
       {data && data.length === 0 && (
-        <p className="mt-2 text-sm text-brand-500">
-          Aucun classeur importé sur ce contrat pour l'instant.
-        </p>
+        <div className="mt-3">
+          <EmptyState>Aucun classeur importé sur ce contrat pour l'instant.</EmptyState>
+        </div>
       )}
       {data && data.length > 0 && (
         <ul className="mt-2 divide-y divide-brand-50">
@@ -287,17 +323,19 @@ function HistoryRow({ batch, contractId }: { batch: ImportBatchDTO; contractId: 
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-touch w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-1 text-left hover:bg-brand-50"
+        className="flex min-h-touch w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-1 text-left transition-colors hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 active:bg-brand-100"
         aria-expanded={open}
       >
         <span className="font-medium text-brand-900">{batch.filename}</span>
         <span className="text-sm text-brand-500">{fmtDateTime(batch.createdAt)}</span>
         {batch.user && <span className="text-sm text-brand-500">· {batch.user.name}</span>}
-        <span className="ml-auto flex flex-wrap items-center gap-x-3 text-sm text-brand-700">
+        <span className="ml-auto flex flex-wrap items-center gap-x-3 text-sm tabular-nums text-brand-700">
           <span className="tabular-nums">
             {fmtInt(batch.sheetCount)} feuille{batch.sheetCount > 1 ? "s" : ""}
           </span>
-          <span className="tabular-nums">{fmtInt(batch.lineCount)} lignes</span>
+          <span className="tabular-nums">
+            {fmtInt(batch.lineCount)} ligne{batch.lineCount > 1 ? "s" : ""}
+          </span>
           <span className="tabular-nums">{fmtNum(batch.totalM3)} m³</span>
           {batch.createdTrucks > 0 && (
             <Badge tone="amber">
@@ -315,37 +353,20 @@ function HistoryRow({ batch, contractId }: { batch: ImportBatchDTO; contractId: 
       {open && (
         <ul className="mt-2 space-y-1 pl-1 text-sm">
           {batch.applied.map((a) => (
-            <li key={a.name} className="flex flex-wrap items-center gap-2">
+            <li key={a.name} className="flex flex-wrap items-center gap-x-2">
               <Badge tone={TYPE_TONE[a.type]}>{IMPORT_SHEET_LABELS[a.type]}</Badge>
               <span className="text-brand-700">{a.name}</span>
-              <span className="text-brand-500">· {fmtInt(a.lines)} lignes</span>
-              {a.volumeM3 && <span className="text-brand-500">· {fmtNum(a.volumeM3)} m³</span>}
+              <span className="tabular-nums text-brand-500">
+                · {fmtInt(a.lines)} ligne{a.lines > 1 ? "s" : ""}
+              </span>
+              {a.volumeM3 && (
+                <span className="tabular-nums text-brand-500">· {fmtNum(a.volumeM3)} m³</span>
+              )}
               {a.createdTruck && <Badge tone="amber">camion créé</Badge>}
-              {a.truckId && (
-                <Link to={`/trucks/${a.truckId}`} className="underline text-brand-600">
-                  ouvrir le camion
-                </Link>
-              )}
-              {a.type === "SAWN" && (
-                <Link to={`/production-runs/${a.createdId}`} className="underline text-brand-600">
-                  ouvrir la session
-                </Link>
-              )}
-              {a.type === "CONTAINER" && (
-                <Link
-                  to={`/contracts/${contractId}?onglet=empotage`}
-                  className="underline text-brand-600"
-                >
-                  voir les conteneurs
-                </Link>
-              )}
+              <AppliedLinks applied={a} contractId={contractId} />
             </li>
           ))}
-          {batch.skipped.map((s) => (
-            <li key={s.name} className="text-amber-800">
-              ⚠ {s.name} : {s.reason}
-            </li>
-          ))}
+          <SkippedList skipped={batch.skipped} />
         </ul>
       )}
     </li>
@@ -372,25 +393,34 @@ function PreviewPanel({
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-brand-900">
-          {preview.filename} — {preview.sheets.length} feuille{preview.sheets.length > 1 ? "s" : ""}
-          {" · "}
-          <span className="font-normal text-brand-500">contrat {preview.contract.code}</span>
+        <h2 className="min-w-0 text-base font-semibold tracking-tight text-brand-900">
+          <span className="break-all">{preview.filename}</span>
+          <span className="block text-sm font-normal text-brand-600">
+            {preview.sheets.length} feuille{preview.sheets.length > 1 ? "s" : ""} · contrat{" "}
+            {preview.contract.code}
+            {applicable.length < preview.sheets.length &&
+              ` · ${preview.sheets.length - applicable.length} non importable${
+                preview.sheets.length - applicable.length > 1 ? "s" : ""
+              }`}
+          </span>
         </h2>
-        <div className="flex items-center gap-3">
-          {applyError && <FormError>{applyError}</FormError>}
-          <Button
-            variant="primary"
-            size="lg"
-            disabled={applying || selected.length === 0}
-            onClick={onApply}
-          >
-            {applying
-              ? "Enregistrement…"
-              : `Importer ${selected.length} feuille${selected.length > 1 ? "s" : ""}`}
-          </Button>
-        </div>
+        <Button
+          variant="primary"
+          size="lg"
+          disabled={applying || selected.length === 0}
+          onClick={onApply}
+        >
+          {applying
+            ? "Enregistrement…"
+            : `Importer ${selected.length} feuille${selected.length > 1 ? "s" : ""}`}
+        </Button>
       </div>
+      {/* Erreur sur sa propre ligne : à côté du bouton, elle l'écrasait sur téléphone. */}
+      {applyError && (
+        <div className="mb-3">
+          <FormError>{applyError}</FormError>
+        </div>
+      )}
       <div className="space-y-3">
         {preview.sheets.map((s) => (
           <SheetCard
@@ -408,18 +438,14 @@ function PreviewPanel({
 function IssueList({ issues }: { issues: ImportIssue[] }) {
   if (issues.length === 0) return null;
   return (
+    // Icône du bandeau (alerte) au lieu de glyphes texte : le ton se lit à la
+    // couleur, l'icône la double.
     <ul className="mt-2 space-y-1">
       {issues.map((i, k) => (
-        <li
-          key={k}
-          className={`rounded-lg px-3 py-1.5 text-sm ${
-            i.level === "error"
-              ? "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200/70"
-              : "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/70"
-          }`}
-        >
-          {i.level === "error" ? "✕ " : "⚠ "}
-          {i.message}
+        <li key={k}>
+          <Notice tone={i.level === "error" ? "danger" : "warn"} className="py-1.5">
+            {i.message}
+          </Notice>
         </li>
       ))}
     </ul>
@@ -444,9 +470,14 @@ function SheetCard({
   const hasGrade = !isLog && sheet.lines.some((l) => !!l.grade);
 
   return (
-    <div className={`rounded-xl bg-white shadow-card ${sheet.canApply ? "" : "opacity-90"}`}>
+    <div className={`${cardCls} ${sheet.canApply ? "" : "opacity-90"}`}>
       <div className="flex flex-wrap items-start gap-3 p-4">
-        <label className="flex min-h-touch items-center">
+        {/* Case élargie à 44px : elle se coche au pouce, pas à la pointe. */}
+        <label
+          className={`-my-1 -ml-3 flex min-h-touch w-11 items-center justify-center ${
+            sheet.canApply ? "cursor-pointer" : "cursor-not-allowed"
+          }`}
+        >
           <input
             type="checkbox"
             className="h-5 w-5 accent-accent-600"
@@ -462,7 +493,7 @@ function SheetCard({
             <Badge tone={TYPE_TONE[sheet.type]}>{IMPORT_SHEET_LABELS[sheet.type]}</Badge>
             {sheet.truckAction === "create" && <Badge tone="amber">camion à créer</Badge>}
             {sheet.truckAction === "match" && sheet.truck && (
-              <Link to={`/trucks/${sheet.truck.id}`} className="text-sm text-brand-600 underline">
+              <Link to={`/trucks/${sheet.truck.id}`} className={rowLinkCls}>
                 camion {sheet.truck.registration}
                 {sheet.truck.deliveryNote ? ` · B/L ${sheet.truck.deliveryNote}` : ""}
               </Link>
@@ -485,7 +516,7 @@ function SheetCard({
               .join(" · ") || "—"}
           </div>
           {sheet.type !== "UNKNOWN" && (
-            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-brand-900">
               <span>
                 <span className="text-brand-500">Lignes</span>{" "}
                 <strong className="tabular-nums">{fmtInt(sheet.lines.length)}</strong>
@@ -548,15 +579,15 @@ function SheetCard({
                   <tr key={`${l.page ?? 0}-${l.n}-${i}`} className="border-t border-brand-50">
                     {hasPage && <Td num>{l.page ?? ""}</Td>}
                     <Td num>{l.n ?? <span className="text-brand-500">—</span>}</Td>
-                    {isLog && <Td>{l.id ?? <span className="text-brand-300">—</span>}</Td>}
+                    {isLog && <Td>{l.id ?? <span className="text-brand-500">—</span>}</Td>}
                     {hasGrade && <Td>{l.grade ?? ""}</Td>}
                     <Td num>{fmtNum(l.a)}</Td>
                     <Td num>{fmtNum(l.b)}</Td>
                     {!isLog && <Td num>{l.c ? fmtNum(l.c) : ""}</Td>}
                     {!isLog && <Td num>{l.count ?? ""}</Td>}
-                    <Td num>{Number(l.volumeM3).toFixed(3)}</Td>
+                    <Td num>{fmtDec3(l.volumeM3)}</Td>
                     <Td num className="text-brand-500">
-                      {l.excelM3 ? Number(l.excelM3).toFixed(3) : ""}
+                      {l.excelM3 ? fmtDec3(l.excelM3) : ""}
                     </Td>
                   </tr>
                 ))}
@@ -567,9 +598,17 @@ function SheetCard({
             <button
               type="button"
               onClick={() => setShowAll((v) => !v)}
-              className="mt-2 min-h-touch rounded-lg px-2 text-sm text-brand-500 underline hover:text-brand-900"
+              aria-expanded={showAll}
+              className="mt-2 inline-flex min-h-touch items-center gap-1 rounded-lg px-2 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-100 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 active:bg-brand-200"
             >
               {showAll ? "Réduire" : `Voir les ${sheet.lines.length} lignes`}
+              <IconChevronDown
+                width={16}
+                height={16}
+                className={`transition-transform duration-150 ease-out motion-reduce:transition-none ${
+                  showAll ? "rotate-180" : ""
+                }`}
+              />
             </button>
           )}
         </div>
@@ -578,45 +617,68 @@ function SheetCard({
   );
 }
 
+type AppliedSheet = ImportApplyDTO["applied"][number];
+
+/** Où aller voir ce qu'une feuille a créé — partagé par le résultat et l'historique. */
+function AppliedLinks({ applied: a, contractId }: { applied: AppliedSheet; contractId: string }) {
+  return (
+    <>
+      {a.truckId && (
+        <Link to={`/trucks/${a.truckId}`} className={rowLinkCls}>
+          Ouvrir le camion
+        </Link>
+      )}
+      {a.type === "SAWN" && (
+        <Link to={`/production-runs/${a.createdId}`} className={rowLinkCls}>
+          Ouvrir la session
+        </Link>
+      )}
+      {a.type === "CONTAINER" && (
+        <Link to={`/contracts/${contractId}?onglet=empotage`} className={rowLinkCls}>
+          Voir les conteneurs
+        </Link>
+      )}
+    </>
+  );
+}
+
+/** Feuilles écartées : bandeau d'alerte (icône SVG), pas de glyphe dans le texte. */
+function SkippedList({ skipped }: { skipped: ImportApplyDTO["skipped"] }) {
+  return (
+    <>
+      {skipped.map((s) => (
+        <li key={s.name}>
+          <Notice tone="warn" className="py-1.5">
+            <span className="font-medium">{s.name}</span> : {s.reason}
+          </Notice>
+        </li>
+      ))}
+    </>
+  );
+}
+
 function ResultPanel({ result, contractId }: { result: ImportApplyDTO; contractId: string }) {
   return (
-    <section className="rounded-xl bg-white p-4 shadow-card">
-      <h2 className="text-sm font-semibold text-brand-900">
-        Import terminé — {result.applied.length} feuille{result.applied.length > 1 ? "s" : ""}{" "}
-        enregistrée{result.applied.length > 1 ? "s" : ""}
-      </h2>
-      <ul className="mt-2 space-y-1 text-sm">
+    <section className={`${cardCls} p-4`}>
+      <Notice tone="success">
+        <span className="font-medium">
+          Import terminé : {result.applied.length} feuille{result.applied.length > 1 ? "s" : ""}{" "}
+          enregistrée{result.applied.length > 1 ? "s" : ""}.
+        </span>
+      </Notice>
+      <ul className="mt-3 space-y-1 text-sm">
         {result.applied.map((a) => (
-          <li key={a.name} className="flex flex-wrap items-center gap-2">
+          <li key={a.name} className="flex flex-wrap items-center gap-x-2">
             <Badge tone={TYPE_TONE[a.type]}>{IMPORT_SHEET_LABELS[a.type]}</Badge>
             <span className="text-brand-700">{a.name}</span>
-            <span className="text-brand-500">· {fmtInt(a.lines)} lignes</span>
+            <span className="tabular-nums text-brand-500">
+              · {fmtInt(a.lines)} ligne{a.lines > 1 ? "s" : ""}
+            </span>
             {a.createdTruck && <Badge tone="amber">camion créé</Badge>}
-            {a.truckId && (
-              <Link to={`/trucks/${a.truckId}`} className="underline text-brand-600">
-                ouvrir le camion
-              </Link>
-            )}
-            {a.type === "SAWN" && (
-              <Link to={`/production-runs/${a.createdId}`} className="underline text-brand-600">
-                ouvrir la session
-              </Link>
-            )}
-            {a.type === "CONTAINER" && (
-              <Link
-                to={`/contracts/${contractId}?onglet=empotage`}
-                className="underline text-brand-600"
-              >
-                voir les conteneurs
-              </Link>
-            )}
+            <AppliedLinks applied={a} contractId={contractId} />
           </li>
         ))}
-        {result.skipped.map((s) => (
-          <li key={s.name} className="text-amber-800">
-            ⚠ {s.name} : {s.reason}
-          </li>
-        ))}
+        <SkippedList skipped={result.skipped} />
       </ul>
     </section>
   );

@@ -114,32 +114,56 @@ export default function CamionsPage() {
   const dup = key ? vehicles.data?.find((x) => x.plateKey === key) : undefined;
 
   const needle = q.trim().toLowerCase();
-  const shown = (vehicles.data ?? []).filter((x) =>
-    needle === ""
-      ? true
-      : [x.registration, x.code, x.brand, x.driver, x.trailer]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(needle)
-  );
+  const shown = (vehicles.data ?? [])
+    .filter((x) =>
+      needle === ""
+        ? true
+        : [x.registration, x.code, x.brand, x.driver, x.trailer]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(needle)
+    )
+    // Camions retirés en fin de liste : ils ne se choisissent plus à la
+    // réception, le pouce qui cherche un camion actif n'a pas à les enjamber.
+    // Tri stable : l'ordre de l'API est conservé dans chaque groupe.
+    .sort((a, b) => Number(b.active) - Number(a.active));
+
+  // Synthèse du parc sous le titre — « … » tant que la liste n'est pas là.
+  const activeCount = vehicles.data?.filter((x) => x.active).length ?? 0;
+  const retiredCount = (vehicles.data?.length ?? 0) - activeCount;
+  const subtitle = vehicles.data
+    ? `${activeCount} camion${activeCount > 1 ? "s" : ""} au parc` +
+      (retiredCount > 0 ? ` · ${retiredCount} retiré${retiredCount > 1 ? "s" : ""}` : "")
+    : undefined;
 
   return (
     <>
       <PageHeader
         wide={false}
         title="Camions"
+        subtitle={subtitle}
         right={
           can("camions.create") && (
-          <Button
-            variant="primary"
-            onClick={() => {
-              setError(null);
-              setShowForm((s) => !s);
-            }}
-          >
-            {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Camion</>}
-          </Button>
+            // Formulaire ouvert : « Ajouter au parc » porte le teck, la bascule
+            // redevient discrète.
+            <Button
+              variant={showForm ? "secondary" : "primary"}
+              aria-expanded={showForm}
+              onClick={() => {
+                setError(null);
+                setShowForm((s) => !s);
+              }}
+            >
+              {showForm ? (
+                "Fermer"
+              ) : (
+                <>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Camion
+                </>
+              )}
+            </Button>
           )
         }
       />
@@ -151,8 +175,11 @@ export default function CamionsPage() {
               e.preventDefault();
               create.mutate();
             }}
-            className="mb-4 rounded-xl bg-white shadow-card p-4"
+            className="mb-4 rounded-xl bg-white p-4 shadow-card"
           >
+            <h2 className="mb-3 text-base font-semibold tracking-tight text-brand-900">
+              Nouveau camion
+            </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Immatriculation">
                 <Input
@@ -181,14 +208,15 @@ export default function CamionsPage() {
               </Notice>
             )}
 
-            <div className="mt-3 flex items-center justify-between gap-3">
-              {error && <FormError>{error}</FormError>}
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={create.isPending || !!dup}
-                className="ml-auto"
-              >
+            {/* Erreur au-dessus du bouton, pleine largeur : côte à côte, sur
+                téléphone le message se tassait en colonne étroite. */}
+            {error && (
+              <div className="mt-3">
+                <FormError>{error}</FormError>
+              </div>
+            )}
+            <div className="mt-3 flex justify-end">
+              <Button type="submit" variant="primary" disabled={create.isPending || !!dup}>
                 {create.isPending ? "Enregistrement…" : "Ajouter au parc"}
               </Button>
             </div>
@@ -228,7 +256,15 @@ export default function CamionsPage() {
             </EmptyState>
           )}
           {(vehicles.data?.length ?? 0) > 0 && shown.length === 0 && (
-            <EmptyState>Aucun camion ne correspond.</EmptyState>
+            <EmptyState
+              action={
+                <Button size="sm" onClick={() => setQ("")}>
+                  Effacer la recherche
+                </Button>
+              }
+            >
+              Aucun camion ne correspond à « {q.trim()} ».
+            </EmptyState>
           )}
 
           {shown.map((x) =>
@@ -322,13 +358,19 @@ export default function CamionsPage() {
                         <Badge tone="amber">Jamais reçu</Badge>
                       )}
                     </div>
-                    <div className="mt-1 text-sm text-brand-500">
-                      {[x.brand, x.driver || "Chauffeur non renseigné"]
+                    {/* La remorque part aussi sur le bordereau : visible ici, elle se
+                        vérifie sans ouvrir la fiche. */}
+                    <div className="mt-1 text-sm text-brand-600">
+                      {[
+                        x.brand,
+                        x.driver || "Chauffeur non renseigné",
+                        x.trailer && `remorque ${x.trailer}`,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </div>
                     {x.lastTripAt && (
-                      <div className="mt-0.5 text-sm text-brand-500">
+                      <div className="mt-0.5 text-sm tabular-nums text-brand-500">
                         Dernier voyage le {new Date(x.lastTripAt).toLocaleDateString("fr-FR")}
                       </div>
                     )}
@@ -338,6 +380,7 @@ export default function CamionsPage() {
                     <Button
                       size="xs"
                       className="shrink-0"
+                      aria-label={`Modifier ${x.registration}`}
                       onClick={() => {
                         setEditError(null);
                         setEdit(toForm(x));

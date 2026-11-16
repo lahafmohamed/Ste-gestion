@@ -20,9 +20,9 @@ import TruckDebitageSection from "../components/TruckDebitageSection";
 import Badge, { type BadgeTone } from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Chip from "../components/ui/Chip";
-import { BackLink } from "../components/ui/Card";
+import { BackLink, SectionHeading } from "../components/ui/Card";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { FormError, QueryError } from "../components/ui/Feedback";
+import { EmptyState, FormError, QueryError } from "../components/ui/Feedback";
 import { SkeletonList } from "../components/ui/Skeleton";
 import { IconCheck, IconChevronDown } from "../components/icons";
 
@@ -101,6 +101,9 @@ export default function TruckDetailPage() {
   const declaredCount = t.declaredLogCount;
   const countGap =
     declaredCount != null && billesOnParc != null ? billesOnParc - declaredCount : null;
+  // Signe explicite, vrai moins (« −2 », pas « -2 ») — comme fmtM3.
+  const gapLabel =
+    countGap == null ? "" : `${countGap > 0 ? "+" : countGap < 0 ? "−" : ""}${Math.abs(countGap)}`;
 
   // Étape atteinte dans la chaîne réception → étalage → billonnage → débitage.
   const stage: { label: string; tone: BadgeTone } = t.sawn
@@ -145,22 +148,26 @@ export default function TruckDetailPage() {
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-title font-semibold tracking-tight text-brand-900">
-            {t.registration}
+          {/* Le B/L en titre, comme sur la carte camion et l'analyse par camion :
+              c'est lui qui identifie le voyage — le même camion revient tous
+              les jours. Sans B/L, l'immatriculation reprend la place. */}
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-balance text-title font-semibold tracking-tight text-brand-900">
+            {t.deliveryNote ? `B/L ${t.deliveryNote}` : t.registration}
             {/* Où en est le camion dans la chaîne — visible sans dérouler la page. */}
             <Badge tone={stage.tone}>{stage.label}</Badge>
           </h1>
-          <div className="text-sm text-brand-500">
+          <div className="mt-0.5 text-sm text-brand-600">
             {[
-              t.deliveryNote && `B/L ${t.deliveryNote}`,
-              t.parcel && `Parcelle ${t.parcel}`,
+              t.deliveryNote && t.registration,
+              t.parcel && `parcelle ${t.parcel}`,
               t.origin,
+              `arrivé le ${new Date(t.arrivedAt).toLocaleDateString("fr-FR")}`,
             ]
               .filter(Boolean)
-              .join(" · ") || "—"}
+              .join(" · ")}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {can("contracts.export") && (
             <Button
               size="sm"
@@ -191,43 +198,53 @@ export default function TruckDetailPage() {
 
       {/* Écart de comptage billes — bordereau vs parc (assumé, non bloquant) */}
       {(declaredCount != null || billesOnParc != null) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <Badge>Bordereau : {declaredCount ?? "—"} billes</Badge>
-          <Badge>Parc : {billesOnParc ?? "—"} billes</Badge>
-          {billonCount != null && <Badge>Tronçonnées en {billonCount} billons</Badge>}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Badge size="md" className="tabular-nums">
+            Bordereau : {declaredCount ?? "—"} billes
+          </Badge>
+          <Badge size="md" className="tabular-nums">
+            Parc : {billesOnParc ?? "—"} billes
+          </Badge>
+          {billonCount != null && (
+            <Badge size="md" className="tabular-nums">
+              Tronçonnées en {billonCount} billons
+            </Badge>
+          )}
           {countGap != null &&
             countGap !== 0 &&
             (t.countGapConfirmed ? (
               <>
-                <Badge tone="parc">
-                  écart {countGap > 0 ? "+" : ""}
-                  {countGap} · confirmé
+                <Badge size="md" tone="parc" className="tabular-nums">
+                  Écart {gapLabel} · confirmé
                   <IconCheck width={14} height={14} className="ml-1 shrink-0" aria-hidden />
                 </Badge>
-                <button
-                  type="button"
-                  onClick={() => confirmGap.mutate(false)}
-                  disabled={confirmGap.isPending || !can("etalage.edit")}
-                  className="min-h-touch rounded-lg px-2 text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200 disabled:opacity-50"
-                >
-                  annuler
-                </button>
+                {/* Sans le droit de corriger l'étalage, pas de bouton grisé
+                    à deviner : l'écart confirmé se lit, c'est tout. */}
+                {can("etalage.edit") && (
+                  <Button
+                    size="xs"
+                    onClick={() => confirmGap.mutate(false)}
+                    disabled={confirmGap.isPending}
+                  >
+                    Retirer la confirmation
+                  </Button>
+                )}
               </>
             ) : (
               <>
-                <Badge tone="amber">
-                  écart {countGap > 0 ? "+" : ""}
-                  {countGap}
+                <Badge size="md" tone="amber" className="tabular-nums">
+                  Écart {gapLabel}
                   {countGap < 0 ? " · à compléter ?" : ""}
                 </Badge>
-                <button
-                  type="button"
-                  onClick={() => confirmGap.mutate(true)}
-                  disabled={confirmGap.isPending || !can("etalage.edit")}
-                  className="min-h-touch rounded-full border border-amber-300 px-3 py-1 font-medium text-amber-700 hover:bg-amber-100 active:bg-amber-200 disabled:opacity-50"
-                >
-                  Confirmer l'écart
-                </button>
+                {can("etalage.edit") && (
+                  <Button
+                    size="xs"
+                    onClick={() => confirmGap.mutate(true)}
+                    disabled={confirmGap.isPending}
+                  >
+                    Confirmer l'écart
+                  </Button>
+                )}
               </>
             ))}
         </div>
@@ -240,6 +257,10 @@ export default function TruckDetailPage() {
       <TruckDebitageSection truck={t} />
 
       <section className="mt-5">
+        {/* Camion en cours : titre de section comme le bordereau et le débitage
+            au-dessus — les pastilles d'onglet seules ne disaient pas de quoi
+            parlait le tableau. */}
+        {!t.sawn && <SectionHeading>Cubage billes / billons</SectionHeading>}
         {/* Camion scié : plus rien à saisir ici, le détail est de l'historique.
             On le replie derrière son total — tant que le camion tourne, la
             section reste ouverte, c'est le point de saisie du parc. */}
@@ -266,18 +287,28 @@ export default function TruckDetailPage() {
         {measShown && (
           <>
             {/* Un seul tableau à l'écran : on bascule billes ↔ billons au lieu de scroller. */}
-            <div className="mb-2 flex flex-wrap items-center gap-2">
+            <div
+              role="group"
+              aria-label="Relevé affiché"
+              className="mb-2 flex flex-wrap items-center gap-2"
+            >
               {tabs.map((c) => {
                 const m = t.measurements.find((x) => x.context === c);
                 return (
                   <Chip key={c} selected={c === activeCtx} onClick={() => setMeasTab(c)}>
                     {MEASUREMENT_CONTEXT_LABELS[c]}
-                    {m ? ` · ${fmtM3(measurementTotalM3(m))}` : " · à saisir"}
+                    <span
+                      className={`ml-1.5 tabular-nums ${
+                        c === activeCtx ? "text-brand-200" : "text-brand-500"
+                      }`}
+                    >
+                      {m ? fmtM3(measurementTotalM3(m)) : "à saisir"}
+                    </span>
                   </Chip>
                 );
               })}
             </div>
-            <div className="rounded-xl bg-white shadow-card p-4">
+            <div className="rounded-xl bg-white p-4 shadow-card">
               {measurement ? (
                 <MeasurementTable
                   m={measurement}
@@ -298,23 +329,20 @@ export default function TruckDetailPage() {
                   logPending={updateLog.isPending || delLog.isPending}
                 />
               ) : !can("etalage.create") ? (
-                <p className="text-sm text-brand-500">
-                  Aucun relevé — saisie réservée au parc.
-                </p>
+                <EmptyState>Aucun relevé pour l'instant. La saisie se fait au parc.</EmptyState>
               ) : (
                 <>
                   {/* Étalage Ø : reprendre les n° de billes déjà saisis en packing list. */}
                   {activeCtx === "YARD_DIAMETER" && !diaPrefill && packingIds.length > 0 && (
-                    <button
-                      type="button"
+                    <Button
+                      className="mb-3 w-full"
                       onClick={() => {
                         clearTallyDraft(`${t.id}:${activeCtx}`);
                         setDiaPrefill(packingIds);
                       }}
-                      className="mb-3 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2 text-sm text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
                     >
                       Préremplir les n° depuis la packing list ({packingIds.length} billes)
-                    </button>
+                    </Button>
                   )}
                   <TallyEntry
                     key={activeCtx === "YARD_DIAMETER" && diaPrefill ? "prefill" : "blank"}

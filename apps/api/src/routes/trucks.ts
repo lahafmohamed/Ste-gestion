@@ -102,6 +102,9 @@ export async function truckRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
+    // Contrat clôturé : le bordereau ne bouge plus. Vérifié avant de résoudre
+    // l'immat — un camion introuvable ne doit pas laisser une fiche parc créée.
+    if (!(await ensureTruckContractOpen(reply, req.params.id))) return;
     // Immat corrigée sur le bordereau : le voyage change de camion (ou en crée
     // un), sinon la fiche parc et l'historique divergeraient en silence.
     const vehicle = parsed.data.registration
@@ -127,6 +130,7 @@ export async function truckRoutes(app: FastifyInstance) {
 
   // Suppression
   app.delete<{ Params: { id: string } }>("/trucks/:id", async (req, reply) => {
+    if (!(await ensureTruckContractOpen(reply, req.params.id))) return;
     try {
       await prisma.truck.delete({ where: { id: req.params.id } });
       return reply.code(204).send();
@@ -317,10 +321,23 @@ export async function truckRoutes(app: FastifyInstance) {
     return reply.code(204).send();
   });
 
-  // Suppression d'un étalage
+  // Suppression d'un étalage. Même garde que la ligne seule : un billon déjà
+  // passé à la scie perdrait son lien de débitage en cascade, sans trace.
   app.delete<{ Params: { id: string } }>("/measurements/:id", async (req, reply) => {
+    const m = await prisma.logMeasurement.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, truckId: true },
+    });
+    if (!m) return reply.code(404).send({ error: "Étalage introuvable" });
+    if (!(await ensureTruckContractOpen(reply, m.truckId))) return;
+    const sawn = await prisma.productionRunLog.count({ where: { log: { measurementId: m.id } } });
+    if (sawn > 0) {
+      return reply.code(409).send({
+        error: `${sawn} billon(s) de ce relevé sont liés à un débitage — supprimer le débitage d'abord`,
+      });
+    }
     try {
-      await prisma.logMeasurement.delete({ where: { id: req.params.id } });
+      await prisma.logMeasurement.delete({ where: { id: m.id } });
       return reply.code(204).send();
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {

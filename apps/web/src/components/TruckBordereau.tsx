@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TruckDTO, TruckUpdateInput } from "@ste/shared";
 import { trucksApi } from "../lib/api";
 import { useCan } from "../lib/auth";
+import { fmtNum, normalizeDecimal } from "../lib/format";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Card, { SectionHeading } from "./ui/Card";
@@ -46,11 +47,13 @@ function toInput(t: TruckDTO, f: Field): string {
   return String(v);
 }
 
-function display(t: TruckDTO, f: Field): string {
+/** Valeur affichée, `null` si le champ est vide (rendu « — » atténué). */
+function display(t: TruckDTO, f: Field): string | null {
   const v = raw(t, f.key as string);
-  if (v === null || v === "") return "—";
+  if (v === null || v === "") return null;
   if (f.kind === "date") return new Date(String(v)).toLocaleDateString("fr-FR");
-  if (f.kind === "decimal" || f.kind === "int") return Number(v) === 0 ? "—" : String(v);
+  // Virgule décimale française (« 33,171 »), comme partout ailleurs dans l'app.
+  if (f.kind === "decimal" || f.kind === "int") return Number(v) === 0 ? null : fmtNum(v);
   return String(v);
 }
 
@@ -83,6 +86,8 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
     const init: Record<string, string> = {};
     for (const f of FIELDS) init[f.key as string] = toInput(truck, f);
     setV(init);
+    // L'échec d'une saisie précédente abandonnée ne doit pas réapparaître.
+    setError(null);
     setEditing(true);
   }
 
@@ -108,19 +113,25 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
       <SectionHeading
         right={
           can("reception.edit") && (
-            <button
+            <Button
+              size="xs"
+              className="-my-2"
+              aria-expanded={editing}
               onClick={() => (editing ? setEditing(false) : openEdit())}
-              className="-my-2 min-h-touch rounded-lg px-2.5 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
             >
               {editing ? "Annuler" : "Modifier"}
-            </button>
+            </Button>
           )
         }
       >
         <span className="inline-flex items-center gap-2">
           Bordereau SODEFOR
-          <Badge tone={filled === FIELDS.length ? "parc" : filled <= 2 ? "brand" : "amber"}>
-            {filled}/{FIELDS.length}
+          {/* Saisie progressive : combien de cases du ticket sont remplies. */}
+          <Badge
+            tone={filled === FIELDS.length ? "parc" : filled <= 2 ? "brand" : "amber"}
+            className="tabular-nums"
+          >
+            {filled}/{FIELDS.length} renseignés
           </Badge>
         </span>
       </SectionHeading>
@@ -139,35 +150,56 @@ export default function TruckBordereau({ truck }: { truck: TruckDTO }) {
                   ) : (
                     <Input
                       required={f.key === "registration"}
-                      inputMode={f.kind === "int" || f.kind === "decimal" ? "decimal" : undefined}
+                      inputMode={
+                        f.kind === "decimal" ? "decimal" : f.kind === "int" ? "numeric" : undefined
+                      }
                       value={v[f.key as string]}
-                      onChange={(e) => setV((p) => ({ ...p, [f.key as string]: e.target.value }))}
+                      // Virgule du clavier FR → point : « 33,171 » partait tel quel
+                      // et l'API refusait l'enregistrement du bordereau.
+                      onChange={(e) =>
+                        setV((p) => ({
+                          ...p,
+                          [f.key as string]:
+                            f.kind === "decimal" ? normalizeDecimal(e.target.value) : e.target.value,
+                        }))
+                      }
                       placeholder={f.ph}
                     />
                   )}
                 </Field>
               ))}
             </div>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              {error && <FormError>{error}</FormError>}
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={save.isPending}
-                className="ml-auto"
-              >
+            {error && (
+              <div className="mt-3">
+                <FormError>{error}</FormError>
+              </div>
+            )}
+            <div className="mt-3 flex justify-end gap-2 border-t border-brand-100 pt-3">
+              <Button onClick={() => setEditing(false)}>Annuler</Button>
+              <Button type="submit" variant="primary" disabled={save.isPending}>
                 {save.isPending ? "Enregistrement…" : "Enregistrer"}
               </Button>
             </div>
           </form>
         ) : (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-            {FIELDS.map((f) => (
-              <div key={f.key as string}>
-                <dt className="text-xs text-brand-500">{f.label}</dt>
-                <dd className="text-sm text-brand-900">{display(truck, f)}</dd>
-              </div>
-            ))}
+          // Valeurs en text-base (lues debout sur tablette) ; une case vide reste
+          // à sa place mais s'efface, pour que l'œil trouve ce qui manque.
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            {FIELDS.map((f) => {
+              const val = display(truck, f);
+              return (
+                <div key={f.key as string} className="min-w-0">
+                  <dt className="text-xs text-brand-500">{f.label}</dt>
+                  <dd
+                    className={`break-words text-base ${
+                      val === null ? "text-brand-500" : "tabular-nums text-brand-900"
+                    }`}
+                  >
+                    {val ?? "—"}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         )}
       </Card>

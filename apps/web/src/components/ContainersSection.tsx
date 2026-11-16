@@ -11,16 +11,17 @@ import {
 } from "@ste/shared";
 import { containersApi, contractsApi, downloadFile, trucksApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtDec3, fmtM3, fmtNum } from "../lib/format";
+import { fmtDec3, fmtInt, fmtM3, fmtNum } from "../lib/format";
 import { printContainerPackingList } from "../lib/printPacking";
 import EmpotagePicker from "./EmpotagePicker";
 import Badge, { type BadgeTone } from "./ui/Badge";
 import Button from "./ui/Button";
-import { SectionHeading } from "./ui/Card";
+import { cardCls, SectionHeading } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
 import Chip from "./ui/Chip";
 import { EmptyState, FormError, QueryError } from "./ui/Feedback";
 import Input, { Field } from "./ui/Input";
+import { SkeletonList } from "./ui/Skeleton";
 import { IconChevronDown, IconPlus, IconX } from "./icons";
 
 // Puces de sélection multi-camions (origine des débités empotés).
@@ -28,16 +29,23 @@ function TruckChips({
   trucks,
   selected,
   onToggle,
+  disabled = false,
 }: {
   trucks: TruckDTO[];
   selected: string[];
   onToggle: (id: string) => void;
+  disabled?: boolean;
 }) {
   if (trucks.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div role="group" aria-label="Camions d'origine" className="flex flex-wrap gap-1.5">
       {trucks.map((t) => (
-        <Chip key={t.id} selected={selected.includes(t.id)} onClick={() => onToggle(t.id)}>
+        <Chip
+          key={t.id}
+          selected={selected.includes(t.id)}
+          disabled={disabled}
+          onClick={() => onToggle(t.id)}
+        >
           {t.registration}
         </Chip>
       ))}
@@ -90,7 +98,7 @@ function CreateForm({ trucks, onDone }: { trucks: TruckDTO[]; onDone: () => void
           truckIds: truckIds.length ? truckIds : undefined,
         });
       }}
-      className="mb-3 rounded-xl bg-white shadow-card p-4"
+      className={`mb-3 ${cardCls} p-4`}
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(
@@ -115,7 +123,9 @@ function CreateForm({ trucks, onDone }: { trucks: TruckDTO[]; onDone: () => void
       </div>
       {trucks.length > 0 && (
         <div className="mt-3">
-          <div className="mb-1 text-xs text-brand-500">Camions d'origine (optionnel)</div>
+          <div className="mb-1 text-sm font-medium text-brand-600">
+            Camions d'origine <span className="font-normal text-brand-500">(facultatif)</span>
+          </div>
           <TruckChips
             trucks={trucks}
             selected={truckIds}
@@ -133,7 +143,7 @@ function CreateForm({ trucks, onDone }: { trucks: TruckDTO[]; onDone: () => void
         )}
         <div className="flex justify-end">
           <Button type="submit" variant="primary" disabled={create.isPending}>
-            Créer le conteneur
+            {create.isPending ? "Création…" : "Créer le conteneur"}
           </Button>
         </div>
       </div>
@@ -194,9 +204,12 @@ function ContainerCard({
     onSuccess: invalidate,
   });
   const remove = useMutation({ mutationFn: () => containersApi.remove(c.id), onSuccess: invalidate });
+  // Une action de la fiche a échoué (statut, camions, ligne, suppression) :
+  // sans ce bandeau, le tap restait sans effet visible.
+  const failed = [setStatus, setTrucks, removeItem, addItems, remove].find((m) => m.isError);
 
   return (
-    <div className="rounded-xl bg-white shadow-card">
+    <div className={cardCls}>
       {/* En-tête dépliable : le chevron dit qu'il y a un détail dessous (sans
           lui, rien ne distinguait la carte d'une simple ligne). */}
       <button
@@ -229,12 +242,12 @@ function ContainerCard({
         </div>
         <div className="flex shrink-0 items-center gap-2 text-right">
           <div>
-            <div className="whitespace-nowrap text-sm font-semibold text-brand-900">
+            <div className="whitespace-nowrap text-sm font-semibold tabular-nums text-brand-900">
               {fmtM3(containerTotalM3(c))}
             </div>
             {/* Contenu visible sans déplier : pièces + sections l×ép. */}
             {c.items.length > 0 && (
-              <div className="whitespace-nowrap text-xs text-brand-500">
+              <div className="whitespace-nowrap text-xs tabular-nums text-brand-500">
                 {fmtNum(containerPieceCount(c))} pièces
                 <span className="hidden sm:inline">
                   {" "}
@@ -255,13 +268,21 @@ function ContainerCard({
 
       {open && (
         <div className="border-t border-brand-100 p-3">
+          {failed && (
+            <div className="mb-3">
+              <FormError>
+                Modification non enregistrée
+                {failed.error instanceof Error ? ` : ${failed.error.message}` : "."}
+              </FormError>
+            </div>
+          )}
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-brand-500">Statut :</span>
+            <span className="text-sm text-brand-600">Statut :</span>
             {STATUSES.map((st) => (
               <Chip
                 key={st}
                 selected={c.status === st}
-                disabled={!canEdit}
+                disabled={!canEdit || setStatus.isPending}
                 onClick={() => setStatus.mutate(st)}
               >
                 {CONTAINER_STATUS_LABELS[st]}
@@ -294,12 +315,14 @@ function ContainerCard({
               </Button>
             )}
             {can("empotage.delete") && (
-              <button
+              <Button
+                variant="ghost-danger"
+                size="xs"
+                className="ml-auto"
                 onClick={() => setDelOpen(true)}
-                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
               >
-                Supprimer conteneur
-              </button>
+                Supprimer le conteneur
+              </Button>
             )}
             <ConfirmDialog
               open={delOpen}
@@ -319,12 +342,13 @@ function ContainerCard({
 
           {/* Camions d'origine (traçabilité) */}
           <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-brand-500">Camions d'origine :</span>
+            <span className="text-brand-600">Camions d'origine :</span>
             {editTrucks ? (
               <div className="flex flex-1 flex-col gap-2">
                 <TruckChips
                   trucks={trucks}
                   selected={c.truckIds}
+                  disabled={setTrucks.isPending}
                   onToggle={(id) => {
                     const next = c.truckIds.includes(id)
                       ? c.truckIds.filter((x) => x !== id)
@@ -332,27 +356,21 @@ function ContainerCard({
                     setTrucks.mutate(next);
                   }}
                 />
-                <button
-                  onClick={() => setEditTrucks(false)}
-                  className="min-h-touch self-start rounded-lg px-2 text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
-                >
-                  Fermer
-                </button>
+                <Button size="xs" className="self-start" onClick={() => setEditTrucks(false)}>
+                  Terminé
+                </Button>
               </div>
             ) : (
               <>
                 {linkedRegs.length ? (
                   linkedRegs.map((r) => <Badge key={r}>{r}</Badge>)
                 ) : (
-                  <span className="text-brand-500">aucun</span>
+                  <span className="text-brand-600">aucun</span>
                 )}
                 {trucks.length > 0 && canEdit && (
-                  <button
-                    onClick={() => setEditTrucks(true)}
-                    className="min-h-touch rounded-lg px-2 text-brand-500 underline hover:text-brand-900 active:bg-brand-100"
-                  >
+                  <Button size="xs" onClick={() => setEditTrucks(true)}>
                     Modifier
-                  </button>
+                  </Button>
                 )}
               </>
             )}
@@ -363,12 +381,14 @@ function ContainerCard({
             <table className="w-full min-w-[480px] text-base">
               <thead>
                 <tr className="text-left text-xs text-brand-500">
-                  <th className="py-1 font-normal">#</th>
-                  <th className="py-1 font-normal">Long. (ft)</th>
-                  <th className="py-1 font-normal">Taille</th>
-                  <th className="py-1 text-right font-normal">Nbr</th>
-                  <th className="py-1 text-right font-normal">m³</th>
-                  <th />
+                  <th className="py-1 pr-3 font-normal">#</th>
+                  <th className="py-1 pr-3 font-normal">L (ft)</th>
+                  <th className="py-1 pr-3 font-normal">Taille</th>
+                  <th className="py-1 pr-3 text-right font-normal">Nbr</th>
+                  <th className="py-1 pr-3 text-right font-normal">m³</th>
+                  <th>
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -376,33 +396,36 @@ function ContainerCard({
                   <Fragment key={sec.key}>
                     {/* En-tête de section l×ép — le doc d'empotage se lit par paquets. */}
                     <tr className="border-t border-brand-200 bg-brand-50">
-                      <td colSpan={3} className="py-1 text-sm font-medium text-brand-700">
+                      <td colSpan={3} className="py-1 pl-1 pr-3 text-sm font-medium text-brand-800">
                         Section {fmtNum(sec.widthIn)}×{fmtNum(sec.thicknessIn)}
                         <span className="ml-2 text-xs font-normal text-brand-500">
                           {sec.sizeCode}
                         </span>
                       </td>
-                      <td className="py-1 text-right text-sm font-medium tabular-nums text-brand-700">
-                        {sec.count}
+                      <td className="py-1 pr-3 text-right text-sm font-medium tabular-nums text-brand-800">
+                        {fmtInt(sec.count)}
                       </td>
-                      <td className="py-1 text-right text-sm font-medium tabular-nums text-brand-700">
-                        {fmtNum(sec.volumeM3.toFixed(3))}
+                      <td className="py-1 pr-3 text-right text-sm font-medium tabular-nums text-brand-800">
+                        {fmtDec3(sec.volumeM3)}
                       </td>
                       <td />
                     </tr>
                     {sec.items.map((it) => (
                       <tr key={it.id} className="border-t border-brand-100">
-                        <td className="py-1 text-brand-500">{it.position}</td>
-                        <td className="py-1 tabular-nums">{fmtNum(it.lengthFt)}</td>
-                        <td className="py-1">{it.sizeCode}</td>
-                        <td className="py-1 text-right tabular-nums">{it.count}</td>
-                        <td className="py-1 text-right tabular-nums">{fmtDec3(it.volumeM3)}</td>
+                        <td className="py-1 pr-3 tabular-nums text-brand-500">{it.position}</td>
+                        <td className="py-1 pr-3 tabular-nums">{fmtNum(it.lengthFt)}</td>
+                        <td className="py-1 pr-3">{it.sizeCode}</td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{fmtInt(it.count)}</td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{fmtDec3(it.volumeM3)}</td>
                         <td className="py-1 text-right">
                           {can("empotage.delete") && (
                           <button
+                            type="button"
                             onClick={() => removeItem.mutate(it.id)}
-                            aria-label="Retirer la ligne"
-                            className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+                            // Un seul retrait à la fois : un double tap ne vise pas la ligne d'en dessous.
+                            disabled={removeItem.isPending}
+                            aria-label={`Retirer la ligne ${it.position}`}
+                            className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 active:bg-red-100 disabled:opacity-50"
                           >
                             <IconX width={18} height={18} />
                           </button>
@@ -415,11 +438,13 @@ function ContainerCard({
               </tbody>
               <tfoot>
                 <tr className="border-t border-brand-200 font-semibold">
-                  <td colSpan={3} className="py-1.5">
+                  <td colSpan={3} className="py-1.5 pr-3">
                     Total ({sections.length} section{sections.length > 1 ? "s" : ""})
                   </td>
-                  <td className="py-1.5 text-right tabular-nums">{containerPieceCount(c)}</td>
-                  <td className="py-1.5 text-right tabular-nums">
+                  <td className="py-1.5 pr-3 text-right tabular-nums">
+                    {fmtInt(containerPieceCount(c))}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">
                     {fmtNum(containerTotalM3(c).toFixed(6))}
                   </td>
                   <td />
@@ -439,7 +464,7 @@ function ContainerCard({
               can("empotage.create") && (
                 <Button size="xs" onClick={() => setAdding(true)}>
                   <IconPlus width={16} height={16} className="-ml-0.5" />
-                  Lignes d'empotage
+                  Ajouter des pièces
                 </Button>
               )
             )}
@@ -483,19 +508,38 @@ export default function ContainersSection({ contractId }: { contractId?: string 
           )
         }
       >
-        Conteneurs / Empotage ({containers.data?.length ?? 0})
+        {/* Compteur une fois chargé : « (0) » pendant la requête trompait. */}
+        Conteneurs
+        {containers.data && (
+          <span className="ml-1.5 font-normal tabular-nums text-brand-500">
+            {containers.data.length}
+          </span>
+        )}
       </SectionHeading>
 
       {showForm && <CreateForm trucks={trucks} onDone={() => setShowForm(false)} />}
 
       <div className="space-y-2">
-        {containers.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
+        {containers.isLoading && <SkeletonList count={3} lines={1} />}
         {containers.isError && (
           <QueryError error={containers.error} onRetry={() => containers.refetch()}>
             Impossible de charger les conteneurs
           </QueryError>
         )}
-        {containers.data?.length === 0 && !showForm && <EmptyState>Aucun conteneur.</EmptyState>}
+        {containers.data?.length === 0 && !showForm && (
+          <EmptyState
+            action={
+              can("empotage.create") && (
+                <Button variant="primary" onClick={() => setShowForm(true)}>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Nouveau conteneur
+                </Button>
+              )
+            }
+          >
+            Aucun conteneur. Créez-en un, puis ajoutez-y les pièces prises au stock.
+          </EmptyState>
+        )}
         {containers.data?.map((c) => (
           <ContainerCard key={c.id} c={c} trucks={trucks} contractCode={contractQ.data?.code} />
         ))}

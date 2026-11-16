@@ -14,23 +14,29 @@ import { cardInteractiveCls } from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
 import { EmptyState, QueryError } from "../components/ui/Feedback";
 import { SearchInput } from "../components/ui/Input";
-import { SkeletonList } from "../components/ui/Skeleton";
+import { SkeletonCard } from "../components/ui/Skeleton";
 import { IconPlus } from "../components/icons";
 
-function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
+function ContractCard({
+  c,
+  o,
+  ovFailed = false,
+}: {
+  c: ContractDTO;
+  o?: ContractOverviewDTO;
+  /** Résumés en échec : pas de barre qui pulse sans fin. */
+  ovFailed?: boolean;
+}) {
+  const meta = [c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ");
   return (
-    <Link
-      to={`/contracts/${c.id}`}
-      className={`${cardInteractiveCls} block p-4`}
-    >
+    <Link to={`/contracts/${c.id}`} className={`${cardInteractiveCls} block p-4`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-base font-semibold text-brand-900">{c.code}</div>
-          <div
-            className="mt-0.5 line-clamp-2 text-sm text-brand-600"
-            title={[c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ") || undefined}
-          >
-            {[c.year, c.forest, c.managementCenter].filter(Boolean).join(" · ") || "—"}
+          <div className="truncate text-base font-semibold tracking-tight text-brand-900">
+            {c.code}
+          </div>
+          <div className="mt-0.5 line-clamp-2 text-sm text-brand-600" title={meta || undefined}>
+            {meta || "—"}
           </div>
         </div>
         <Badge tone={c.status === "OPEN" ? "parc" : "brand"}>
@@ -38,7 +44,7 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
         </Badge>
       </div>
       {/* Camions : entrés / total projeté (≈, dérivé des arrivées) ou prévu saisi. */}
-      <div className="mt-3 text-sm text-brand-600">
+      <div className="mt-3 text-sm tabular-nums text-brand-600">
         Camions <strong className="text-brand-900">{fmtInt(o?.trucksEntered ?? 0)}</strong>
         {o?.estTrucksTotal != null
           ? ` / ≈ ${fmtInt(o.estTrucksTotal)}`
@@ -56,6 +62,8 @@ function ContractCard({ c, o }: { c: ContractDTO; o?: ContractOverviewDTO }) {
       <div className="mt-2">
         {o ? (
           <QuotaBar brousseM3={o.brousseM3} quotaM3={c.quotaM3} />
+        ) : ovFailed ? (
+          <p className="text-sm text-brand-500">Avancement du quota indisponible.</p>
         ) : (
           <div className="h-2 w-full rounded-full bg-brand-100 motion-safe:animate-pulse" />
         )}
@@ -142,16 +150,30 @@ export default function ContractsPage() {
     });
 
   const filtering = q.trim() !== "" || year !== "ALL";
+  const ovFailed = overview.isError && !overview.data;
 
   return (
     <>
       <PageHeader
         title="Contrats"
-        subtitle={`${openCount} ouvert(s)${closedCount > 0 ? ` · ${closedCount} clôturé(s)` : ""} — l'état opérationnel est calculé à partir des opérations.`}
+        subtitle={
+          contracts.data
+            ? `${openCount} ouvert${openCount > 1 ? "s" : ""}${
+                closedCount > 0 ? ` · ${closedCount} clôturé${closedCount > 1 ? "s" : ""}` : ""
+              } · avancement calculé à partir des opérations`
+            : undefined
+        }
         right={
           canCreate && (
             <Button variant="primary" onClick={() => setShowForm((s) => !s)}>
-              {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Nouveau contrat</>}
+              {showForm ? (
+                "Fermer"
+              ) : (
+                <>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Nouveau contrat
+                </>
+              )}
             </Button>
           )
         }
@@ -201,7 +223,6 @@ export default function ContractsPage() {
         )}
 
         <div className="space-y-3">
-          {contracts.isLoading && <SkeletonList count={3} lines={1} />}
           {contracts.isError && (
             <QueryError error={contracts.error} onRetry={() => contracts.refetch()}>
               Impossible de charger les contrats
@@ -223,28 +244,44 @@ export default function ContractsPage() {
             </EmptyState>
           )}
 
+          {/* Filtre sans résultat : l'action qui débloque (inclure les clôturés,
+              effacer la recherche) est un vrai bouton, pas un lien souligné. */}
           {all.length > 0 && shown.length === 0 && (
-            <p className="text-sm text-brand-500">
-              Aucun contrat ne correspond
-              {filtering ? " à la recherche" : ""}.{" "}
-              {!withClosed && closedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowClosed(true)}
-                  className="underline hover:text-brand-900"
-                >
-                  Inclure les {closedCount} clôturé(s)
-                </button>
-              )}
-            </p>
+            <EmptyState
+              action={
+                !withClosed && closedCount > 0 ? (
+                  <Button onClick={() => setShowClosed(true)}>
+                    Inclure {closedCount > 1 ? `les ${closedCount} clôturés` : "le clôturé"}
+                  </Button>
+                ) : filtering ? (
+                  <Button
+                    onClick={() => {
+                      setQ("");
+                      setYear("ALL");
+                    }}
+                  >
+                    Effacer les filtres
+                  </Button>
+                ) : undefined
+              }
+            >
+              Aucun contrat ne correspond{filtering ? " à la recherche" : ""}.
+            </EmptyState>
           )}
-
         </div>
 
         {/* Grille : une colonne sur téléphone, 2–3 dès que la largeur le permet. */}
+        {/* Squelettes dans la grille même : la page garde sa forme à l'arrivée. */}
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {contracts.isLoading && (
+            <>
+              <SkeletonCard lines={2} />
+              <SkeletonCard lines={2} />
+              <SkeletonCard lines={2} />
+            </>
+          )}
           {shown.map((c) => (
-            <ContractCard key={c.id} c={c} o={ovById.get(c.id)} />
+            <ContractCard key={c.id} c={c} o={ovById.get(c.id)} ovFailed={ovFailed} />
           ))}
         </div>
       </div>

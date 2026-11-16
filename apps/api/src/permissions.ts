@@ -36,6 +36,8 @@ const RULES: Rule[] = [
     permission: "compta.view",
   },
   { method: "GET", pattern: new RegExp(`^/contracts/${ID}/expenses$`), permission: "finances.view" },
+  { method: "GET", pattern: /^\/expenses$/, permission: "finances.view" },
+  { method: "GET", pattern: /^\/payment-vouchers$/, permission: "finances.view" },
   { method: "GET", pattern: /^\/parties(\/|$)/, permission: "compta.view" },
   { method: "GET", pattern: /^\/account-entries(\/|$)/, permission: "compta.view" },
   { method: "GET", pattern: /^\/sales(\/|$)/, permission: "ventes.view" },
@@ -83,9 +85,15 @@ const RULES: Rule[] = [
     permission: "debitage.delete",
   },
 
-  // Stock (resciages)
+  // Stock (resciages, inventaires, sorties, classeurs STOCK / SUIVI)
   { method: "POST", pattern: /^\/resaws$/, permission: "stock.create" },
   { method: "DELETE", pattern: new RegExp(`^/resaws/${ID}$`), permission: "stock.delete" },
+  { method: "GET", pattern: /^\/stock\/(stock|suivi)\.xlsx$/, permission: "stock.export" },
+  // Inventaire (stock.edit) ou sortie (stock.create / stock.delete) : le type
+  // est dans le corps ou en base, la route vérifie la bonne permission.
+  { method: "POST", pattern: /^\/stock\/movements$/, permission: "stock.view" },
+  { method: "DELETE", pattern: new RegExp(`^/stock/movements/${ID}$`), permission: "stock.view" },
+  { method: "POST", pattern: /^\/stock\/import\/(preview|apply)$/, permission: "stock.view" },
 
   // Empotage
   { method: "POST", pattern: /^\/containers$/, permission: "empotage.create" },
@@ -117,6 +125,13 @@ const RULES: Rule[] = [
   },
   // Dépenses du contrat (calculées + ajoutées) — module Finances.
   { method: "POST", pattern: /^\/contract-expenses$/, permission: "finances.edit" },
+  { method: "POST", pattern: /^\/payment-vouchers$/, permission: "finances.edit" },
+  { method: "POST", pattern: /^\/expense-transfers$/, permission: "finances.edit" },
+  {
+    method: "DELETE",
+    pattern: new RegExp(`^/payment-vouchers/${ID}$`),
+    permission: "finances.edit",
+  },
   {
     method: "DELETE",
     pattern: new RegExp(`^/contract-expenses/${ID}$`),
@@ -131,7 +146,9 @@ const RULES: Rule[] = [
 
 /** Permission requise pour (méthode, chemin) ; `null` = libre pour tout connecté. */
 export function requiredPermission(method: string, path: string): Permission | null {
-  const m = method.toUpperCase();
+  // HEAD = GET sans corps (route exposée d'office par Fastify) : même règle.
+  const up = method.toUpperCase();
+  const m = up === "HEAD" ? "GET" : up;
   for (const r of RULES) {
     if ((r.method === "*" || r.method === m) && r.pattern.test(path)) return r.permission;
   }

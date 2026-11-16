@@ -38,6 +38,8 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   importBatches ImportBatch[]
+  paymentVouchers PaymentVoucher[]
+  stockMovements  StockMovement[]
 
   @@map("user")
 }
@@ -111,6 +113,8 @@ model Contract {
   productionRuns ProductionRun[]
   accountEntries AccountEntry[]
   expenses       ContractExpense[]
+  expensePayments ExpensePayment[]
+  paymentVouchers PaymentVoucher[]
   sales          Sale[]
   containers     Container[]
   resawOps       ResawOp[]
@@ -178,9 +182,68 @@ model ContractExpense {
   note        String?
   expenseDate DateTime @default(now()) @map("expense_date")
   createdAt   DateTime @default(now()) @map("created_at")
+  /// Règlements (bons de paiement) ; aucun = à payer.
+  payments    ExpensePayment[]
 
   @@index([contractId])
   @@map("contract_expense")
+}
+
+// Ligne d'un bon de paiement : ce qui a été réglé sur UNE dépense — un poste
+// calculé (`key`, prix × quantités, jamais stocké) ou une dépense ajoutée
+// (`expenseId`). Le montant est celui réellement payé, saisi au bon : moins
+// que le dû (le reste reste à payer), ou plus (Ibrahim payé au-delà). Une
+// dépense peut donc avoir plusieurs lignes, sur plusieurs bons.
+model ExpensePayment {
+  id         String          @id @default(cuid())
+  contractId String          @map("contract_id")
+  contract   Contract        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  key        String? // ComputedExpenseDTO["key"] : SODEFOR, IBRAHIM…
+  expenseId  String?         @map("expense_id")
+  expense    ContractExpense? @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  amount     Decimal         @db.Decimal(18, 2)
+  paidAt     DateTime        @default(now()) @map("paid_at")
+  voucherId  String          @map("voucher_id")
+  voucher    PaymentVoucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([contractId, key])
+  @@index([expenseId])
+  @@index([voucherId])
+  @@map("expense_payment")
+}
+
+enum PaymentMethod {
+  CASH
+  CHEQUE
+  TRANSFER
+  MOBILE_MONEY
+  /// Report d'un trop-payé d'un contrat vers un autre (même compte) : le bon
+  /// porte une ligne négative sur le contrat source, positive sur la cible.
+  CREDIT
+}
+
+// Bon de paiement : un règlement, pour UN contrat, de plusieurs de ses
+// dépenses (postes calculés et/ou dépenses ajoutées). Numéro BP-0001 tiré de
+// `seq`. Supprimer le bon = annuler le paiement : ses dépenses repassent à payer.
+model PaymentVoucher {
+  id          String        @id @default(cuid())
+  seq         Int           @unique @default(autoincrement())
+  contractId  String        @map("contract_id")
+  contract    Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  paidAt      DateTime      @map("paid_at")
+  method      PaymentMethod
+  /// N° de chèque, de virement, de transaction…
+  reference   String?
+  note        String?
+  total       Decimal       @db.Decimal(18, 2)
+  createdById String?       @map("created_by_id")
+  createdBy   User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  payments ExpensePayment[]
+
+  @@index([contractId])
+  @@map("payment_voucher")
 }
 
 enum MeasurementContext {
@@ -322,6 +385,14 @@ enum SizeGroup {
   OTHER
 }
 
+// Qualité d'une pièce débitée — ne se déduit pas des dimensions. B = courante,
+// A = « A GRADE » (colonne à part du suivi), C = second choix (5X3 C…).
+enum Quality {
+  A
+  B
+  C
+}
+
 model ProductionRun {
   id String @id @default(cuid())
   // Le débité part au stock général : le contrat ne se choisit plus, il se
@@ -450,6 +521,7 @@ model ContainerItem {
   widthIn     Decimal @map("width_in") @db.Decimal(8, 3)
   thicknessIn Decimal @map("thickness_in") @db.Decimal(8, 3)
   count       Int
+  quality     Quality @default(B)
 
   sizeCode  String    @map("size_code")
   sizeGroup SizeGroup @map("size_group")
@@ -495,6 +567,7 @@ model ResawLine {
   widthIn     Decimal @map("width_in") @db.Decimal(8, 3)
   thicknessIn Decimal @map("thickness_in") @db.Decimal(8, 3)
   count       Int
+  quality     Quality @default(B)
 
   sizeCode  String    @map("size_code")
   sizeGroup SizeGroup @map("size_group")
@@ -513,12 +586,66 @@ model SawnLine {
   widthIn     Decimal @map("width_in") @db.Decimal(8, 3)
   thicknessIn Decimal @map("thickness_in") @db.Decimal(8, 3)
   count       Int
+  quality     Quality @default(B)
 
   sizeCode  String    @map("size_code")
   sizeGroup SizeGroup @map("size_group")
   volumeM3  Decimal   @map("volume_m3") @db.Decimal(12, 6)
 
   @@map("sawn_line")
+}
+
+// ── Stock : inventaire et sorties saisies ─────────────────────────────
+// Le suivi du stock reprend le classeur du client : dernier inventaire +
+// sciage + nouvelle mesure − empotage − sorties − ancienne mesure. Sciage,
+// resciage et empotage viennent de leurs modules ; cette table porte le reste.
+// L'inventaire est une remise à zéro : il fixe le stock au matin de son jour.
+
+enum StockMovementKind {
+  INVENTAIRE
+  LIVRAISON
+  SECHOIR
+  MENUISERIE
+  REJET
+  VENTE
+}
+
+model StockMovement {
+  id         String            @id @default(cuid())
+  kind       StockMovementKind
+  movedAt    DateTime          @default(now()) @map("moved_at")
+  reference  String? // n° de commande, client, bon de livraison…
+  note       String?
+  sourceFile String?           @map("source_file") // classeur importé
+  userId     String?           @map("user_id")
+  user       User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  lines StockMovementLine[]
+
+  @@index([kind, movedAt])
+  @@map("stock_movement")
+}
+
+// Même forme qu'une ligne débitée (F3) ; le nombre est toujours positif, le
+// sens vient du type de mouvement.
+model StockMovementLine {
+  id         String        @id @default(cuid())
+  movementId String        @map("movement_id")
+  movement   StockMovement @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  position   Int
+
+  lengthFt    Decimal @map("length_ft") @db.Decimal(8, 3)
+  widthIn     Decimal @map("width_in") @db.Decimal(8, 3)
+  thicknessIn Decimal @map("thickness_in") @db.Decimal(8, 3)
+  count       Int
+  quality     Quality @default(B)
+
+  sizeCode  String    @map("size_code")
+  sizeGroup SizeGroup @map("size_group")
+  volumeM3  Decimal   @map("volume_m3") @db.Decimal(12, 6)
+
+  @@map("stock_movement_line")
 }
 
 // Historique des imports Excel réussis : qui a déposé quel classeur, quand, et

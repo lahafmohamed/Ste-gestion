@@ -39,7 +39,7 @@ export type ParsedSheet = {
   issues: ImportIssue[];
 };
 
-type Cell = string | number | null;
+export type Cell = string | number | null;
 
 function cellValue(v: ExcelJS.CellValue): Cell {
   if (v === null || v === undefined) return null;
@@ -55,7 +55,7 @@ function cellValue(v: ExcelJS.CellValue): Cell {
   return null;
 }
 
-function num(v: Cell): number | null {
+export function num(v: Cell): number | null {
   if (v === null) return null;
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   const s = v.trim().replace(/\s/g, "").replace(",", ".");
@@ -64,12 +64,12 @@ function num(v: Cell): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function text(v: Cell): string {
+export function text(v: Cell): string {
   return v === null ? "" : String(v).trim();
 }
 
 /** Grille brute d'une feuille : grid[r][c] (0-based), trous = null. */
-function readGrid(ws: ExcelJS.Worksheet): Cell[][] {
+export function readGrid(ws: ExcelJS.Worksheet): Cell[][] {
   const grid: Cell[][] = [];
   ws.eachRow({ includeEmpty: false }, (row, r) => {
     const line: Cell[] = [];
@@ -83,7 +83,7 @@ function readGrid(ws: ExcelJS.Worksheet): Cell[][] {
 
 // ── Détection du gabarit par la ligne d'en-tête ─────────────────────────
 
-type Layout = {
+export type Layout = {
   type: Exclude<ImportSheetType, "UNKNOWN">;
   headerRow: number;
   col: {
@@ -113,7 +113,7 @@ const H = {
   page: /^feuil/i,
 };
 
-function findLayout(grid: Cell[][], titleText: string): Layout | null {
+export function findLayout(grid: Cell[][], titleText: string): Layout | null {
   for (let r = 0; r < Math.min(grid.length, 15); r++) {
     const line = grid[r] ?? [];
     const idx = (re: RegExp) => line.findIndex((v) => typeof v === "string" && re.test(v.trim()));
@@ -181,10 +181,17 @@ function findLayout(grid: Cell[][], titleText: string): Layout | null {
 
 // ── Métadonnées en marge ────────────────────────────────────────────────
 
-function sheetDate(name: string): string | undefined {
+export function sheetDate(name: string): string | undefined {
   const m = name.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
   if (!m) return undefined;
   const [, d, mo, y] = m;
+  // Jour réel exigé : « 31-13-2026 » donnerait une date invalide et l'import
+  // planterait à l'écriture (après avoir créé le camion). Sans date lisible, la
+  // feuille retombe sur la date du jour, comme une feuille sans date.
+  const day = Number(d);
+  const month = Number(mo);
+  const check = new Date(Date.UTC(Number(y), month - 1, day));
+  if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return undefined;
   // Midi local : évite le décalage de jour au passage en UTC (même règle que
   // la réception).
   return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T12:00:00`;

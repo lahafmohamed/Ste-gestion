@@ -7,7 +7,7 @@ export default function EmpotagePage() {
     <>
       <PageHeader
         title="Empotage"
-        subtitle="Conteneurs d'export — chargés depuis le stock général (F3), plomb, statut."
+        subtitle="Conteneurs d'export chargés depuis le stock général : contenu, plombs et statut."
       />
       <div className="mx-auto max-w-page-wide px-4 py-6 short:py-3">
         <ContainersSection />

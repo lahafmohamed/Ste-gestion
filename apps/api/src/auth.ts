@@ -18,8 +18,23 @@ const PUBLIC: { method?: string; path: string }[] = [
   { method: "POST", path: "/auth/login" },
 ];
 
+/**
+ * Chemin confronté aux règles : le MOTIF de la route (`/contracts/:id/accounts`)
+ * plutôt que l'URL brute. Le routeur décode les %xx avant de chercher la route
+ * — `/%75sers` sert `/users` — alors qu'une regex sur l'URL brute ne le voyait
+ * pas et laissait passer la lecture. `:id` ne contient pas de « / », les
+ * règles (`[^/]+`) le reconnaissent comme un identifiant. Sans route (404) : URL
+ * décodée, au mieux.
+ */
 function urlPath(req: FastifyRequest): string {
-  return req.raw.url?.split("?")[0] ?? "";
+  const route = req.routeOptions?.url;
+  if (route) return route;
+  const raw = req.raw.url?.split("?")[0] ?? "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 // Secrets par défaut à ne jamais garder en production.

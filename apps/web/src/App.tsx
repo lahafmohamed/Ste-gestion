@@ -21,6 +21,7 @@ import StockPage from "./pages/StockPage";
 import VentesPage from "./pages/VentesPage";
 import EmpotagePage from "./pages/EmpotagePage";
 import ComptaPage from "./pages/ComptaPage";
+import DepensesPage from "./pages/DepensesPage";
 import RapportPage from "./pages/RapportPage";
 import TruckDetailPage from "./pages/TruckDetailPage";
 import ProductionRunPage from "./pages/ProductionRunPage";
@@ -122,6 +123,7 @@ export default function App() {
             {FEATURES.accounting && (
               <Route path="/compta" element={<Guard perm="compta.view"><ComptaPage /></Guard>} />
             )}
+            <Route path="/depenses" element={<Guard perm="finances.view"><DepensesPage /></Guard>} />
             {FEATURES.report && (
               <Route path="/rapport" element={<Guard perm="rapport.view"><RapportPage /></Guard>} />
             )}

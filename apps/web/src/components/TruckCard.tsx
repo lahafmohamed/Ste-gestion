@@ -32,6 +32,12 @@ export default function TruckCard({
   const count = truckBillCount(t);
   const countGap = d.count != null && count != null ? count - d.count : null;
   const volGap = d.m3 != null && d.m3 > 0 && total != null ? total - d.m3 : null;
+  // Jour d'arrivée : au portail, deux voyages du même camion ne se distinguent
+  // que par lui (et le B/L). Format court — la carte se lit debout.
+  const arrived = new Date(t.arrivedAt).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+  });
 
   return (
     // La carte se soulève au survol (pointeur fin) et le chevron dit « fiche » :
@@ -53,15 +59,17 @@ export default function TruckCard({
             {!dia && !girth && <Badge tone="amber">À étaler</Badge>}
             {dia && !girth && <Badge tone="info">À billonner</Badge>}
           </div>
+          <span className="mt-0.5 shrink-0 text-sm tabular-nums text-brand-500">{arrived}</span>
           <IconChevronRight
             width={18}
             height={18}
+            aria-hidden
             className="mt-0.5 shrink-0 text-brand-500 transition-transform duration-150 ease-out group-hover:translate-x-0.5 motion-reduce:transition-none"
           />
         </div>
 
         <div className="mt-2 space-y-1 text-sm">
-          <div className="text-brand-600">
+          <div className="tabular-nums text-brand-600">
             Annoncé : {d.count ?? "—"} billes ·{" "}
             {d.m3 != null ? fmtM3(d.m3) : "— m³"}
             {/* Code parcelle d'un bloc : « 112- » / « 03/05 » se coupait au trait. */}
@@ -74,16 +82,27 @@ export default function TruckCard({
           </div>
           {measured && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-brand-800">
+              {/* Billons après les billes, sans flèche-glyphe : « 58 billes ·
+                  31,2 m³ · 74 billons » se lit dans l'ordre du parc. */}
+              <span className="tabular-nums text-brand-800">
                 Étalé : {count} billes · {fmtM3(total!)}
-                {girth && ` → ${girth.logs.length} billons`}
+                {girth && ` · ${girth.logs.length} billons`}
               </span>
               {countGap != null && (
                 <Badge tone={countGap === 0 ? "parc" : "amber"}>
                   {countGap === 0 ? (
-                    <>compte bon<IconCheck width={14} height={14} className="-mr-0.5 ml-1 shrink-0" aria-hidden /></>
+                    <>
+                      Compte bon
+                      <IconCheck
+                        width={14}
+                        height={14}
+                        className="-mr-0.5 ml-1 shrink-0"
+                        aria-hidden
+                      />
+                    </>
                   ) : (
-                    `billes ${countGap > 0 ? "+" : ""}${countGap}`
+                    // Vrai signe moins, comme les volumes (fmtM3).
+                    `Billes ${countGap > 0 ? "+" : "−"}${Math.abs(countGap)}`
                   )}
                 </Badge>
               )}
@@ -92,7 +111,7 @@ export default function TruckCard({
                   tone={Math.abs(volGap) / d.m3! <= 0.05 ? "parc" : "amber"}
                   className="tabular-nums"
                 >
-                  vol {volGap >= 0 ? "+" : ""}
+                  Vol. {volGap >= 0 ? "+" : ""}
                   {fmtM3(volGap)}
                 </Badge>
               )}

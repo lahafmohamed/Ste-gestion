@@ -238,3 +238,49 @@ export const IconSearch = (p: IconProps) => (
     <path d="M20 20l-4.2-4.2" />
   </Base>
 );
+
+/** Ouverture du tiroir de navigation (sous lg). */
+export const IconMenu = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </Base>
+);
+
+/** Mot de passe affiché en clair. */
+export const IconEye = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </Base>
+);
+
+/** Mot de passe masqué. */
+export const IconEyeOff = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M10.6 5.6A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.6 3.4" />
+    <path d="M6.6 6.6C3.9 8.3 2.5 12 2.5 12S6 18.5 12 18.5c1.9 0 3.5-.6 4.9-1.5" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    <path d="M3 3l18 18" />
+  </Base>
+);
+
+/** Réseau tombé (bandeau hors ligne). */
+export const IconWifiOff = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M3 3l18 18" />
+    <path d="M8.5 16.4a5 5 0 0 1 7 0" />
+    <path d="M5 12.9a10 10 0 0 1 4.1-2.4M19 12.9a10 10 0 0 0-2.5-1.8" />
+    <path d="M2 9.3a15 15 0 0 1 4-2.6M22 9.3A15 15 0 0 0 10.7 5.6" />
+    <path d="M12 19.5h.01" />
+  </Base>
+);
+
+/** Rechargement (nouvelle version de l'application). */
+export const IconRefresh = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M20 11a8 8 0 0 0-14.6-4.5L4 8" />
+    <path d="M4 4v4h4" />
+    <path d="M4 13a8 8 0 0 0 14.6 4.5L20 16" />
+    <path d="M20 20v-4h-4" />
+  </Base>
+);

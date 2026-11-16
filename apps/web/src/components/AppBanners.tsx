@@ -1,25 +1,38 @@
 import { useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { useOnline } from "../lib/online";
+import Button from "./ui/Button";
+import { IconCheck, IconRefresh, IconWifiOff, type IconProps } from "./icons";
+
+// Trois états d'application, un seul gabarit : bande pleine largeur sous
+// l'en-tête, filet bas de structure (pas d'ombre : elle est collée au header).
+// L'icône double la couleur — l'état se lit sans distinguer l'ambre du vert.
+const TONE = {
+  warn: { box: "border-amber-300 bg-amber-50 text-amber-900", icon: "text-amber-600" },
+  info: { box: "border-brand-200 bg-white text-brand-900", icon: "text-accent-600" },
+  success: { box: "border-parc-300 bg-parc-50 text-parc-900", icon: "text-parc-700" },
+} as const;
 
 function Banner({
   tone,
+  icon: Glyph,
   children,
 }: {
-  tone: "warn" | "info";
+  tone: keyof typeof TONE;
+  icon: (p: IconProps) => JSX.Element;
   children: React.ReactNode;
 }) {
-  const cls =
-    tone === "warn"
-      ? "border-amber-300 bg-amber-50 text-amber-900"
-      : "border-brand-300 bg-white text-brand-900";
+  const t = TONE[tone];
   return (
     <div
       // role=status : annoncé sans voler le focus au champ en cours de saisie.
       role="status"
-      className={`flex min-h-touch flex-wrap items-center justify-center gap-2 border-b px-4 py-1.5 text-sm ${cls}`}
+      className={`flex min-h-touch flex-wrap items-center justify-center gap-x-3 gap-y-1.5 border-b px-4 py-1.5 text-sm ${t.box}`}
     >
-      {children}
+      <span className="flex min-w-0 items-center gap-2 text-pretty">
+        <Glyph width={18} height={18} className={`shrink-0 ${t.icon}`} />
+        {children}
+      </span>
     </div>
   );
 }
@@ -45,20 +58,16 @@ export function OfflineBanner() {
 
   if (!online) {
     return (
-      <Banner tone="warn">
-        <span aria-hidden className="size-2 shrink-0 rounded-full bg-amber-500" />
+      <Banner tone="warn" icon={IconWifiOff}>
         Hors ligne — la saisie continue, l'envoi partira au retour du réseau.
       </Banner>
     );
   }
   if (justBack) {
     return (
-      <div
-        role="status"
-        className="flex min-h-touch items-center justify-center border-b border-parc-300 bg-parc-50 px-4 py-1.5 text-sm text-parc-800"
-      >
+      <Banner tone="success" icon={IconCheck}>
         Réseau rétabli — envoi des enregistrements en attente.
-      </div>
+      </Banner>
     );
   }
   return null;
@@ -73,22 +82,24 @@ export function UpdateBanner() {
 
   if (!needRefresh) return null;
   return (
-    <Banner tone="info">
-      Nouvelle version disponible.
-      <button
-        type="button"
-        onClick={() => void updateServiceWorker(true)}
-        className="min-h-touch rounded-lg bg-accent-500 px-3 py-1 font-medium text-white hover:bg-accent-600 active:bg-accent-700"
-      >
-        Recharger
-      </button>
-      <button
-        type="button"
-        onClick={() => setNeedRefresh(false)}
-        className="min-h-touch px-2 py-1 text-brand-500 underline hover:text-brand-900"
-      >
-        Plus tard
-      </button>
-    </Banner>
+    <div
+      role="status"
+      className={`flex min-h-touch flex-wrap items-center justify-center gap-x-3 gap-y-1.5 border-b px-4 py-1.5 text-sm ${TONE.info.box}`}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <IconRefresh width={18} height={18} className={`shrink-0 ${TONE.info.icon}`} />
+        Nouvelle version disponible.
+      </span>
+      {/* Le moment du rechargement reste au pointeur : jamais en plein relevé
+          sans qu'il l'ait choisi. */}
+      <span className="flex items-center gap-2">
+        <Button variant="primary" size="xs" onClick={() => void updateServiceWorker(true)}>
+          Recharger
+        </Button>
+        <Button size="xs" onClick={() => setNeedRefresh(false)}>
+          Plus tard
+        </Button>
+      </span>
+    </div>
   );
 }

@@ -21,7 +21,8 @@ import { IconLock } from "../components/icons";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card, { BackLink, Kpi, SectionHeading } from "../components/ui/Card";
-import { Notice, QueryError } from "../components/ui/Feedback";
+import { FormError, Notice, QueryError } from "../components/ui/Feedback";
+import { inputCls } from "../components/ui/Input";
 import { SkeletonLine, SkeletonList } from "../components/ui/Skeleton";
 import Tabs from "../components/ui/Tabs";
 
@@ -89,7 +90,7 @@ function PipelineBar({
           deux textes en colonnes étroites. */}
       <div className="flex flex-wrap justify-between gap-x-4 gap-y-0.5 text-sm">
         <span className="text-brand-600">{label}</span>
-        <span className="font-medium text-brand-900">{value}</span>
+        <span className="font-medium tabular-nums text-brand-900">{value}</span>
       </div>
       <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-brand-100">
         <div className={`h-full ${color}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
@@ -191,6 +192,20 @@ export default function ContractDetailPage() {
 
   const c: ContractDTO = q.data;
   const s: ContractSummaryDTO | undefined = summaryQ.data;
+  // Le résumé alimente le suivi et le stock des ventes : sans ces deux états,
+  // l'onglet restait blanc pendant le calcul, et blanc pour toujours en erreur.
+  const summaryState =
+    summaryQ.isError && !s ? (
+      <div className="mt-4">
+        <QueryError error={summaryQ.error} onRetry={() => summaryQ.refetch()}>
+          Impossible de calculer le suivi du contrat
+        </QueryError>
+      </div>
+    ) : !s ? (
+      <div className="mt-4" aria-busy="true">
+        <SkeletonList count={2} lines={3} />
+      </div>
+    ) : null;
   const meta = [
     c.year,
     c.forest,
@@ -217,7 +232,7 @@ export default function ContractDetailPage() {
           </h1>
           {meta && <div className="mt-1 text-sm text-brand-600">{meta}</div>}
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {can("contracts.export") && (
             <Button
               size="sm"
@@ -227,16 +242,17 @@ export default function ContractDetailPage() {
             </Button>
           )}
           {can("contracts.delete") && (
-          <Button
-            variant="ghost-danger"
-            size="sm"
-            onClick={() => {
-              setDelText("");
-              setDelOpen((s) => !s);
-            }}
-          >
-            Supprimer
-          </Button>
+            <Button
+              variant="ghost-danger"
+              size="sm"
+              aria-expanded={delOpen}
+              onClick={() => {
+                setDelText("");
+                setDelOpen((s) => !s);
+              }}
+            >
+              Supprimer
+            </Button>
           )}
         </div>
       </div>
@@ -247,7 +263,7 @@ export default function ContractDetailPage() {
           Recopier le n° évite le clic réflexe sur une boîte de dialogue —
           c'est irréversible et il n'y a pas d'annulation. */}
       {delOpen && (
-        <div className="mt-3 rounded-xl border border-red-300 bg-red-50 p-4">
+        <div className="mt-3 rounded-xl bg-red-50 p-4 ring-1 ring-inset ring-red-200">
           <div className="text-sm font-semibold text-red-800">
             Supprimer définitivement le contrat {c.code} ?
           </div>
@@ -270,13 +286,13 @@ export default function ContractDetailPage() {
               autoCorrect="off"
               spellCheck={false}
               placeholder={c.code}
-              className="min-h-touch rounded-lg border border-red-300 bg-white px-3 py-2 text-base outline-none transition-[border-color,box-shadow] focus:border-red-600 focus:ring-[3px] focus:ring-red-600/20 sm:max-w-xs"
+              className={`${inputCls} !border-red-300 focus:!border-red-600 focus:!ring-red-600/20 sm:max-w-xs`}
             />
           </label>
           {del.isError && (
-            <p className="mt-2 text-sm text-red-700">
-              Suppression échouée : {(del.error as Error).message}
-            </p>
+            <div className="mt-3">
+              <FormError>Suppression échouée : {(del.error as Error).message}</FormError>
+            </div>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
@@ -312,6 +328,7 @@ export default function ContractDetailPage() {
 
       {tab === "suivi" && (
         <>
+        {summaryState}
         {/* Jauge quota — cœur du suivi : alimentée par chaque réception camion */}
         {s && (
           <div className="mt-4">
@@ -394,7 +411,7 @@ export default function ContractDetailPage() {
                       tone={1 - Number(s.diaM3) / Number(s.brousseM3) > 0.25 ? "amber" : "brand"}
                       title="Écart entre le cubage brousse déclaré et les billes mesurées à l'étalage"
                     >
-                      Perte brousse → parc :{" "}
+                      Perte brousse / parc :{" "}
                       {fmtPct((1 - Number(s.diaM3) / Number(s.brousseM3)) * 100, 1)}
                     </Badge>
                   )}
@@ -416,7 +433,9 @@ export default function ContractDetailPage() {
               )}
               {/* Quatre colonnes seulement quand l'argent s'affiche : sans lui,
                   deux tuiles sur une grille de quatre laissaient une demi-rangée vide. */}
-              <div className={`grid grid-cols-2 gap-3 pt-1 ${showMoney ? "sm:grid-cols-4" : ""}`}>
+              <div
+                className={`grid grid-cols-2 gap-3 pt-1 tabular-nums ${showMoney ? "sm:grid-cols-4" : ""}`}
+              >
                 <Kpi inset label="Stock produits" value={fmtM3(s.stockProductsM3)} />
                 <Kpi inset label="Stock parc (billons)" value={fmtM3(s.stockParcM3)} />
                 {/* Argent : dépend des ventes et de la compta, en veille tous les deux. */}
@@ -464,7 +483,8 @@ export default function ContractDetailPage() {
         </>
       )}
 
-      {tab === "ventes" && s && <SalesSection contract={c} stock={s.stockBySize} />}
+      {tab === "ventes" &&
+        (s ? <SalesSection contract={c} stock={s.stockBySize} /> : summaryState)}
 
       {/* L'empotage puise dans le stock général : les nouveaux conteneurs ne
           portent plus de contrat. Ne restent ici que les anciens. */}

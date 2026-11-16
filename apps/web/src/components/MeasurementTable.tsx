@@ -97,6 +97,10 @@ export default function MeasurementTable({
   const bills = hasBillons ? groupByBill(m) : [];
 
   const total = measurementTotalM3(m);
+  // Nom de l'étape dans les libellés d'action : le même tableau sert aux billes
+  // (étalage Ø) et aux billons (girth) — « Continuer l'étalage » sur un relevé
+  // de billons envoyait le parc chercher la mauvaise étape.
+  const stepName = isDia ? "l'étalage" : m.context === "YARD_GIRTH" ? "le billonnage" : "le relevé";
   const vols = m.logs.map((l) => Number(l.volumeM3));
 
   return (
@@ -140,21 +144,17 @@ export default function MeasurementTable({
                   />
                 </label>
               </div>
-              <div className="mt-2 flex items-center justify-end gap-1">
-                <button
-                  type="button"
-                  onClick={() => setEdit(null)}
-                  className="min-h-touch rounded-lg px-3 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
-                >
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <Button size="sm" onClick={() => setEdit(null)}>
                   Annuler
-                </button>
+                </Button>
                 <Button
                   variant="primary"
                   size="sm"
                   disabled={!editValid || logPending}
                   onClick={saveEdit}
                 >
-                  OK
+                  Enregistrer
                 </Button>
               </div>
             </div>
@@ -180,9 +180,9 @@ export default function MeasurementTable({
                     type="button"
                     onClick={() => startEdit(l)}
                     aria-label={`Corriger la ligne ${l.position}`}
-                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
+                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
                   >
-                    <IconPencil width={18} height={18} />
+                    <IconPencil width={18} height={18} aria-hidden />
                   </button>
                   )}
                   {canDelete && (
@@ -190,9 +190,9 @@ export default function MeasurementTable({
                     type="button"
                     onClick={() => onDeleteLog(l)}
                     aria-label={`Supprimer la ligne ${l.position}`}
-                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+                    className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
                   >
-                    <IconX width={18} height={18} />
+                    <IconX width={18} height={18} aria-hidden />
                   </button>
                   )}
                 </div>
@@ -200,7 +200,7 @@ export default function MeasurementTable({
             </div>
           )
         )}
-        <div className="mt-2 flex items-center justify-between font-semibold">
+        <div className="mt-2 flex items-center justify-between gap-3 font-semibold text-brand-900">
           <span>
             Total ({m.logs.length} {m.context === "YARD_GIRTH" ? "billons" : "billes"}
             {hasBillons && ` · ${bills.length} billes`})
@@ -208,7 +208,7 @@ export default function MeasurementTable({
           <span className="tabular-nums">{fmtNum(total.toFixed(6))}</span>
         </div>
         {m.logs.length > 1 && (
-          <div className="mt-1 text-xs text-brand-500">
+          <div className="mt-1 text-sm tabular-nums text-brand-500">
             Moy {fmtNum((total / vols.length).toFixed(4))} · Max{" "}
             {fmtNum(Math.max(...vols).toFixed(4))} · Min {fmtNum(Math.min(...vols).toFixed(4))}
           </div>
@@ -221,8 +221,8 @@ export default function MeasurementTable({
           <tr className="text-left text-xs text-brand-500">
             <th className="py-1 font-normal">#</th>
             <th className="py-1 font-normal">N° log</th>
-            <th className="py-1 font-normal">L (m)</th>
-            <th className="py-1 font-normal">{isDia ? "Ø (cm)" : "Circ (cm)"}</th>
+            <th className="py-1 pr-4 text-right font-normal">L (m)</th>
+            <th className="py-1 pr-4 text-right font-normal">{isDia ? "Ø (cm)" : "Circ (cm)"}</th>
             <th className="py-1 text-right font-normal">m³</th>
             {isDia && <th className="py-1 text-right font-normal">CFT</th>}
             <th className="py-1" />
@@ -262,23 +262,18 @@ export default function MeasurementTable({
                   />
                 </td>
                 <td colSpan={isDia ? 3 : 2} className="py-1.5">
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button size="sm" onClick={() => setEdit(null)}>
+                      Annuler
+                    </Button>
                     <Button
                       variant="primary"
                       size="sm"
                       disabled={!editValid || logPending}
                       onClick={saveEdit}
                     >
-                      OK
+                      Enregistrer
                     </Button>
-                    <button
-                      type="button"
-                      onClick={() => setEdit(null)}
-                      aria-label="Annuler la correction"
-                      className="min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
-                    >
-                      Annuler
-                    </button>
                   </div>
                 </td>
               </tr>
@@ -286,10 +281,10 @@ export default function MeasurementTable({
               <tr key={l.id} className="border-t border-brand-100">
                 <td className="py-1 text-brand-500">{l.position}</td>
                 <td className="py-1">{l.externalId ?? "—"}</td>
-                <td className="py-1 tabular-nums">
+                <td className="py-1 pr-4 text-right tabular-nums">
                   {fmtNum(isDia ? (l.lengthFt ?? 0) : (l.lengthM ?? 0))}
                 </td>
-                <td className="py-1 tabular-nums">
+                <td className="py-1 pr-4 text-right tabular-nums">
                   {fmtNum(isDia ? (l.diameterIn ?? 0) : (l.circumferenceCm ?? 0))}
                 </td>
                 <td className="py-1 text-right tabular-nums">{fmtNum(l.volumeM3)}</td>
@@ -304,9 +299,9 @@ export default function MeasurementTable({
                       type="button"
                       onClick={() => startEdit(l)}
                       aria-label={`Corriger la ligne ${l.position}`}
-                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
+                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
                     >
-                      <IconPencil width={18} height={18} />
+                      <IconPencil width={18} height={18} aria-hidden />
                     </button>
                     )}
                     {canDelete && (
@@ -314,9 +309,9 @@ export default function MeasurementTable({
                       type="button"
                       onClick={() => onDeleteLog(l)}
                       aria-label={`Supprimer la ligne ${l.position}`}
-                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
+                      className="flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
                     >
-                      <IconX width={18} height={18} />
+                      <IconX width={18} height={18} aria-hidden />
                     </button>
                     )}
                   </div>
@@ -342,8 +337,8 @@ export default function MeasurementTable({
               const vols = m.logs.map((l) => Number(l.volumeM3));
               const avg = vols.reduce((a, b) => a + b, 0) / vols.length;
               return (
-                <tr className="text-xs text-brand-500">
-                  <td colSpan={4} className="py-1">
+                <tr className="text-sm text-brand-500">
+                  <td colSpan={4} className="py-1 tabular-nums">
                     Moy {fmtNum(avg.toFixed(4))} · Max {fmtNum(Math.max(...vols).toFixed(4))} ·
                     Min {fmtNum(Math.min(...vols).toFixed(4))}
                   </td>
@@ -358,13 +353,17 @@ export default function MeasurementTable({
       </TableWrap>
 
       {byBill && (
-        <div className="mt-3 rounded-lg bg-brand-50 p-3">
-          <div className="mb-1 text-xs font-medium text-brand-500">
-            Par bille mère ({bills.length} billes → {m.logs.length} billons)
+        <div className="mt-3 rounded-lg bg-brand-50 p-3 ring-1 ring-inset ring-brand-100">
+          <div className="mb-2 text-sm font-medium text-brand-700">
+            Par bille mère : {bills.length} billes, {m.logs.length} billons
           </div>
           <div className="flex flex-wrap gap-1.5">
             {bills.map((b) => (
-              <Badge key={b.bill} title={`${fmtNum(b.m3.toFixed(4))} m³`}>
+              <Badge
+                key={b.bill}
+                className="tabular-nums"
+                title={`${fmtNum(b.m3.toFixed(4))} m³`}
+              >
                 {b.bill} · {b.billons}
               </Badge>
             ))}
@@ -376,33 +375,29 @@ export default function MeasurementTable({
         {onAppend && !adding && (
           <Button variant="primary" onClick={() => setAdding(true)}>
             <IconPlus width={16} height={16} className="-ml-0.5" />
-            Continuer l'étalage
+            Continuer {stepName}
           </Button>
         )}
-        {canDelete && (
-          <button
-            onClick={onDelete}
-            className="min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100"
-          >
-            Supprimer cet étalage
-          </button>
-        )}
         {hasBillons && (
-          <button
-            onClick={() => setByBill((s) => !s)}
-            className="min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-900 active:bg-brand-200"
-          >
+          <Button size="sm" aria-expanded={byBill} onClick={() => setByBill((s) => !s)}>
             {byBill ? "Masquer la vue par bille" : "Vue par bille"}
-          </button>
+          </Button>
+        )}
+        {/* Destructeur et rare : rejeté en bout de rangée, gris au repos. Le
+            libellé suit le relevé affiché (étalage des billes ou billonnage). */}
+        {canDelete && (
+          <Button size="sm" variant="ghost-danger" className="ml-auto" onClick={onDelete}>
+            Supprimer {stepName}
+          </Button>
         )}
       </div>
 
       {adding && onAppend && (
-        <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
-          <div className="mb-2 text-xs font-medium text-brand-500">
-            Ajouter des {m.context === "YARD_GIRTH" ? "billons" : "billes"} (à partir du n°{" "}
-            {m.logs.length + 1})
-          </div>
+        <div className="mt-3 rounded-lg bg-brand-50 p-3 ring-1 ring-inset ring-brand-100">
+          <h3 className="mb-2 text-sm font-medium text-brand-700">
+            Ajouter des {m.context === "YARD_GIRTH" ? "billons" : "billes"}, à partir du n°{" "}
+            {m.logs.length + 1}
+          </h3>
           <TallyEntry
             context={m.context}
             saving={appending}
@@ -412,13 +407,9 @@ export default function MeasurementTable({
             error={appendError}
             onSave={(data) => onAppend(data)}
           />
-          <button
-            type="button"
-            onClick={() => setAdding(false)}
-            className="mt-2 min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-brand-100 hover:text-brand-700 active:bg-brand-200"
-          >
+          <Button size="sm" className="mt-2" onClick={() => setAdding(false)}>
             Annuler
-          </button>
+          </Button>
         </div>
       )}
     </div>

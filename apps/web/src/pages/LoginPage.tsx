@@ -4,10 +4,14 @@ import { setSession } from "../lib/auth";
 import Button from "../components/ui/Button";
 import { FormError } from "../components/ui/Feedback";
 import Input, { Field, inputErrorCls } from "../components/ui/Input";
+import { IconEye, IconEyeOff } from "../components/icons";
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Saisie au pouce sur tablette : une faute de frappe invisible coûte un
+  // échec de connexion. Le mot de passe peut s'afficher, à la demande.
+  const [showPassword, setShowPassword] = useState(false);
   // Validation locale (noValidate) : bulles natives du navigateur remplacées
   // par des erreurs inline stylées, annoncées via aria-describedby.
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
@@ -86,6 +90,10 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
               ref={emailRef}
               type="email"
               autoComplete="username"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -106,21 +114,45 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
             error={fieldErrors.password}
             errorId="login-password-error"
           >
-            <Input
-              ref={passwordRef}
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
-              }}
-              className={fieldErrors.password ? inputErrorCls : ""}
-              aria-invalid={passwordInvalid || undefined}
-              aria-describedby={
-                fieldErrors.password ? "login-password-error" : error ? "login-error" : undefined
-              }
-            />
+            <div className="relative">
+              <Input
+                ref={passwordRef}
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+                }}
+                className={`pr-11${fieldErrors.password ? ` ${inputErrorCls}` : ""}`}
+                aria-invalid={passwordInvalid || undefined}
+                aria-describedby={
+                  fieldErrors.password ? "login-password-error" : error ? "login-error" : undefined
+                }
+              />
+              {/* Après la bascule, le focus revient au champ : la saisie continue
+                  sans retaper dedans. Le <label> du Field reste lié à l'input
+                  (premier élément étiquetable). */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPassword((v) => !v);
+                  passwordRef.current?.focus();
+                }}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-brand-500 transition-colors hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 active:text-brand-900"
+              >
+                {showPassword ? (
+                  <IconEyeOff width={20} height={20} />
+                ) : (
+                  <IconEye width={20} height={20} />
+                )}
+              </button>
+            </div>
           </Field>
 
           {/* Zone d'annonce stable : présente dès le rendu, le lecteur d'écran
@@ -141,7 +173,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
                 className="size-4 rounded-full border-2 border-white/40 border-t-white motion-safe:animate-spin"
               />
             )}
-            Se connecter
+            {loading ? "Connexion…" : "Se connecter"}
           </Button>
         </form>
       </div>

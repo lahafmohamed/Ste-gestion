@@ -11,14 +11,16 @@ import {
 } from "@ste/shared";
 import { accountsApi, salesApi } from "../lib/api";
 import { useCan } from "../lib/auth";
-import { fmtFcfa, fmtNum, fmtM3 } from "../lib/format";
+import { fmtFcfa, fmtM3, normalizeDecimal } from "../lib/format";
 import Button from "./ui/Button";
-import { SectionHeading } from "./ui/Card";
+import { SectionHeading, cardCls } from "./ui/Card";
 import ConfirmDialog from "./ui/ConfirmDialog";
 import DateField from "./ui/DateField";
-import { EmptyState, FormError, QueryError } from "./ui/Feedback";
-import Input, { Field, inputQuietCls } from "./ui/Input";
+import { EmptyState, FormError, Notice, QueryError } from "./ui/Feedback";
+import Input, { Field, inputErrorCls } from "./ui/Input";
 import SelectField from "./ui/SelectField";
+import { SkeletonList } from "./ui/Skeleton";
+import { IconPlus, IconX } from "./icons";
 
 type Mode = "USD" | "CFA";
 type RowState = { sizeCode: string; volumeM3: string; mode: Mode; priceUsd: string; rate: string; priceCfa: string };
@@ -123,7 +125,7 @@ function SaleForm({
   }
 
   return (
-    <form onSubmit={submit} className="mb-3 rounded-xl bg-white shadow-card p-4">
+    <form onSubmit={submit} className={`mb-3 ${cardCls} p-4`}>
       <div className="mb-3 grid grid-cols-2 gap-3 sm:w-96">
         <Field label="Date">
           <DateField value={date} onChange={setDate} />
@@ -142,8 +144,9 @@ function SaleForm({
       {rows.map((r, i) => {
         const dispo = stockOf(r.sizeCode);
         const over = dispo !== null && Number(r.volumeM3) > dispo;
+        const n = rows.length > 1 ? ` ${i + 1}` : "";
         return (
-          <div key={i} className="mb-2 rounded-lg border border-brand-100 p-2">
+          <div key={i} className="mb-2 rounded-lg border border-brand-100 p-3">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Field label="Taille">
                 <Input
@@ -157,22 +160,22 @@ function SaleForm({
               <Field
                 label={
                   <>
-                    m³{" "}
+                    Volume (m³){" "}
                     {dispo !== null && (
-                      <span className="text-brand-500">(dispo {fmtNum(dispo)})</span>
+                      <span className="font-normal tabular-nums text-brand-500">
+                        · dispo {fmtM3(dispo)}
+                      </span>
                     )}
                   </>
                 }
               >
-                <input
+                <Input
+                  variant="quiet"
                   inputMode="decimal"
                   value={r.volumeM3}
-                  onChange={(e) => setRow(i, { volumeM3: e.target.value })}
-                  className={`w-full min-w-0 min-h-touch rounded-lg border bg-white px-2.5 py-2 text-base outline-none ${
-                    over
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-brand-200 focus:border-brand-900"
-                  }`}
+                  aria-invalid={over || undefined}
+                  onChange={(e) => setRow(i, { volumeM3: normalizeDecimal(e.target.value) })}
+                  className={over ? inputErrorCls : ""}
                 />
               </Field>
               <Field label="Mode">
@@ -186,50 +189,61 @@ function SaleForm({
                   ]}
                 />
               </Field>
-              <div className="flex items-end text-sm">
-                <span className="text-brand-500">
-                  ={" "}
-                  <span className="font-semibold text-brand-900">
-                    {amounts[i] !== null ? fmtFcfa(amounts[i]!) : "—"}
-                  </span>
+              {/* Montant de la ligne : libellé au-dessus comme les champs voisins,
+                  la valeur sur la ligne des saisies. */}
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-brand-600">Montant</span>
+                <span className="flex min-h-touch items-center font-semibold tabular-nums text-brand-900">
+                  {amounts[i] !== null ? fmtFcfa(amounts[i]!) : "—"}
                 </span>
               </div>
             </div>
 
+            {/* Prix : libellés visibles (un placeholder disparaît à la frappe), et
+                virgule acceptée comme sur les autres saisies décimales. */}
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {r.mode === "USD" ? (
                 <>
-                  <input
-                    inputMode="decimal"
-                    value={r.priceUsd}
-                    onChange={(e) => setRow(i, { priceUsd: e.target.value })}
-                    placeholder="Prix USD"
-                    className={inputQuietCls}
-                  />
-                  <input
-                    inputMode="decimal"
-                    value={r.rate}
-                    onChange={(e) => setRow(i, { rate: e.target.value })}
-                    placeholder="Taux CFA"
-                    className={inputQuietCls}
-                  />
+                  <Field label="Prix USD/m³">
+                    <Input
+                      variant="quiet"
+                      inputMode="decimal"
+                      value={r.priceUsd}
+                      onChange={(e) => setRow(i, { priceUsd: normalizeDecimal(e.target.value) })}
+                    />
+                  </Field>
+                  <Field label="Taux FCFA/USD">
+                    <Input
+                      variant="quiet"
+                      inputMode="decimal"
+                      value={r.rate}
+                      onChange={(e) => setRow(i, { rate: normalizeDecimal(e.target.value) })}
+                    />
+                  </Field>
                 </>
               ) : (
-                <input
-                  inputMode="decimal"
-                  value={r.priceCfa}
-                  onChange={(e) => setRow(i, { priceCfa: e.target.value })}
-                  placeholder="Prix CFA/m³"
-                  className={inputQuietCls}
-                />
+                <Field label="Prix FCFA/m³">
+                  <Input
+                    variant="quiet"
+                    inputMode="decimal"
+                    value={r.priceCfa}
+                    onChange={(e) => setRow(i, { priceCfa: normalizeDecimal(e.target.value) })}
+                  />
+                </Field>
               )}
-              <button
-                type="button"
-                onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-                className="ml-auto min-h-touch rounded-lg px-2 text-sm text-brand-500 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
-              >
-                Retirer
-              </button>
+              {/* Une seule ligne : rien à retirer (le bouton ne faisait rien). */}
+              {rows.length > 1 && (
+                <div className="col-span-2 flex items-end justify-end sm:col-span-1 sm:col-start-4">
+                  <Button
+                    variant="ghost-danger"
+                    size="sm"
+                    onClick={() => setRows((p) => p.filter((_, j) => j !== i))}
+                    aria-label={`Retirer la ligne${n}`}
+                  >
+                    Retirer
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -241,32 +255,35 @@ function SaleForm({
         ))}
       </datalist>
 
-      <div className="mt-2 flex items-center justify-between">
-        <Button size="xs" onClick={() => setRows((p) => [...p, emptyRow(contract)])}>
-          + Ligne
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <Button size="sm" onClick={() => setRows((p) => [...p, emptyRow(contract)])}>
+          <IconPlus width={16} height={16} className="-ml-0.5" />
+          Ajouter une ligne
         </Button>
-        <div className="text-sm">
-          <span className="text-brand-500">Total : </span>
-          <span className="font-semibold text-brand-900">{fmtFcfa(total)}</span>
+        <div className="text-base">
+          <span className="text-brand-600">Total </span>
+          <span className="font-semibold tabular-nums text-brand-900">{fmtFcfa(total)}</span>
         </div>
       </div>
 
       {oversold.length > 0 && (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
-          Stock insuffisant :{" "}
-          {oversold
-            .map((x) => `${x.code} (demandé ${fmtNum(x.req.toFixed(2))}, dispo ${fmtNum(x.dispo!.toFixed(2))})`)
-            .join(", ")}
-          <label className="mt-1 flex min-h-touch items-center gap-2 text-sm text-amber-800">
+        <Notice tone="warn" className="mt-3">
+          <span className="tabular-nums">
+            Stock insuffisant :{" "}
+            {oversold
+              .map((x) => `${x.code} (demandé ${fmtM3(x.req)}, dispo ${fmtM3(x.dispo!)})`)
+              .join(", ")}
+          </span>
+          <label className="mt-1 flex min-h-touch items-center gap-2 font-medium">
             <input
               type="checkbox"
               checked={override}
               onChange={(e) => setOverride(e.target.checked)}
-              className="h-5 w-5"
+              className="size-5 accent-accent-600"
             />
             Vendre quand même
           </label>
-        </div>
+        </Notice>
       )}
 
       <div className="mt-3 border-t border-brand-100 pt-3">
@@ -281,7 +298,7 @@ function SaleForm({
             variant="primary"
             disabled={create.isPending || (oversold.length > 0 && !override)}
           >
-            Valider la vente
+            {create.isPending ? "Enregistrement…" : "Valider la vente"}
           </Button>
         </div>
       </div>
@@ -323,51 +340,72 @@ export default function SalesSection({
       <SectionHeading
         right={
           can("ventes.create") && (
-            <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-              {showForm ? "Fermer" : "+ Vente"}
+            <Button size="xs" onClick={() => setShowForm((s) => !s)} aria-expanded={showForm}>
+              {showForm ? (
+                "Fermer"
+              ) : (
+                <>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Vente
+                </>
+              )}
             </Button>
           )
         }
       >
-        Ventes ({sales.data?.length ?? 0})
+        Ventes{sales.data ? ` (${sales.data.length})` : ""}
       </SectionHeading>
 
       {showForm && <SaleForm contract={contract} stock={stock} onDone={() => setShowForm(false)} />}
 
       <div className="space-y-2">
-        {sales.isLoading && <p className="text-sm text-brand-500">Chargement…</p>}
+        {sales.isLoading && <SkeletonList count={2} lines={1} />}
+        {remove.isError && (
+          <FormError>Suppression échouée : {(remove.error as Error).message}</FormError>
+        )}
         {sales.isError && (
           <QueryError error={sales.error} onRetry={() => sales.refetch()}>
             Impossible de charger les ventes
           </QueryError>
         )}
-        {sales.data?.length === 0 && !showForm && <EmptyState>Aucune vente.</EmptyState>}
+        {sales.data?.length === 0 && !showForm && (
+          <EmptyState
+            action={
+              can("ventes.create") ? (
+                <Button onClick={() => setShowForm(true)}>Saisir une vente</Button>
+              ) : undefined
+            }
+          >
+            Aucune vente sur ce contrat.
+          </EmptyState>
+        )}
         {sales.data?.map((s) => (
-          <div key={s.id} className="rounded-xl bg-white shadow-card p-3">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-brand-900">
+          <div key={s.id} className={`${cardCls} p-3`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 text-sm font-medium text-brand-900">
                 {new Date(s.saleDate).toLocaleDateString("fr-FR")}
                 {clientName(s.clientId) ? ` · ${clientName(s.clientId)}` : ""}
                 {s.deliveryNote ? ` · B/L ${s.deliveryNote}` : ""}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-brand-900">
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="text-sm font-semibold tabular-nums text-brand-900">
                   {fmtFcfa(saleTotalCfa(s))}
                 </span>
                 {can("ventes.delete") && (
                   <button
+                    type="button"
                     onClick={() => setDelSale(s)}
-                    className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-lg text-brand-500 hover:bg-red-50 hover:text-red-500 active:bg-red-100"
-                    aria-label="Supprimer la vente"
+                    className="inline-flex min-h-touch w-11 items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-red-100"
+                    aria-label={`Supprimer la vente du ${new Date(s.saleDate).toLocaleDateString("fr-FR")}`}
                   >
-                    ×
+                    <IconX width={18} height={18} />
                   </button>
                 )}
               </div>
             </div>
-            <div className="mt-1 text-sm text-brand-500">
-              {fmtM3(saleTotalM3(s))} ·{" "}
-              {s.lines.map((l) => `${l.sizeCode} ${Number(l.volumeM3).toFixed(2)}`).join(" · ")}
+            <div className="mt-1 text-sm tabular-nums text-brand-500">
+              <span className="font-medium text-brand-700">{fmtM3(saleTotalM3(s))}</span> ·{" "}
+              {s.lines.map((l) => `${l.sizeCode} ${fmtM3(l.volumeM3)}`).join(" · ")}
             </div>
           </div>
         ))}

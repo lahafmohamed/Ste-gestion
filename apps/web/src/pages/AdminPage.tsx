@@ -24,7 +24,7 @@ export default function AdminPage() {
     <>
       <PageHeader
         title="Administration"
-        subtitle="Comptes, rôles et permissions (réservé admin)."
+        subtitle="Comptes, rôles et permissions. Réservé à l'administrateur."
       />
       <div className="mx-auto max-w-page-wide px-4 pb-6 pt-3 short:pt-2">
         <Tabs tabs={TABS} value={tab} onChange={setTab} label="Sections de l'administration" />

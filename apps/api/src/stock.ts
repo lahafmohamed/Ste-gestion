@@ -1,7 +1,6 @@
-import { GIRTH_SPLIT_CM, sawnVolumeM3, sizeSortIndex } from "@ste/shared";
+import { GIRTH_SPLIT_CM, sizeSortIndex } from "@ste/shared";
 import type {
   ParcTruckDTO,
-  SawnInventoryRowDTO,
   SizeGroup,
   StockSizeRowDTO,
   StockSummaryDTO,
@@ -116,7 +115,11 @@ export async function parcStock(contractId?: string): Promise<{
   return { totalM3, rows };
 }
 
-/** Stock produits par taille : produit + rescié entrant − vendu − rescié sortant. */
+/**
+ * Stock produits par taille, vue par contrat (fiche contrat, ventes) :
+ * produit + rescié entrant − vendu − rescié sortant. La page Stock, elle,
+ * suit le journal (stock-ledger.ts) : inventaire, empotage et sorties compris.
+ */
 export async function stockSummary(contractId?: string): Promise<StockSummaryDTO> {
   const [sawnLines, saleLines, resawLines, parc] = await Promise.all([
     prisma.sawnLine.findMany({
@@ -207,105 +210,5 @@ export async function stockSummary(contractId?: string): Promise<StockSummaryDTO
   };
 }
 
-// Stock d'avivés à la granularité L×l×ép — base du panier d'empotage.
-// Les ventes (m³ par taille, sans dimensions ni nombre de pièces) ne sont pas
-// déductibles ici : ce stock est celui du bois physique disponible à empoter.
-export async function sawnInventory(contractId?: string): Promise<SawnInventoryRowDTO[]> {
-  const dims = {
-    lengthFt: true,
-    widthIn: true,
-    thicknessIn: true,
-    count: true,
-    sizeCode: true,
-    sizeGroup: true,
-  } as const;
-
-  const [sawn, resaw, packed] = await Promise.all([
-    prisma.sawnLine.findMany({ where: { run: scope(contractId) }, select: dims }),
-    prisma.resawLine.findMany({
-      where: { op: scope(contractId) },
-      select: { ...dims, kind: true },
-    }),
-    prisma.containerItem.findMany({
-      where: { container: scope(contractId) },
-      select: dims,
-    }),
-  ]);
-
-  type Row = {
-    key: string;
-    lengthFt: number;
-    widthIn: number;
-    thicknessIn: number;
-    sizeCode: string;
-    sizeGroup: SizeGroup;
-    producedCount: number;
-    resawnInCount: number;
-    resawnOutCount: number;
-    packedCount: number;
-  };
-  const rows = new Map<string, Row>();
-  const bucket = (l: {
-    lengthFt: unknown;
-    widthIn: unknown;
-    thicknessIn: unknown;
-    sizeCode: string;
-    sizeGroup: string;
-  }) => {
-    const L = Number(l.lengthFt);
-    const w = Number(l.widthIn);
-    const t = Number(l.thicknessIn);
-    const key = `${L}x${w}x${t}`;
-    let r = rows.get(key);
-    if (!r) {
-      r = {
-        key,
-        lengthFt: L,
-        widthIn: w,
-        thicknessIn: t,
-        sizeCode: l.sizeCode,
-        sizeGroup: l.sizeGroup as SizeGroup,
-        producedCount: 0,
-        resawnInCount: 0,
-        resawnOutCount: 0,
-        packedCount: 0,
-      };
-      rows.set(key, r);
-    }
-    return r;
-  };
-
-  for (const l of sawn) bucket(l).producedCount += l.count;
-  for (const l of resaw) {
-    const r = bucket(l);
-    if (l.kind === "PRODUCED") r.resawnInCount += l.count;
-    else r.resawnOutCount += l.count;
-  }
-  for (const l of packed) bucket(l).packedCount += l.count;
-
-  return [...rows.values()]
-    .map((r) => {
-      const available = r.producedCount + r.resawnInCount - r.resawnOutCount - r.packedCount;
-      const unit = sawnVolumeM3(r.lengthFt, r.widthIn, r.thicknessIn, 1);
-      return {
-        key: r.key,
-        lengthFt: String(r.lengthFt),
-        widthIn: String(r.widthIn),
-        thicknessIn: String(r.thicknessIn),
-        sizeCode: r.sizeCode,
-        sizeGroup: r.sizeGroup,
-        producedCount: r.producedCount,
-        resawnInCount: r.resawnInCount,
-        resawnOutCount: r.resawnOutCount,
-        packedCount: r.packedCount,
-        availableCount: available,
-        unitM3: unit.toFixed(6),
-        availableM3: (unit * available).toFixed(6),
-      };
-    })
-    .sort(
-      (a, b) =>
-        sizeSortIndex(a.sizeCode) - sizeSortIndex(b.sizeCode) ||
-        Number(a.lengthFt) - Number(b.lengthFt)
-    );
-}
+// Le stock par dimension (page Stock, panier d'empotage) et le suivi par
+// épaisseur vivent dans stock-ledger.ts : dernier inventaire + entrées − sorties.

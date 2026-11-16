@@ -34,6 +34,13 @@ export async function saleRoutes(app: FastifyInstance) {
     }
     const d = parsed.data;
     if (!(await ensureContractOpen(reply, d.contractId))) return;
+    if (d.clientId) {
+      const client = await prisma.party.findUnique({
+        where: { id: d.clientId },
+        select: { id: true },
+      });
+      if (!client) return reply.code(400).send({ error: "Client introuvable" });
+    }
 
     const lines = d.lines.map((l, i) => {
       const amount = saleLineAmountCfa({
@@ -69,6 +76,13 @@ export async function saleRoutes(app: FastifyInstance) {
 
   // Suppression
   app.delete<{ Params: { id: string } }>("/sales/:id", async (req, reply) => {
+    // Les ventes restent par contrat : clôturé, on n'en retire plus.
+    const sale = await prisma.sale.findUnique({
+      where: { id: req.params.id },
+      select: { contractId: true },
+    });
+    if (!sale) return reply.code(404).send({ error: "Vente introuvable" });
+    if (!(await ensureContractOpen(reply, sale.contractId))) return;
     try {
       await prisma.sale.delete({ where: { id: req.params.id } });
       return reply.code(204).send();

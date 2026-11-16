@@ -5,13 +5,15 @@ import {
   sawnLongShortM3,
   sawnThicknessBands,
   sawnVolumeM3,
+  QUALITY_LABELS,
   SIZE_GROUP_LABELS,
+  type Quality,
   type ProductionRunCreateInput,
   type ProductionRunDTO,
   type SizeGroup,
   type TruckDTO,
 } from "@ste/shared";
-import { fmtNum, fmtPct, normalizeDecimal, todayISO, fmtM3 } from "../lib/format";
+import { fmtDec3, fmtNum, fmtPct, normalizeDecimal, todayISO, fmtM3 } from "../lib/format";
 import SawnTruckPicker from "./SawnTruckPicker";
 import Badge, { SIZE_GROUP_TONE } from "./ui/Badge";
 import Button from "./ui/Button";
@@ -24,9 +26,25 @@ import { IconX, IconPlus } from "./icons";
 // par planche laisse Nbr à 1 et enchaîne comme avant ; celui qui sort douze
 // pièces identiques les saisit une fois. D'où le défaut à « 1 » : la quantité
 // ne coûte aucune frappe tant qu'on n'en a pas besoin.
-type RowState = { lengthFt: string; widthIn: string; thicknessIn: string; count: string };
+// Qualité : B par défaut ; une nouvelle ligne reprend celle du dessus (le
+// classeur range les pièces par blocs A GRADE, B, C).
+type RowState = {
+  lengthFt: string;
+  widthIn: string;
+  thicknessIn: string;
+  count: string;
+  quality: Quality;
+};
 
-const emptyRow = (): RowState => ({ lengthFt: "", widthIn: "", thicknessIn: "", count: "1" });
+const emptyRow = (quality: Quality = "B"): RowState => ({
+  lengthFt: "",
+  widthIn: "",
+  thicknessIn: "",
+  count: "1",
+  quality,
+});
+const nextRow = (p: RowState[]) => emptyRow(p[p.length - 1]?.quality ?? "B");
+const QUALITIES: Quality[] = ["B", "A", "C"];
 
 // Mini-libellés des cartes téléphone (< sm) — l'en-tête de colonnes disparaît.
 const COL_LABELS = {
@@ -112,6 +130,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
         widthIn: r.widthIn.trim(),
         thicknessIn: r.thicknessIn.trim(),
         count: Number(r.count),
+        quality: r.quality,
       }));
     if (lines.length === 0) return;
     onSave({
@@ -152,21 +171,22 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
       )}
 
       <div className="overflow-x-auto sm:overflow-visible">
-      <div className="sm:min-w-[620px]">
+      <div className="sm:min-w-[680px]">
       {/* En-tête inutile sous sm (mini-libellés) ; collant dès sm pour les
           longues sessions. */}
-      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:sticky sm:top-header sm:z-10 sm:grid sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:rounded-lg sm:bg-white sm:py-1">
+      <div className="hidden items-center gap-1 text-xs text-brand-500 sm:sticky sm:top-header sm:z-10 sm:grid sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_5rem_4.5rem_5rem_2.75rem] sm:rounded-lg sm:bg-white sm:py-1">
         <span>#</span>
         <span>L (ft)</span>
         <span>l (in)</span>
         <span>ép (in)</span>
         <span>Nbr</span>
+        <span>Qualité</span>
         <span>Taille</span>
         <span className="text-right">m³</span>
         <span />
       </div>
 
-      {/* Téléphone (< sm) : carte 2 rangées — # + L/l/ép, puis Nbr/Taille/m³/×.
+      {/* Téléphone (< sm) : carte 2 rangées — # + L/l/ép, puis Nbr/Qualité/m³/×.
           Même ordre DOM ; l'Entrée-chaînage passe de ép à Nbr, dernier champ
           de la ligne. */}
       {rows.map((r, i) => {
@@ -174,9 +194,9 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
         return (
           <div
             key={i}
-            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
+            className="mt-1 grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem] items-center gap-1 border-b border-brand-100 pb-2 sm:grid-cols-[2rem_1fr_1fr_1fr_1fr_5rem_4.5rem_5rem_2.75rem] sm:border-b-0 sm:pb-0"
           >
-            <span className="text-xs text-brand-500">{i + 1}</span>
+            <span className="text-xs tabular-nums text-brand-500">{i + 1}</span>
             {(["lengthFt", "widthIn", "thicknessIn", "count"] as const).map((k) => (
               <div
                 key={k}
@@ -196,7 +216,7 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
                       ? (e) => {
                           if (e.key === "Enter" && i === rows.length - 1) {
                             e.preventDefault();
-                            setRows((p) => [...p, emptyRow()]);
+                            setRows((p) => [...p, nextRow(p)]);
                           }
                         }
                       : undefined
@@ -205,22 +225,42 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
                 />
               </div>
             ))}
-            <div className="justify-self-center">
+            <div className="min-w-0">
+              <span aria-hidden="true" className="mb-0.5 block text-xs text-brand-500 sm:hidden">
+                Qualité
+              </span>
+              <select
+                value={r.quality}
+                aria-label={`Qualité ligne ${i + 1}`}
+                onChange={(e) => setRow(i, { quality: e.target.value as Quality })}
+                className={`${inputQuietCls} text-base`}
+              >
+                {QUALITIES.map((q) => (
+                  <option key={q} value={q}>
+                    {QUALITY_LABELS[q]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Taille : sur téléphone, le récap par taille sous la grille la redit. */}
+            <div className="hidden justify-self-center sm:block">
               {info ? (
                 <Badge tone={SIZE_GROUP_TONE[info.size.group]}>{info.size.code}</Badge>
               ) : (
-                <span className="text-center text-xs text-brand-300">—</span>
+                <span aria-hidden className="text-center text-xs text-brand-500">
+                  —
+                </span>
               )}
             </div>
             <span className="text-right text-base tabular-nums text-brand-700">
               <span className="mr-1 text-xs text-brand-500 sm:hidden">m³</span>
-              {info ? info.volume.toFixed(3) : "—"}
+              {info ? fmtDec3(info.volume) : "—"}
             </span>
             <button
               type="button"
               onClick={() => setRows((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p))}
-              className="flex min-h-touch w-full items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 active:bg-red-100"
-              aria-label="Supprimer la ligne"
+              className="flex min-h-touch w-full items-center justify-center rounded-lg text-brand-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500 active:bg-red-100"
+              aria-label={`Supprimer la ligne ${i + 1}`}
             >
               <IconX width={18} height={18} />
             </button>
@@ -232,11 +272,11 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
 
       <button
         type="button"
-        onClick={() => setRows((p) => [...p, emptyRow()])}
-        className="mt-2 min-h-touch w-full rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 hover:border-brand-900 hover:text-brand-900 active:bg-brand-100"
+        onClick={() => setRows((p) => [...p, nextRow(p)])}
+        className="mt-2 inline-flex min-h-touch w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-brand-300 py-2.5 text-sm font-medium text-brand-600 transition-colors hover:border-brand-900 hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-100"
       >
         <IconPlus width={16} height={16} className="-ml-0.5" />
-        Ligne
+        Ajouter une ligne
       </button>
 
       {total > 0 && (
@@ -257,15 +297,13 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
                   {s.code}
                 </Badge>
                 <span className="text-right tabular-nums text-brand-700">{fmtNum(s.pieces)}</span>
-                <span className="text-right tabular-nums text-brand-900">
-                  {fmtNum(s.m3.toFixed(3))}
-                </span>
+                <span className="text-right tabular-nums text-brand-900">{fmtDec3(s.m3)}</span>
               </div>
             ))}
             <div className="grid grid-cols-[1fr_4rem_6rem] gap-1 border-t border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-900">
               <span>Total</span>
               <span className="text-right tabular-nums">{fmtNum(pieces)}</span>
-              <span className="text-right tabular-nums">{fmtNum(total.toFixed(3))}</span>
+              <span className="text-right tabular-nums">{fmtDec3(total)}</span>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -278,26 +316,29 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
               ))}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge tone="info">
-              Long ≥6,5ft {fmtNum(longM3.toFixed(3))} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
-              {fmtNum(shortM3.toFixed(3))}
+            <Badge tone="info" className="tabular-nums">
+              Long ≥ 6,5 ft {fmtM3(longM3)} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
+              {fmtM3(shortM3)}
             </Badge>
             {bands
               .filter((b) => b.m3 > 0)
               .map((b) => (
-                <Badge key={b.key}>
-                  {b.label} {fmtNum(b.m3.toFixed(3))}
+                <Badge key={b.key} className="tabular-nums">
+                  {b.label} {fmtM3(b.m3)}
                 </Badge>
               ))}
           </div>
           {rendement !== null && (
-            <div className="rounded-lg bg-parc-50 px-3 py-1.5 text-sm text-parc-800">
-              Rendement live : <strong>{fmtPct(rendement)}</strong>{" "}
-              <span className="text-xs text-parc-700">
-                ({fmtNum(total.toFixed(3))} débité ÷ {fmtM3(girthSel)} de billons{" "}
+            <div className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-parc-50 px-3 py-2 text-sm text-parc-900">
+              <span>
+                Rendement : <strong className="tabular-nums">{fmtPct(rendement)}</strong>
+              </span>
+              {/* Une phrase, plus de parenthèses imbriquées : ce qui est divisé par quoi. */}
+              <span className="text-pretty tabular-nums text-parc-800">
+                {fmtM3(total)} débités sur {fmtM3(girthSel)} de billons,{" "}
                 {logIds.length > 0
-                  ? `(${logIds.length} billon${logIds.length > 1 ? "s" : ""} sélectionné${logIds.length > 1 ? "s" : ""})`
-                  : "(camions entiers)"})
+                  ? `${logIds.length} billon${logIds.length > 1 ? "s" : ""} coché${logIds.length > 1 ? "s" : ""}`
+                  : "camions entiers"}
               </span>
             </div>
           )}
@@ -307,10 +348,16 @@ export default function SawnEntry({ onSave, saving, trucks, runs }: Props) {
       {/* Récap + validation collés en bas : sur une longue session, le total
           courant et le bouton Valider restent visibles pendant la saisie
           (même motif que TallyEntry). */}
-      <div className="sticky bottom-0 z-10 mt-3 rounded-xl bg-white/95 p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_-8px_24px_-12px_oklch(0_0_0/0.25)] backdrop-blur-sm">
+      {/* Fond opaque, sans flou : les chiffres de la grille qui passent dessous
+          ne doivent pas transparaître sous le total. */}
+      <div className="sticky bottom-0 z-10 mt-3 rounded-xl bg-white p-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_-8px_24px_-12px_oklch(0_0_0/0.25)]">
         <div className="flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2 text-sm">
-          <span className="text-brand-500">{fmtNum(pieces)} pièces</span>
-          <span className="font-semibold text-brand-900">{fmtNum(total.toFixed(6))} m³</span>
+          <span className="tabular-nums text-brand-600">
+            {fmtNum(pieces)} pièce{pieces > 1 ? "s" : ""}
+          </span>
+          <span className="font-semibold tabular-nums text-brand-900">
+            {fmtNum(total.toFixed(6))} m³
+          </span>
         </div>
         <Button
           variant="primary"

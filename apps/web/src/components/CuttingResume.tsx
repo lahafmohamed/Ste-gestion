@@ -1,9 +1,8 @@
 import { cuttingResume } from "@ste/shared";
-import { fmtPct } from "../lib/format";
+import { fmtDec3, fmtPct } from "../lib/format";
 
-// Trois décimales fixes : « 0,040 » sous « 3,339 », les colonnes s'alignent.
-const m3 = (v: number) =>
-  v.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+// Trois décimales fixes (fmtDec3) : « 0,040 » sous « 3,339 », les colonnes s'alignent.
+const m3 = fmtDec3;
 
 // « CUTTING RESUME TRUCK » du classeur de pilotage : m³ et part par famille de
 // sciage, total, puis split long / court. Même lecture que l'Excel pour que le
@@ -29,11 +28,28 @@ export default function CuttingResume({
   const rows = r.rows.filter((x) => x.m3 > 0 || x.key !== "other");
   return (
     <div className={`rounded-lg bg-brand-50 ring-1 ring-inset ring-brand-100 ${className}`}>
-      <div className="px-3 pt-2.5 text-sm font-semibold text-brand-800">Cutting résumé</div>
       <table className="w-full text-sm">
+        {/* En-tête de colonnes : sans lui, m³ et part se lisaient comme deux
+            chiffres anonymes. */}
+        <thead>
+          <tr className="text-xs text-brand-600">
+            <th
+              scope="col"
+              className="px-3 pb-1 pt-2.5 text-left text-sm font-semibold text-brand-900"
+            >
+              Cutting résumé
+            </th>
+            <th scope="col" className="px-3 pb-1 pt-2.5 text-right font-normal">
+              m³
+            </th>
+            <th scope="col" className="px-3 pb-1 pt-2.5 text-right font-normal">
+              Part
+            </th>
+          </tr>
+        </thead>
         <tbody>
           {rows.map((x) => (
-            <tr key={x.key} className={x.m3 > 0 ? "text-brand-800" : "text-brand-500"}>
+            <tr key={x.key} className={x.m3 > 0 ? "text-brand-800" : "text-brand-600"}>
               <td className="px-3 py-1">{x.label}</td>
               <td className="px-3 py-1 text-right tabular-nums">{m3(x.m3)}</td>
               <td className="whitespace-nowrap px-3 py-1 text-right tabular-nums">{fmtPct(x.pct, 1)}</td>

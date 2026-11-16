@@ -13,15 +13,19 @@ import {
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
 import { canSeeFinance } from "../finance.js";
+import { userHas } from "../permissions.js";
 
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 async function send(reply: FastifyReply, wb: ExcelJS.Workbook, filename: string) {
   const buf = await wb.xlsx.writeBuffer();
+  // Le nom vient de saisies libres (immat, code contrat, n° conteneur) : un
+  // guillemet ou un caractère hors latin-1 casserait l'en-tête (500 côté Node).
+  const safe = filename.replace(/[^\w.-]+/g, "-");
   reply
     .type(XLSX_MIME)
-    .header("Content-Disposition", `attachment; filename="${filename}"`)
+    .header("Content-Disposition", `attachment; filename="${safe}"`)
     .send(Buffer.from(buf));
 }
 
@@ -445,6 +449,9 @@ export async function exportRoutes(app: FastifyInstance) {
     const contractId = contract.id;
     // `contracts.export` sort les volumes ; l'argent demande en plus `finances.view`.
     const showMoney = await canSeeFinance(req);
+    // Feuille Comptes (dûs, paiements, solde par tiers) : ce que lit déjà
+    // `compta.view` sur la fiche, pas davantage.
+    const showAccounts = showMoney || (await userHas(req.user.sub, "compta.view"));
 
     const [trucks, runs, sawnLines, saleLines, entries] = await Promise.all([
       prisma.truck.findMany({
@@ -589,21 +596,23 @@ export async function exportRoutes(app: FastifyInstance) {
     ts.columns.forEach((c) => (c.width = 14));
 
     // Feuille Comptes
-    const as = wb.addWorksheet("Comptes");
-    headerStyle(as.addRow(["Date", "Tiers", "Type", "Montant FCFA", "Description"]));
-    for (const e of entries) {
-      as.addRow([
-        e.entryDate.toISOString().slice(0, 10),
-        e.party.name,
-        e.kind === "DUE" ? "Dû" : "Payé",
-        Number(e.amount),
-        e.description ?? "",
-      ]);
+    if (showAccounts) {
+      const as = wb.addWorksheet("Comptes");
+      headerStyle(as.addRow(["Date", "Tiers", "Type", "Montant FCFA", "Description"]));
+      for (const e of entries) {
+        as.addRow([
+          e.entryDate.toISOString().slice(0, 10),
+          e.party.name,
+          e.kind === "DUE" ? "Dû" : "Payé",
+          Number(e.amount),
+          e.description ?? "",
+        ]);
+      }
+      boldRow(as.addRow(["", "TOTAL", "Dû", due, ""]));
+      boldRow(as.addRow(["", "TOTAL", "Payé", paid, ""]));
+      boldRow(as.addRow(["", "TOTAL", "Solde", due - paid, ""]));
+      as.columns.forEach((c) => (c.width = 16));
     }
-    boldRow(as.addRow(["", "TOTAL", "Dû", due, ""]));
-    boldRow(as.addRow(["", "TOTAL", "Payé", paid, ""]));
-    boldRow(as.addRow(["", "TOTAL", "Solde", due - paid, ""]));
-    as.columns.forEach((c) => (c.width = 16));
 
     await send(reply, wb, `contrat-${contract.code}.xlsx`);
   });

@@ -14,7 +14,7 @@ import { EmptyState, FormError, QueryError, Notice } from "./ui/Feedback";
 import Input, { Field, SearchInput } from "./ui/Input";
 import SelectField from "./ui/SelectField";
 import { SkeletonList } from "./ui/Skeleton";
-import { IconCheck, IconLock, IconPlus } from "./icons";
+import { IconLock, IconPlus } from "./icons";
 
 /** Formulaire vierge — recréé à chaque camion enregistré (« camion suivant »). */
 const emptyForm = () => ({
@@ -164,6 +164,13 @@ export default function ReceptionSection({
     };
   })();
 
+  // Ouvre (ou referme) le formulaire de réception — même geste depuis l'en-tête
+  // de section et depuis la liste vide.
+  const toggleForm = () => {
+    setJustReceived(null);
+    setShowForm((s) => !s);
+  };
+
   const needle = q.trim().toLowerCase();
   const shownTrucks = (trucks.data ?? []).filter(
     (t) => truckMatches(t, needle) || contractOf(t.contractId)?.code.toLowerCase().includes(needle)
@@ -182,51 +189,71 @@ export default function ReceptionSection({
       <SectionHeading
         right={
           !closed && (
+            // L'action du portail : en teck tant que le formulaire est fermé,
+            // discrète une fois ouvert (le teck passe alors à « Réceptionner »).
             <Button
               size="xs"
-              onClick={() => {
-                setJustReceived(null);
-                setShowForm((s) => !s);
-              }}
+              variant={showForm ? "secondary" : "primary"}
+              aria-expanded={showForm}
+              onClick={toggleForm}
             >
-              {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Camion arrivé</>}
+              {showForm ? (
+                "Fermer"
+              ) : (
+                <>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Camion arrivé
+                </>
+              )}
             </Button>
           )
         }
       >
-        Camions reçus ({trucks.data?.length ?? 0})
-        {contractId ? "" : " — tous contrats"}
+        {/* Compteur seulement une fois la liste là : « (0) » pendant le
+            chargement se lirait comme « aucun camion ». Filtré : x sur y. */}
+        Camions reçus
+        {trucks.data && (
+          <span className="ml-1.5 font-normal tabular-nums text-brand-500">
+            {needle ? `${shownTrucks.length} sur ${trucks.data.length}` : trucks.data.length}
+          </span>
+        )}
+        {contractId ? null : (
+          <span className="ml-1.5 font-normal text-brand-500">· tous contrats</span>
+        )}
       </SectionHeading>
 
       {/* ── Réception : uniquement l'en-tête recopié du bordereau ── */}
       {showForm && (
-        <form onSubmit={submit} className="mb-3 rounded-xl bg-white shadow-card p-4">
-          <div className="mb-3 text-sm font-medium text-brand-900">
+        <form onSubmit={submit} className="mb-3 rounded-xl bg-white p-4 shadow-card">
+          <h3 className="mb-3 text-base font-semibold tracking-tight text-brand-900">
             Étape 1 · Réception du camion
-          </div>
+          </h3>
 
           {/* Bordereau précédent enregistré : de quoi vérifier et enchaîner. */}
           {justReceived && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-parc-50 px-3 py-2 text-sm text-parc-800 ring-1 ring-inset ring-parc-200/80">
-              <span className="inline-flex items-center gap-1.5">
-                <IconCheck width={16} height={16} className="shrink-0 text-parc-700" aria-hidden />
-                {justReceived.deliveryNote ? `B/L ${justReceived.deliveryNote} · ` : ""}
-                {justReceived.registration} réceptionné
-              </span>
-              {onEtaler && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setJustReceived(null);
-                    onEtaler(justReceived.id);
-                  }}
-                  className="-my-1.5 min-h-touch rounded-lg px-2 font-medium underline hover:text-parc-900 active:bg-parc-100"
-                >
-                  Étaler ses billes
-                </button>
-              )}
-            </div>
+            <Notice tone="success" className="mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                <span>
+                  {justReceived.deliveryNote ? `B/L ${justReceived.deliveryNote} · ` : ""}
+                  {justReceived.registration} réceptionné.
+                </span>
+                {/* Étaler = geste de la chaîne parc : bouton sève, pas un lien. */}
+                {onEtaler && (
+                  <Button
+                    size="xs"
+                    variant="parc"
+                    className="-my-1"
+                    onClick={() => {
+                      setShowForm(false);
+                      setJustReceived(null);
+                      onEtaler(justReceived.id);
+                    }}
+                  >
+                    Étaler ses billes
+                  </Button>
+                )}
+              </div>
+            </Notice>
           )}
 
           {/* Un camion appartient à un contrat, et à un seul : le choix est
@@ -396,9 +423,32 @@ export default function ReceptionSection({
             Impossible de charger les camions
           </QueryError>
         )}
-        {trucks.data?.length === 0 && !showForm && <EmptyState>Aucun camion.</EmptyState>}
+        {trucks.data?.length === 0 && !showForm && (
+          <EmptyState
+            action={
+              !closed && (
+                <Button variant="primary" onClick={toggleForm}>
+                  <IconPlus width={16} height={16} className="-ml-0.5" />
+                  Camion arrivé
+                </Button>
+              )
+            }
+          >
+            {contractId
+              ? "Aucun camion reçu sur ce contrat pour l'instant."
+              : "Aucun camion reçu pour l'instant."}
+          </EmptyState>
+        )}
         {(trucks.data?.length ?? 0) > 0 && shownTrucks.length === 0 && (
-          <EmptyState>Aucun camion ne correspond.</EmptyState>
+          <EmptyState
+            action={
+              <Button size="sm" onClick={() => setQ("")}>
+                Effacer la recherche
+              </Button>
+            }
+          >
+            Aucun camion ne correspond à « {q.trim()} ».
+          </EmptyState>
         )}
         {shownTrucks.map((t) => (
           <TruckCard

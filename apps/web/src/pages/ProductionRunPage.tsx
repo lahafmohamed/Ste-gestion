@@ -17,12 +17,12 @@ import { downloadFile, productionApi, trucksApi } from "../lib/api";
 import { useCan } from "../lib/auth";
 import { fmtDec3, fmtInt, fmtNum, fmtPct, fmtM3 } from "../lib/format";
 import { truckLabel } from "../lib/trucks";
-import Badge from "../components/ui/Badge";
-import Button from "../components/ui/Button";
-import Card, { BackLink } from "../components/ui/Card";
+import Badge, { SIZE_GROUP_TONE } from "../components/ui/Badge";
+import Button, { buttonCls } from "../components/ui/Button";
+import Card, { BackLink, Kpi, KpiStrip } from "../components/ui/Card";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { QueryError } from "../components/ui/Feedback";
-import { SkeletonList } from "../components/ui/Skeleton";
+import { FormError, QueryError } from "../components/ui/Feedback";
+import { SkeletonLine, SkeletonList } from "../components/ui/Skeleton";
 import { TableWrap, Td, Th } from "../components/ui/Table";
 
 export default function ProductionRunPage() {
@@ -48,8 +48,14 @@ export default function ProductionRunPage() {
   const del = useMutation({
     mutationFn: () => productionApi.remove(id),
     onSuccess: () => {
+      // Mêmes clés qu'à la création (ProductionSection) : sans stock / trucks /
+      // summary, le stock général et l'avancement des camions gardaient la
+      // session supprimée jusqu'au rechargement.
       qc.invalidateQueries({ queryKey: ["production"] });
       qc.invalidateQueries({ queryKey: ["cutting"] });
+      qc.invalidateQueries({ queryKey: ["trucks"] });
+      qc.invalidateQueries({ queryKey: ["summary"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
       qc.invalidateQueries({ queryKey: ["contracts"] });
       nav(-1);
     },
@@ -106,9 +112,12 @@ export default function ProductionRunPage() {
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="min-w-0">
-          <h1 className="text-title font-semibold tracking-tight text-brand-900">
+          <h1 className="text-balance text-title font-semibold tracking-tight text-brand-900">
             Débitage du {new Date(r.producedAt).toLocaleDateString("fr-FR")}
           </h1>
+          {/* La note (« DEBITE TECK… ») nomme la feuille : elle figurait sur la
+              liste mais disparaissait de la fiche. */}
+          {r.note && <p className="mt-1 text-pretty text-sm text-brand-600">{r.note}</p>}
         </div>
         <div className="flex items-center gap-3">
           {can("contracts.export") && (
@@ -132,15 +141,47 @@ export default function ProductionRunPage() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <span className="inline-flex items-center rounded-full bg-brand-900 px-3 py-1 text-sm font-medium text-white">
-          {fmtM3(runTotalM3(r))}
-        </span>
-        <Badge size="md">{fmtInt(runPieceCount(r))} pièces</Badge>
+      {/* Chiffres-clés en bande (même motif que Stock) plutôt qu'une pastille
+          noire peinte à la main : le volume, le nombre et le rendement se
+          lisent d'un coup d'œil, debout devant la tablette. */}
+      <KpiStrip cols={3} className="mt-4">
+        <Kpi bare label="Volume débité" value={<span className="tabular-nums">{fmtM3(total)}</span>} />
+        <Kpi
+          bare
+          label="Pièces"
+          value={<span className="tabular-nums">{fmtInt(runPieceCount(r))}</span>}
+          hint={`${r.lines.length} ligne${r.lines.length > 1 ? "s" : ""}`}
+        />
+        <Kpi
+          bare
+          tone={rendement !== null ? "parc" : "default"}
+          label="Rendement"
+          value={
+            trucksQ.isLoading ? (
+              <SkeletonLine className="mt-2 h-6 w-20" />
+            ) : rendement !== null ? (
+              <span className="tabular-nums">{fmtPct(rendement)}</span>
+            ) : (
+              <span className="text-brand-500">—</span>
+            )
+          }
+          hint={
+            rendement !== null
+              ? `sur ${fmtM3(girthLinked)} de billons${
+                  sawnBillons.length > 0 ? ` (${sawnBillons.length} billons)` : ""
+                }`
+              : trucksQ.isLoading
+                ? undefined
+                : "aucun camion lié"
+          }
+        />
+      </KpiStrip>
+
+      <div className="mt-3 flex flex-wrap gap-2">
         {(Object.keys(groups) as SizeGroup[])
           .filter((g) => groups[g] > 0)
           .map((g) => (
-            <Badge key={g} size="md">
+            <Badge key={g} size="md" tone={SIZE_GROUP_TONE[g]} className="tabular-nums">
               {SIZE_GROUP_LABELS[g]} {fmtM3(groups[g])}
             </Badge>
           ))}
@@ -149,33 +190,32 @@ export default function ProductionRunPage() {
       {/* Camions sciés + rendement de la session */}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="text-brand-600">Camions sciés :</span>
-        {linkedTrucks.length === 0 ? (
-          <span className="text-brand-500">aucun camion lié</span>
+        {/* Pas de « aucun camion lié » tant que la liste n'est pas arrivée. */}
+        {trucksQ.isLoading ? (
+          <SkeletonLine className="w-40" />
+        ) : trucksQ.isError ? (
+          <QueryError error={trucksQ.error} onRetry={() => trucksQ.refetch()}>
+            Impossible de charger les camions
+          </QueryError>
+        ) : linkedTrucks.length === 0 ? (
+          <span className="text-brand-600">aucun camion lié</span>
         ) : (
           linkedTrucks.map((t) => (
-            <Link
-              key={t.id}
-              to={`/trucks/${t.id}`}
-              className="inline-flex min-h-touch items-center gap-1.5 rounded-full border border-brand-300 px-3 py-1 text-sm text-brand-700 transition-colors hover:border-brand-900 active:bg-brand-100"
-            >
+            <Link key={t.id} to={`/trucks/${t.id}`} className={buttonCls("secondary", "sm")}>
               {/* B/L d'abord : la session se rapproche des bordereaux, pas des
                   immatriculations. */}
               {truckLabel(t)}
-              {t.deliveryNote && <span className="text-brand-500">{t.registration}</span>}
+              {t.deliveryNote && (
+                <span className="font-normal text-brand-500">{t.registration}</span>
+              )}
             </Link>
           ))
-        )}
-        {rendement !== null && (
-          <Badge tone="parc">
-            Rendement {fmtPct(rendement)} ({fmtM3(girthLinked)} de billons
-            {sawnBillons.length > 0 ? ` · ${sawnBillons.length} billons` : ""})
-          </Badge>
         )}
       </div>
 
       {/* Billons sciés précisés */}
       {sawnBillons.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <span className="text-sm text-brand-600">Billons sciés :</span>
           {sawnBillons.map((l) => (
             <Badge key={l.id} tone="parc" title={`${Number(l.volumeM3).toFixed(4)} m³`}>
@@ -187,15 +227,15 @@ export default function ProductionRunPage() {
 
       {/* Splits longueur & épaisseur (rapport d'activité) */}
       <div className="mt-2 flex flex-wrap gap-2">
-        <Badge tone="info">
-          Long ≥6,5ft {fmtNum(longM3.toFixed(3))} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
-          {fmtNum(shortM3.toFixed(3))} ({fmtPct((shortM3 / total) * 100, 0)})
+        <Badge tone="info" className="tabular-nums">
+          Long ≥ 6,5 ft {fmtM3(longM3)} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
+          {fmtM3(shortM3)} ({fmtPct((shortM3 / total) * 100, 0)})
         </Badge>
         {bands
           .filter((b) => b.m3 > 0)
           .map((b) => (
-            <Badge key={b.key}>
-              {b.label} {fmtNum(b.m3.toFixed(3))} ({fmtPct((b.m3 / total) * 100, 0)})
+            <Badge key={b.key} className="tabular-nums">
+              {b.label} {fmtM3(b.m3)} ({fmtPct((b.m3 / total) * 100, 0)})
             </Badge>
           ))}
       </div>
@@ -227,11 +267,11 @@ export default function ProductionRunPage() {
                   >
                     {sec.code}
                   </th>
-                  <td className="py-1.5 pr-3 text-right text-sm tabular-nums text-brand-500">
+                  <td className="py-1.5 pr-3 text-right text-sm tabular-nums text-brand-600">
                     {fmtInt(sec.count)}
                   </td>
-                  <td className="py-1.5 pr-3 text-right text-sm tabular-nums text-brand-500">
-                    {fmtNum(sec.m3.toFixed(3))}
+                  <td className="py-1.5 pr-3 text-right text-sm tabular-nums text-brand-600">
+                    {fmtDec3(sec.m3)}
                   </td>
                 </tr>
                 {sec.lines.map((l) => (
@@ -241,11 +281,11 @@ export default function ProductionRunPage() {
                     key={l.id}
                     className="border-t border-brand-100 transition-colors duration-150 ease-out hover:bg-brand-50"
                   >
-                    <Td className="text-brand-500">{l.position}</Td>
+                    <Td className="tabular-nums text-brand-500">{l.position}</Td>
                     <Td num>{fmtNum(l.lengthFt)}</Td>
                     <Td num>{fmtNum(l.widthIn)}</Td>
                     <Td num>{fmtNum(l.thicknessIn)}</Td>
-                    <Td num>{l.count}</Td>
+                    <Td num>{fmtInt(l.count)}</Td>
                     <Td num>{fmtDec3(l.volumeM3)}</Td>
                   </tr>
                 ))}
@@ -255,7 +295,7 @@ export default function ProductionRunPage() {
               <tr className="border-t-2 border-brand-300 font-semibold">
                 <Td colSpan={4}>Total</Td>
                 <Td num>{fmtInt(runPieceCount(r))}</Td>
-                <Td num>{fmtDec3(runTotalM3(r))}</Td>
+                <Td num>{fmtDec3(total)}</Td>
               </tr>
             </tfoot>
           </table>
@@ -270,8 +310,17 @@ export default function ProductionRunPage() {
         onConfirm={() => del.mutate()}
         onCancel={() => setDelOpen(false)}
       >
-        {r.lines.length} ligne{r.lines.length > 1 ? "s" : ""}, {fmtM3(total)}
+        {/* {" "} explicite : le saut de ligne JSX collait « m³seront ». */}
+        {r.lines.length} ligne{r.lines.length > 1 ? "s" : ""}, {fmtM3(total)}{" "}
         seront effacés. Action irréversible.
+        {del.isError && (
+          <div className="mt-3">
+            <FormError>
+              Suppression impossible
+              {del.error instanceof Error ? ` : ${del.error.message}` : "."}
+            </FormError>
+          </div>
+        )}
       </ConfirmDialog>
     </div>
   );

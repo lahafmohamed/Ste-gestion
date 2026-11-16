@@ -2,6 +2,7 @@ import { useState } from "react";
 import { billParent, nextBillonId } from "@ste/shared";
 import Button from "./ui/Button";
 import Chip from "./ui/Chip";
+import { IconCheck } from "./icons";
 
 /** Nb de pastilles de billes affichées avant de replier le sélecteur. */
 const BILL_CHIPS = 12;
@@ -47,17 +48,23 @@ export default function BillPicker({
   const visibleBills = allBills ? bills : untouchedBills.slice(0, BILL_CHIPS);
 
   return (
-    <div className="mb-3 rounded-lg bg-brand-50 p-2">
-      <div className="mb-1.5 flex items-center justify-between gap-2 text-xs text-brand-500">
-        <span>
-          Bille tronçonnée → nouveau billon ({billsTouchedCount}/{bills.length} billes
-          entamées)
-        </span>
+    // Anneau léger : le sélecteur reste lisible posé sur un fond brand-50
+    // (ajout de billons depuis la fiche camion), pas seulement sur blanc.
+    <div className="mb-3 rounded-xl bg-brand-50 p-2.5 ring-1 ring-inset ring-brand-100">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        {/* Avancement en tête (chiffre lisible debout), mode d'emploi à la suite. */}
+        <p className="min-w-0 text-pretty text-sm text-brand-600">
+          <span className="font-semibold tabular-nums text-brand-900">
+            {billsTouchedCount}/{bills.length}
+          </span>{" "}
+          billes entamées · taper une bille ajoute son billon suivant
+        </p>
         {bills.length > BILL_CHIPS && (
           <button
             type="button"
+            aria-expanded={allBills}
             onClick={() => setAllBills((s) => !s)}
-            className="-my-2 min-h-touch shrink-0 rounded-lg px-2 underline hover:text-brand-900 active:bg-brand-200"
+            className="-my-2 inline-flex min-h-touch shrink-0 items-center rounded-lg px-2 text-sm font-medium text-brand-600 underline transition-colors hover:text-brand-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:bg-brand-200"
           >
             {allBills ? "Réduire" : `Toutes (${bills.length})`}
           </button>
@@ -92,7 +99,10 @@ export default function BillPicker({
         </div>
       )}
       {!nextBill && !allBills && (
-        <p className="mb-2 text-xs text-brand-500">Toutes les billes sont entamées.</p>
+        <p className="mb-2 flex items-center gap-1.5 text-sm text-parc-700">
+          <IconCheck width={16} height={16} className="shrink-0" aria-hidden />
+          Toutes les billes sont entamées.
+        </p>
       )}
 
       <div className="flex flex-wrap gap-1.5">
@@ -104,10 +114,23 @@ export default function BillPicker({
               size="lg"
               selected={n > 0}
               className="tabular-nums"
+              // Le compteur seul (« 2 ») ne dit rien au lecteur d'écran.
+              aria-label={`Bille ${b}${
+                n > 0 ? `, ${n} billon${n > 1 ? "s" : ""}` : ""
+              } : ajouter un billon`}
               onClick={() => onAddBillon(b)}
             >
               {b}
-              {n > 0 && <span className="ml-1 text-xs opacity-70">×{n}</span>}
+              {/* Pastille de compte plutôt qu'un « ×2 » : se lit d'un coup d'œil
+                  sur la puce sombre (sélectionnée). */}
+              {n > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-white/20 px-1.5 text-xs font-semibold"
+                >
+                  {n}
+                </span>
+              )}
             </Chip>
           );
         })}

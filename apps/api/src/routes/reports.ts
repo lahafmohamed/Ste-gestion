@@ -196,6 +196,10 @@ export async function reportRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "Paramètre date requis (YYYY-MM-DD)" });
       }
       const from = new Date(`${dateStr}T00:00:00.000Z`);
+      // « 2026-02-30 » passe la regex et JS le décale au 2 mars : jour réel exigé.
+      if (Number.isNaN(from.getTime()) || from.toISOString().slice(0, 10) !== dateStr) {
+        return reply.code(400).send({ error: "Date invalide" });
+      }
       const to = new Date(`${dateStr}T23:59:59.999Z`);
       const range = { gte: from, lte: to };
 

@@ -10,7 +10,7 @@ import {
 import { permissionsApi, usersApi } from "../../lib/api";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
-import { FormError } from "../ui/Feedback";
+import { FormError, QueryError } from "../ui/Feedback";
 import { SkeletonList } from "../ui/Skeleton";
 
 /**
@@ -45,7 +45,13 @@ export default function UserPermissions({ user }: { user: UserDTO }) {
     );
   }
   if (matrix.isLoading) return <SkeletonList count={3} lines={1} />;
-  if (!matrix.data) return <FormError>Matrice des rôles indisponible.</FormError>;
+  if (matrix.isError || !matrix.data) {
+    return (
+      <QueryError error={matrix.error} onRetry={() => matrix.refetch()}>
+        Impossible de charger les permissions du rôle
+      </QueryError>
+    );
+  }
 
   const fromRole = new Set(matrix.data[user.role]);
   const granted = new Set(user.permissionsGranted ?? []);
@@ -70,10 +76,10 @@ export default function UserPermissions({ user }: { user: UserDTO }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-brand-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-brand-600">
         <span>
           Hérite du rôle{" "}
-          <strong className="font-medium text-brand-700">{USER_ROLE_LABELS[user.role]}</strong>
+          <strong className="font-medium text-brand-900">{USER_ROLE_LABELS[user.role]}</strong>
           {overrideCount > 0
             ? ` · ${overrideCount} surcharge${overrideCount > 1 ? "s" : ""}`
             : " · aucune surcharge"}
@@ -89,8 +95,11 @@ export default function UserPermissions({ user }: { user: UserDTO }) {
         )}
       </div>
       {error && <FormError>{error}</FormError>}
+      <p className="text-sm text-brand-600">
+        Une case différente du rôle crée une surcharge ; la recliquer revient au rôle.
+      </p>
 
-      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {PERMISSION_MODULES.map((mod) => (
           <fieldset key={mod.key} className="min-w-0">
             <legend className="text-sm font-semibold text-brand-800">
@@ -105,11 +114,11 @@ export default function UserPermissions({ user }: { user: UserDTO }) {
                 return (
                   <label
                     key={p}
-                    className="flex min-h-touch cursor-pointer items-center gap-2 rounded-lg px-1 text-sm text-brand-700 hover:bg-brand-50"
+                    className="flex min-h-touch cursor-pointer items-center gap-2.5 rounded-lg px-1.5 text-sm text-brand-800 hover:bg-brand-50 has-[:disabled]:cursor-wait"
                   >
                     <input
                       type="checkbox"
-                      className="h-5 w-5 accent-accent-600"
+                      className="size-5 shrink-0 accent-accent-600"
                       checked={on}
                       disabled={update.isPending}
                       onChange={() => toggle(p)}
@@ -117,8 +126,8 @@ export default function UserPermissions({ user }: { user: UserDTO }) {
                     <span className="min-w-0 flex-1 truncate">
                       {mod.actionLabels?.[a] ?? PERMISSION_ACTION_LABELS[a]}
                     </span>
-                    {isGrant && <Badge tone="parc">ajout</Badge>}
-                    {isRevoke && <Badge tone="amber">retrait</Badge>}
+                    {isGrant && <Badge tone="parc">Ajout</Badge>}
+                    {isRevoke && <Badge tone="amber">Retrait</Badge>}
                   </label>
                 );
               })}

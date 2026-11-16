@@ -389,7 +389,7 @@ export default function DateField({
                 setOpen(false);
                 inputRef.current?.focus();
               }}
-              className="min-h-touch rounded-lg px-3 text-sm font-medium text-brand-500 transition-[color,background-color,transform] duration-150 ease-out hover:bg-brand-50 hover:text-brand-900 motion-safe:active:scale-[0.96]"
+              className="min-h-touch rounded-lg px-3 text-sm font-medium text-brand-500 transition-[color,background-color,transform] duration-150 ease-out hover:bg-brand-50 hover:text-brand-900 motion-safe:active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
             >
               Effacer
             </button>
@@ -397,7 +397,7 @@ export default function DateField({
               type="button"
               disabled={Boolean(outOfRange(todayIso))}
               onClick={() => pick(new Date())}
-              className="min-h-touch rounded-lg px-3 text-sm font-medium text-accent-700 transition-[color,background-color,transform] duration-150 ease-out hover:bg-accent-50 motion-safe:active:scale-[0.96] disabled:opacity-40"
+              className="min-h-touch rounded-lg px-3 text-sm font-medium text-accent-700 transition-[color,background-color,transform] duration-150 ease-out hover:bg-accent-50 motion-safe:active:scale-[0.96] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
             >
               Aujourd'hui
             </button>
@@ -422,7 +422,7 @@ function NavButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-500 transition-[background-color,color,transform] duration-150 ease-out hover:bg-brand-50 hover:text-brand-900 motion-safe:active:scale-[0.96]"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-500 transition-[background-color,color,transform] duration-150 ease-out hover:bg-brand-50 hover:text-brand-900 motion-safe:active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-500"
     >
       {children}
     </button>

@@ -10,6 +10,9 @@ import {
   touchesFinance,
 } from "../finance.js";
 
+// Tiers assigné (SODEFOR, cubage, transport) inconnu : clé étrangère refusée.
+const PARTY_MSG = "Tiers assigné introuvable";
+
 export async function contractRoutes(app: FastifyInstance) {
   // Liste
   // Sans `finances.view` : les prix, frais, budgets et tiers partent à null.
@@ -38,8 +41,9 @@ export async function contractRoutes(app: FastifyInstance) {
       const c = await prisma.contract.create({ data: parsed.data });
       return reply.code(201).send(c);
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        return reply.code(409).send({ error: "Code de contrat déjà utilisé" });
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        if (e.code === "P2002") return reply.code(409).send({ error: "Code de contrat déjà utilisé" });
+        if (e.code === "P2003") return reply.code(400).send({ error: PARTY_MSG });
       }
       throw e;
     }
@@ -66,6 +70,7 @@ export async function contractRoutes(app: FastifyInstance) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         if (e.code === "P2025") return reply.code(404).send({ error: "Contrat introuvable" });
         if (e.code === "P2002") return reply.code(409).send({ error: "Code de contrat déjà utilisé" });
+        if (e.code === "P2003") return reply.code(400).send({ error: PARTY_MSG });
       }
       throw e;
     }
