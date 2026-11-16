@@ -446,7 +446,7 @@ function ImportForm({
       <p className="mb-3 text-sm text-brand-600">
         Tableau N° · PRODUITS · LONGUEUR (FEET) · LARGEUR (INCH) · EPAISSEUR (INCH) · NBR DELIGNE :
         le classeur STOCK, l'export STOCK de la plateforme ou un DEBITES. La colonne PRODUITS donne
-        la qualité (A GRADE, 5X3 C…). Les feuilles cochées forment un seul mouvement.
+        la qualité (A GRADE, C GRADE). Les feuilles cochées forment un seul mouvement.
       </p>
 
       <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Le classeur est">

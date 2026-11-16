@@ -16,8 +16,10 @@ import { decimalString } from "./primitives.js";
 import type { SizeGroup } from "./sizes.js";
 
 // ── Qualité d'une pièce ────────────────────────────────────────────────
-// B = qualité courante. A = « A GRADE » (meilleure, colonne à part dans le
-// suivi). C = second choix (5X3 C…). Elle ne se déduit pas des dimensions.
+// B = qualité courante. A = « A GRADE » (meilleure), C = « C GRADE » (second
+// choix) : chacune a sa colonne au suivi, quelle que soit la section (le
+// RESUME STOCK du 14/11 range 6×5, 6×4 et 5×3 sous C GRADE, total égal à la
+// colonne « 5X3 C » du SUIVI). Elle ne se déduit pas des dimensions.
 
 export const Quality = z.enum(["A", "B", "C"]);
 export type Quality = z.infer<typeof Quality>;
@@ -54,20 +56,15 @@ export const SUIVI_COLUMNS: readonly SuiviColumn[] = [
   { key: "6x3B", label: "6X3 B" },
   { key: "5x4B", label: "5X4 B" },
   { key: "5x3B", label: "5X3 B" },
-  { key: "5x3C", label: "5X3 C" },
+  { key: "C", label: "C GRADE" },
   { key: "4x3", label: "4X3" },
   { key: "2in", label: "2 inch" },
   { key: "1.5in", label: "1,5 inch" },
   { key: "1in", label: "1 inch" },
 ];
 
-/** Colonnes absentes du classeur, affichées seulement quand elles portent du volume. */
-export const SUIVI_EXTRA_COLUMNS: readonly SuiviColumn[] = [
-  { key: "6x4C", label: "6X4 C" },
-  { key: "6x3C", label: "6X3 C" },
-  { key: "5x4C", label: "5X4 C" },
-  { key: "other", label: "Autre" },
-];
+/** Colonne absente du classeur, affichée seulement quand elle porte du volume. */
+export const SUIVI_EXTRA_COLUMNS: readonly SuiviColumn[] = [{ key: "other", label: "Autre" }];
 
 const ALL_SUIVI = [...SUIVI_COLUMNS, ...SUIVI_EXTRA_COLUMNS];
 
@@ -81,12 +78,12 @@ export function suiviColumnIndex(key: string): number {
 }
 
 /**
- * Colonne du suivi d'une pièce. La qualité A prime (colonne A GRADE) ; sinon
- * la règle dimensionnelle du résumé de sciage (largeur ≥ 8 → 8" + …), les
- * main sizes étant ventilées par section et qualité (6X4 B, 5X3 C…).
+ * Colonne du suivi d'une pièce. Les qualités A et C priment (colonnes A GRADE
+ * et C GRADE) ; sinon la règle dimensionnelle du résumé de sciage (largeur
+ * ≥ 8 → 8" + …), les main sizes B ventilées par section (6X4 B…).
  */
 export function suiviColumnKey(widthIn: number, thicknessIn: number, quality: Quality): string {
-  if (quality === "A") return "A";
+  if (quality === "A" || quality === "C") return quality;
   switch (cuttingResumeKey(widthIn, thicknessIn)) {
     case "oneInch":
       return "1in";

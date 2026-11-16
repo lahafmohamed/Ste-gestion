@@ -31,10 +31,10 @@ describe("suiviColumnKey", () => {
     expect(suiviColumnKey(7, 5, "B")).toBe("6to7");
     expect(suiviColumnKey(6, 4, "B")).toBe("6x4B");
     expect(suiviColumnKey(6, 3, "B")).toBe("6x3B");
-    expect(suiviColumnKey(5, 3, "C")).toBe("5x3C");
+    expect(suiviColumnKey(5, 3, "C")).toBe("C");
+    expect(suiviColumnKey(6, 5, "C")).toBe("C"); // C GRADE quelle que soit la section
     expect(suiviColumnKey(6, 3, "A")).toBe("A");
     expect(suiviColumnKey(4, 3, "B")).toBe("4x3");
-    expect(suiviColumnKey(4, 3, "C")).toBe("4x3"); // pas de C en side sizes
     expect(suiviColumnKey(4, 2, "B")).toBe("2in");
     expect(suiviColumnKey(3, 1.5, "B")).toBe("1.5in");
     expect(suiviColumnKey(9.5, 1, "B")).toBe("1in");
@@ -43,8 +43,7 @@ describe("suiviColumnKey", () => {
 
   it("n'affiche les colonnes hors classeur que si elles servent", () => {
     expect(suiviVisibleColumns([]).length).toBe(12);
-    const cols = suiviVisibleColumns(["6x3C", "8plus"]).map((c) => c.key);
-    expect(cols).toContain("6x3C");
-    expect(cols).not.toContain("other");
+    expect(suiviVisibleColumns(["other", "8plus"]).map((c) => c.key)).toContain("other");
+    expect(suiviVisibleColumns(["C", "8plus"]).map((c) => c.key)).not.toContain("other");
   });
 });
