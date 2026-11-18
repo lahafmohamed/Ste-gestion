@@ -19,7 +19,7 @@ import {
 } from "@ste/shared";
 import { prisma } from "../prisma.js";
 import { resolveVehicle } from "../vehicles.js";
-import { parseWorkbook, type ParsedSheet, type RawRow } from "./parse.js";
+import { parseWorkbook, sheetDate, type ParsedSheet, type RawRow } from "./parse.js";
 
 // ── Aperçu : ce que l'import ferait, sans rien écrire ───────────────────
 // Choix (2026-09-04) : camion absent → créé depuis la marge du classeur ;
@@ -118,6 +118,38 @@ function pieceCount(sheet: ParsedSheet): number {
   return sheet.rows.reduce((a, r) => a + (r.count ?? 1), 0);
 }
 
+/** « 2026-11-17T12:00:00 » → « 17/11/2026 ». */
+function frDay(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+
+// La date d'une feuille vient de son nom. Un classeur recopié garde souvent
+// le nom de feuille de l'original (2026-11-17 : fichier « DEBITES TECK DU
+// 17-11-2026 C », feuille « … 11-11-2026 C ») : le débit tombe avant
+// l'inventaire et disparaît du stock sans bruit. On signale tout écart avec la
+// date du nom de fichier, sans bloquer (la feuille peut avoir raison).
+function compareFileDate(
+  sheet: ParsedSheet,
+  fileDay: string | undefined,
+  inventoryDay: string | undefined,
+  issues: ImportIssue[],
+) {
+  const day = sheet.meta.date?.slice(0, 10);
+  if (!day || !fileDay || day === fileDay) return;
+  const stockSide = sheet.type === "SAWN" || sheet.type === "CONTAINER";
+  let consequence = "";
+  if (stockSide && inventoryDay !== undefined && day <= inventoryDay) {
+    const effect =
+      sheet.type === "SAWN" ? "ce débit n'entrera pas au stock" : "cet empotage ne sortira pas du stock";
+    consequence = `, antérieure à l'inventaire du ${frDay(inventoryDay)} : ${effect}`;
+  }
+  issues.push({
+    level: "warning",
+    message: `Feuille datée du ${frDay(day)}, fichier du ${frDay(fileDay)} : la date retenue est celle de la feuille${consequence}. Renommer la feuille si la bonne date est le ${frDay(fileDay)}.`,
+  });
+}
+
 function compareTotals(lines: ImportLine[], sheet: ParsedSheet, issues: ImportIssue[]) {
   const pieces = sheet.meta.excelPieceCount;
   if (pieces !== undefined && pieces > 0 && pieces !== pieceCount(sheet)) {
@@ -149,7 +181,7 @@ export async function previewImport(
   });
   if (!contract) throw Object.assign(new Error("Contrat introuvable"), { status: 404 });
 
-  const [sheets, trucks, containers] = await Promise.all([
+  const [sheets, trucks, containers, inventory] = await Promise.all([
     parseWorkbook(buffer),
     prisma.truck.findMany({
       where: { contractId },
@@ -168,7 +200,16 @@ export async function previewImport(
     // Conteneurs : plus de contrat depuis le stock général — un n° déjà empoté
     // ailleurs reste un doublon, on regarde donc tous les conteneurs.
     prisma.container.findMany({ select: { containerNo: true } }),
+    // Même règle que stock-ledger.ts : dernier inventaire = comptage de fin de
+    // journée, seuls les mouvements du lendemain ou après s'y ajoutent.
+    prisma.stockMovement.findFirst({
+      where: { kind: "INVENTAIRE" },
+      orderBy: [{ movedAt: "desc" }, { createdAt: "desc" }],
+      select: { movedAt: true },
+    }),
   ]);
+  const fileDay = sheetDate(filename)?.slice(0, 10);
+  const inventoryDay = inventory?.movedAt.toISOString().slice(0, 10);
 
   // Billes Ø créées par une feuille du même classeur : un billon « 283A » d'une
   // feuille GIRTH peut s'appuyer dessus même si le camion n'existe pas encore.
@@ -193,6 +234,7 @@ export async function previewImport(
     if (!hasPermission && sheet.type !== "UNKNOWN") {
       issues.push({ level: "error", message: "Permission insuffisante pour ce type de feuille" });
     }
+    if (sheet.type !== "UNKNOWN") compareFileDate(sheet, fileDay, inventoryDay, issues);
     if (sheet.meta.contractCode && sheet.meta.contractCode !== contract.code) {
       issues.push({
         level: "warning",
