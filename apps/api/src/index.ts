@@ -21,6 +21,7 @@ import { containerRoutes } from "./routes/containers.js";
 import { reportRoutes } from "./routes/reports.js";
 import { exportRoutes } from "./routes/exports.js";
 import { importRoutes } from "./routes/imports.js";
+import { dashboardRoutes } from "./routes/dashboard.js";
 
 const app = Fastify({ logger: true });
 
@@ -108,6 +109,7 @@ await app.register(containerRoutes);
 await app.register(reportRoutes);
 await app.register(exportRoutes);
 await app.register(importRoutes);
+await app.register(dashboardRoutes);
 
 await bootstrapAdmin(app);
 

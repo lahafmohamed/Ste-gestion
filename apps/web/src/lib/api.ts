@@ -22,6 +22,7 @@ import type {
   DailyReportDTO,
   LoginInput,
   LoginResponse,
+  ParcOverviewDTO,
   ParcTruckDTO,
   SawnInventoryRowDTO,
   StockImportApplyInput,
@@ -175,6 +176,11 @@ export const contractsApi = {
   truckStats: (id: string) => req<TruckStatDTO[]>(`/contracts/${id}/truck-stats`),
   dailyReport: (id: string, date: string) =>
     req<DailyReportDTO>(`/contracts/${id}/daily-report?date=${date}`),
+};
+
+export const dashboardApi = {
+  /** Camions sur parc par étape (à étaler, à billonner, à scier), tous contrats. */
+  parc: () => req<ParcOverviewDTO>("/dashboard/parc"),
 };
 
 // Stock général : tous contrats confondus. `contractId` ne sert qu'aux vues

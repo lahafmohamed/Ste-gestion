@@ -890,6 +890,39 @@ export type ParcTruckDTO = {
   girthLt85M3: string;
 };
 
+// ── Tableau de bord : où en sont les camions du parc ──────────────────
+// Un camion est « sur parc » tant qu'il lui reste une étape : étaler ses
+// billes, les billonner, ou scier ses billons. Compté tous contrats confondus.
+
+export type ParcQueueStage = "A_ETALER" | "A_BILLONNER";
+
+/** Camion qui attend le parc (étalage ou billonnage), le plus ancien d'abord. */
+export type ParcQueueTruckDTO = {
+  truckId: string;
+  contractId: string;
+  contractCode: string;
+  registration: string;
+  deliveryNote: string | null;
+  arrivedAt: string;
+  /** Annoncé au bordereau — rien n'est encore mesuré au parc. */
+  declaredLogCount: number | null;
+  declaredFieldM3: string | null;
+  stage: ParcQueueStage;
+};
+
+/** GET /dashboard/parc */
+export type ParcOverviewDTO = {
+  /** À étaler + à billonner + à scier. */
+  trucksOnParc: number;
+  toSpread: number; // non étalés
+  toBuck: number; // étalés, pas encore billonnés
+  toSaw: number; // billonnés, billons restants à scier
+  /** Billons non sciés (même total que la page Stock). */
+  parcM3: string;
+  parcBillons: number;
+  queue: ParcQueueTruckDTO[];
+};
+
 // ── Dépenses du contrat ───────────────────────────────────────────────
 // Deux familles : les dépenses « calculées » (paramètres de prix × quantités
 // réalisées, jamais stockées) et les dépenses « ajoutées » à la main (ce que

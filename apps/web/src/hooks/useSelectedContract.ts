@@ -8,6 +8,15 @@ import { contractsApi } from "../lib/api";
 const KEY = "ste.selectedContract.v2";
 
 /**
+ * Fixe le contrat courant avant de naviguer vers une page par étape (lien du
+ * tableau de bord vers l'étalage d'un camion précis) : la page l'y relit à
+ * son montage.
+ */
+export function rememberSelectedContract(id: string) {
+  localStorage.setItem(KEY, id);
+}
+
+/**
  * Contrat courant (partagé entre les pages par étape), persisté en localStorage.
  * Aucun contrat par défaut : l'opérateur choisit, ensuite son choix le suit.
  */

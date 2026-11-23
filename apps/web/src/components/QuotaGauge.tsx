@@ -18,7 +18,7 @@ function pctText(pct: number): string {
 }
 
 /** Piste de la jauge — rôle progressbar : la valeur se lit aussi au lecteur d'écran. */
-function Track({ pct, label, thick = false }: { pct: number; label: string; thick?: boolean }) {
+export function QuotaTrack({ pct, label, thick = false }: { pct: number; label: string; thick?: boolean }) {
   return (
     <div
       role="progressbar"
@@ -50,7 +50,7 @@ export function QuotaBar({ brousseM3, quotaM3 }: { brousseM3: string; quotaM3: s
         {quota > 0 && <span className={`font-medium ${pctText(pct)}`}>{fmtPct(pct, 0)}</span>}
       </div>
       <div className="mt-1.5">
-        <Track pct={pct} label="Utilisation du quota" />
+        <QuotaTrack pct={pct} label="Utilisation du quota" />
       </div>
     </div>
   );
@@ -113,7 +113,7 @@ export function QuotaGauge({
         )}
       </div>
       <div className="mt-3">
-        <Track pct={pct} label="Utilisation du quota" thick />
+        <QuotaTrack pct={pct} label="Utilisation du quota" thick />
       </div>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm tabular-nums text-brand-500">
         <span>
