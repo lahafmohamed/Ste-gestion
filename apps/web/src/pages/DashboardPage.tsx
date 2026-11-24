@@ -95,9 +95,10 @@ function StageCell({
 }: {
   /** Absent : le compte n'a pas accès à la page, la cellule reste un chiffre. */
   to?: string;
-  dot: keyof typeof STAGE_DOT;
+  /** Absent : pas une étape du parc (camions à venir), pas de pastille. */
+  dot?: keyof typeof STAGE_DOT;
   label: string;
-  value: number;
+  value: ReactNode;
   hint: ReactNode;
   /** Chiffre en ambre : des camions attendent leur première mesure. */
   alert?: boolean;
@@ -106,7 +107,7 @@ function StageCell({
   const body = (
     <>
       <div className="flex items-center gap-2 text-sm text-brand-600">
-        <span aria-hidden className={`size-2 shrink-0 rounded-full ${STAGE_DOT[dot]}`} />
+        {dot && <span aria-hidden className={`size-2 shrink-0 rounded-full ${STAGE_DOT[dot]}`} />}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {to && (
           <IconArrowRight
@@ -121,7 +122,7 @@ function StageCell({
           alert ? "text-amber-700" : "text-brand-900"
         }`}
       >
-        {fmtInt(value)}
+        {typeof value === "number" ? fmtInt(value) : value}
       </div>
       <div className="mt-0.5 text-xs text-brand-500">{hint}</div>
     </>
@@ -139,7 +140,57 @@ function StageCell({
   );
 }
 
-function ParcStrip({ parc }: { parc: ParcOverviewDTO }) {
+/** Camions encore attendus sur les contrats ouverts : la cellule de tête du parc. */
+function ToComeCell({ toCome }: { toCome: ToCome | null | undefined }) {
+  const can = useCan();
+  let value: ReactNode;
+  let hint: ReactNode;
+  if (toCome === undefined) {
+    // Quotas encore en chargement : le parc, lui, est déjà là.
+    value = <SkeletonLine className="mt-1 h-6 w-1/3" />;
+    hint = <SkeletonLine className="mt-1 w-2/3" />;
+  } else if (toCome === null) {
+    value = "—";
+    hint = "quotas indisponibles";
+  } else if (toCome.est === null) {
+    // Aucun camion mesuré sur un contrat qui a un quota : pas de moyenne.
+    value = "—";
+    hint = toCome.contracts > 0 ? "aucun camion mesuré" : "aucun quota ouvert";
+  } else if (toCome.remaining === 0) {
+    value = 0;
+    hint = "quotas atteints";
+  } else {
+    // Même arrondi que les lignes du quota : sous un demi-camion moyen, « < 1 ».
+    value =
+      toCome.est > 0 ? (
+        <>
+          <span className="font-normal text-brand-500">≈ </span>
+          {fmtInt(toCome.est)}
+        </>
+      ) : (
+        "< 1"
+      );
+    hint = `moyenne ${fmtM3(toCome.avg)}/camion`;
+  }
+  return (
+    <StageCell
+      to={can("contracts.view") ? "/contracts" : undefined}
+      label="Camions à venir"
+      value={value}
+      hint={hint}
+      className="col-span-2 tabular-nums md:col-span-1"
+    />
+  );
+}
+
+function ParcStrip({
+  parc,
+  toCome,
+}: {
+  parc: ParcOverviewDTO;
+  /** undefined : quotas en chargement ; null : quotas en erreur. */
+  toCome: ToCome | null | undefined;
+}) {
   const can = useCan();
   const total = parc.trucksOnParc;
   const oldest = parc.queue.find((t) => t.stage === "A_ETALER");
@@ -186,7 +237,9 @@ function ParcStrip({ parc }: { parc: ParcOverviewDTO }) {
   const heroCls = "col-span-2 bg-white px-4 py-3.5 md:col-span-1";
 
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-100 shadow-card md:grid-cols-[1.35fr_1fr_1fr_1fr]">
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-100 shadow-card md:grid-cols-[1fr_1.35fr_1fr_1fr_1fr]">
+      {/* Dans l'ordre du bois : à venir (brousse), puis reçu et ses étapes. */}
+      <ToComeCell toCome={toCome} />
       {can("reception.view") ? (
         <Link
           to="/reception"
@@ -235,13 +288,13 @@ function ParcStrip({ parc }: { parc: ParcOverviewDTO }) {
 function SkeletonStrip() {
   return (
     <div
-      className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-100 shadow-card md:grid-cols-[1.35fr_1fr_1fr_1fr]"
+      className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-100 shadow-card md:grid-cols-[1fr_1.35fr_1fr_1fr_1fr]"
       aria-hidden
     >
-      {[0, 1, 2, 3].map((i) => (
+      {[0, 1, 2, 3, 4].map((i) => (
         <div
           key={i}
-          className={`bg-white px-4 py-3.5 ${i === 0 || i === 3 ? "col-span-2 md:col-span-1" : ""}`}
+          className={`bg-white px-4 py-3.5 ${i === 0 || i === 1 || i === 4 ? "col-span-2 md:col-span-1" : ""}`}
         >
           <SkeletonLine className="w-1/2" />
           <SkeletonLine className="mt-3 h-6 w-1/3" />
@@ -359,6 +412,33 @@ function quotaLine(c: ContractDTO, o: ContractOverviewDTO): QuotaLine {
   };
 }
 
+type ToCome = {
+  /** Camions encore attendus, somme des projections par contrat ; null sans moyenne. */
+  est: number | null;
+  /** m³ brousse restant, contrat par contrat (un dépassement ne comble pas un autre quota). */
+  remaining: number;
+  /** Brousse moyen par camion mesuré, tous contrats ouverts. */
+  avg: number;
+  /** Contrats ouverts dont le quota n'est pas atteint. */
+  contracts: number;
+};
+
+/** Camions encore attendus sur l'ensemble des contrats ouverts. */
+function trucksToCome(lines: QuotaLine[]): ToCome {
+  const withQuota = lines.filter((l) => l.quota > 0);
+  const open = withQuota.filter((l) => l.remaining > 0);
+  const brousse = lines.reduce((s, l) => s + l.brousse, 0);
+  const measured = lines.reduce((s, l) => s + l.o.trucksMeasured, 0);
+  return {
+    est: withQuota.some((l) => l.estRemaining != null)
+      ? open.reduce((s, l) => s + (l.estRemaining ?? 0), 0)
+      : null,
+    remaining: open.reduce((s, l) => s + l.remaining, 0),
+    avg: measured > 0 ? brousse / measured : 0,
+    contracts: open.length,
+  };
+}
+
 /** Ce qu'il reste du quota, et ce que ça représente en camions. */
 function remainingLabel(l: Pick<QuotaLine, "quota" | "remaining" | "over" | "estRemaining">) {
   if (l.quota <= 0) return <span>quota non renseigné</span>;
@@ -366,10 +446,13 @@ function remainingLabel(l: Pick<QuotaLine, "quota" | "remaining" | "over" | "est
     return <span className="font-medium text-red-700">dépassé de {fmtM3(l.over)}</span>;
   }
   if (l.remaining === 0) return <span className="font-medium text-parc-800">quota atteint</span>;
+  // L'API arrondit au plus proche : un reste inférieur à un demi-camion moyen
+  // donne 0, qui se lit « moins d'un camion » et non « ≈ 1 camion ».
   return (
     <span>
       reste {fmtM3(l.remaining)}
-      {l.estRemaining != null && l.estRemaining > 0 && ` · ≈ ${plural(l.estRemaining, "camion")}`}
+      {l.estRemaining != null &&
+        (l.estRemaining > 0 ? ` · ≈ ${plural(l.estRemaining, "camion")}` : " · moins d'un camion")}
     </span>
   );
 }
@@ -437,9 +520,8 @@ function QuotaCard({ lines, closedCount }: { lines: QuotaLine[]; closedCount: nu
     quota,
     remaining: Math.max(quota - brousse, 0),
     over: quota > 0 ? Math.max(brousse - quota, 0) : 0,
-    estRemaining: withQuota.some((l) => l.estRemaining != null)
-      ? withQuota.reduce((s, l) => s + (l.over > 0 ? 0 : (l.estRemaining ?? 0)), 0)
-      : null,
+    // Même total que la cellule « Camions à venir » du parc.
+    estRemaining: trucksToCome(lines).est,
   };
   const pct = quota > 0 ? (brousse / quota) * 100 : 0;
   const trucks = lines.reduce((s, l) => s + l.o.trucksEntered, 0);
@@ -714,6 +796,7 @@ export default function DashboardPage() {
 
   const quotaError = contracts.isError ? contracts : overview.isError ? overview : null;
   const quotaReady = !!contracts.data && !!overview.data;
+  const toCome = quotaError ? null : quotaReady ? trucksToCome(lines) : undefined;
   const dateLabel = today.format(new Date());
 
   return (
@@ -729,7 +812,7 @@ export default function DashboardPage() {
             Impossible de charger l'état du parc
           </QueryError>
         ) : parc.data ? (
-          <ParcStrip parc={parc.data} />
+          <ParcStrip parc={parc.data} toCome={toCome} />
         ) : (
           <SkeletonStrip />
         )}

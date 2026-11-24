@@ -146,7 +146,8 @@ export async function summaryRoutes(app: FastifyInstance) {
       const a = acc.get(c.id)!;
       const avg = a.measured > 0 ? a.brousse / a.measured : 0;
       const remainingQuota = Math.max(Number(c.quotaM3) - a.brousse, 0);
-      const estTrucksRemaining = avg > 0 ? Math.ceil(remainingQuota / avg) : null;
+      // Arrondi (pas plafond) : 0,4 m³ restant ne vaut pas « 1 camion ».
+      const estTrucksRemaining = avg > 0 ? Math.round(remainingQuota / avg) : null;
       const b = money.get(c.id);
       const debited = b?.debited ?? 0;
       const sawnGirth = sawnGirthByContract.get(c.id) ?? 0;
@@ -156,6 +157,7 @@ export async function summaryRoutes(app: FastifyInstance) {
         trucksEntered: a.trucks,
         trucksSawn: a.sawn,
         brousseM3: a.brousse.toFixed(6),
+        trucksMeasured: a.measured,
         estTrucksTotal: estTrucksRemaining !== null ? a.trucks + estTrucksRemaining : null,
         debitedM3: debited.toFixed(6),
         outputPct: (sawnGirth > 0 ? (debited / sawnGirth) * 100 : 0).toFixed(4),
@@ -434,10 +436,13 @@ export async function summaryRoutes(app: FastifyInstance) {
     // qu'il faudra encore pour consommer le quota restant. Estimatif : la
     // moyenne s'affine à chaque arrivée. `trucksPlanned` (saisi) reste le
     // chiffre contractuel ; ceci est la projection terrain.
+    // Arrondi au plus proche, pas au-dessus : le chiffre suit le reste réel
+    // (0,4 m³ sur des camions de 22 m³ → 0, que l'écran lit « moins d'un
+    // camion » ; Math.ceil affichait « 1 camion » jusqu'au dernier litre).
     const avgBrousse = trucksWithBrousse > 0 ? brousseM3 / trucksWithBrousse : 0;
     const remainingQuota = Math.max(quota - brousseM3, 0);
     const estTrucksRemaining =
-      avgBrousse > 0 ? Math.ceil(remainingQuota / avgBrousse) : null;
+      avgBrousse > 0 ? Math.round(remainingQuota / avgBrousse) : null;
     const estTrucksTotal =
       estTrucksRemaining !== null ? trucksEntered + estTrucksRemaining : null;
 

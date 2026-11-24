@@ -786,6 +786,7 @@ export type ContractOverviewDTO = {
   trucksEntered: number;
   trucksSawn: number; // camions avec au moins un débitage saisi
   brousseM3: string; // même règle que le résumé : étalage brousse > packing > déclaré
+  trucksMeasured: number; // camions qui portent un volume brousse (dénominateur de la moyenne)
   estTrucksTotal: number | null;
   debitedM3: string;
   outputPct: string; // débité ÷ billons sciés (rendement scierie, F6)

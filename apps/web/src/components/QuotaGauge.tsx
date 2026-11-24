@@ -134,9 +134,19 @@ export function QuotaGauge({
           faut encore pour finir le quota. S'affine à chaque arrivée. */}
       {estTrucksRemaining != null && avg > 0 && remaining > 0 && (
         <div className="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-sm tabular-nums text-brand-600">
-          ≈ <strong className="text-brand-900">{estTrucksRemaining}</strong> camion
-          {estTrucksRemaining > 1 ? "s" : ""} encore nécessaire
-          {estTrucksRemaining > 1 ? "s" : ""} pour finir
+          {/* Arrondi au plus proche côté API : 0 = le reste tient dans moins
+              d'un demi-camion moyen, pas « aucun camion ». */}
+          {estTrucksRemaining > 0 ? (
+            <>
+              ≈ <strong className="text-brand-900">{estTrucksRemaining}</strong> camion
+              {estTrucksRemaining > 1 ? "s" : ""} encore nécessaire
+              {estTrucksRemaining > 1 ? "s" : ""} pour finir
+            </>
+          ) : (
+            <>
+              <strong className="text-brand-900">Moins d'un camion</strong> pour finir
+            </>
+          )}
           {estTrucksTotal != null && (
             <>
               {" "}
