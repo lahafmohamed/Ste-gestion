@@ -412,6 +412,21 @@ function quotaLine(c: ContractDTO, o: ContractOverviewDTO): QuotaLine {
   };
 }
 
+/** Plus rien à recevoir : quota atteint, ou reste inférieur à un camion. */
+function isDone(l: QuotaLine) {
+  return l.quota > 0 && (l.remaining === 0 || l.estRemaining === 0);
+}
+
+/**
+ * Contrats en cours en haut, finis en bas. En cours : le plus avancé d'abord.
+ * Finis : le moins avancé d'abord, les dépassements ferment la liste.
+ */
+function byProgress(a: QuotaLine, b: QuotaLine) {
+  const done = isDone(a);
+  if (done !== isDone(b)) return done ? 1 : -1;
+  return done ? a.pct - b.pct : b.pct - a.pct;
+}
+
 type ToCome = {
   /** Camions encore attendus, somme des projections par contrat ; null sans moyenne. */
   est: number | null;
@@ -788,9 +803,7 @@ export default function DashboardPage() {
       const o = ovById.get(c.id);
       if (o) lines.push(quotaLine(c, o));
     }
-    // Le plus avancé en tête : c'est celui qui demande une décision (dernier
-    // camion, dépassement).
-    lines.sort((a, b) => b.pct - a.pct);
+    lines.sort(byProgress);
     return { lines, closedCount: all.filter((c) => c.status !== "OPEN").length };
   }, [contracts.data, overview.data]);
 
