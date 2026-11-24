@@ -79,8 +79,10 @@ export default function UsersSection() {
   // Carte en cours d'enregistrement : ses commandes se figent le temps du PATCH.
   const pendingId = update.isPending ? update.variables?.id : undefined;
 
+  // Pleine largeur de la colonne : les onglets au-dessus s'étendent sur 72rem,
+  // une liste arrêtée à 48rem laissait un tiers de page vide à droite.
   return (
-    <div className="max-w-page">
+    <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-brand-600">
           Le rôle donne les permissions de base ; « Permissions » ajuste compte par compte.

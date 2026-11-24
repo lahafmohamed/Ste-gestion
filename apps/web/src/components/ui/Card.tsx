@@ -100,21 +100,28 @@ export function Kpi({
  * d'1px (le fond de la grille passe entre les cellules), au lieu de trois ou
  * quatre cartes identiques côte à côte. Enfants : des <Kpi bare />.
  * Téléphone : deux colonnes ; une cellule seule en dernière ligne s'étale sur
- * les deux plutôt que de laisser un trou.
+ * les deux plutôt que de laisser un trou. `stack` : une seule colonne sur
+ * téléphone, pour les valeurs longues (montants FCFA) qui débordaient d'une
+ * demi-largeur.
  */
 export function KpiStrip({
   children,
   cols = 4,
+  stack = false,
   className = "",
 }: {
   children: ReactNode;
   /** Colonnes à partir de la tablette (3 ou 4 chiffres). */
   cols?: 3 | 4;
+  /** Une cellule par ligne sous sm (montants longs). */
+  stack?: boolean;
   className?: string;
 }) {
   return (
     <div
-      className={`grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-100 shadow-card [&>:last-child:nth-child(odd)]:col-span-2 ${
+      className={`grid gap-px overflow-hidden rounded-xl bg-brand-100 shadow-card ${
+        stack ? "grid-cols-1" : "grid-cols-2 [&>:last-child:nth-child(odd)]:col-span-2"
+      } ${
         cols === 3
           ? "sm:grid-cols-3 sm:[&>:last-child:nth-child(odd)]:col-span-1"
           : "md:grid-cols-4 md:[&>:last-child:nth-child(odd)]:col-span-1"

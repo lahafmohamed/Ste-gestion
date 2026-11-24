@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -18,7 +19,7 @@ import { useCan } from "../lib/auth";
 import { fmtDec3, fmtInt, fmtNum, fmtPct, fmtM3 } from "../lib/format";
 import { truckLabel } from "../lib/trucks";
 import Badge, { SIZE_GROUP_TONE } from "../components/ui/Badge";
-import Button, { buttonCls } from "../components/ui/Button";
+import Button from "../components/ui/Button";
 import Card, { BackLink, Kpi, KpiStrip } from "../components/ui/Card";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { FormError, QueryError } from "../components/ui/Feedback";
@@ -177,68 +178,87 @@ export default function ProductionRunPage() {
         />
       </KpiStrip>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {(Object.keys(groups) as SizeGroup[])
-          .filter((g) => groups[g] > 0)
-          .map((g) => (
-            <Badge key={g} size="md" tone={SIZE_GROUP_TONE[g]} className="tabular-nums">
-              {SIZE_GROUP_LABELS[g]} {fmtM3(groups[g])}
-            </Badge>
-          ))}
-      </div>
+      {/* Répartition de la session : une fiche à rangées libellées plutôt que
+          trois lignes de pastilles en vrac sous la bande de chiffres. */}
+      <Card pad="none" className="mt-3 divide-y divide-brand-100 px-4">
+        <SummaryRow label="Tailles">
+          {(Object.keys(groups) as SizeGroup[])
+            .filter((g) => groups[g] > 0)
+            .map((g) => (
+              <Badge key={g} size="md" tone={SIZE_GROUP_TONE[g]} className="tabular-nums">
+                {SIZE_GROUP_LABELS[g]} {fmtM3(groups[g])}
+              </Badge>
+            ))}
+        </SummaryRow>
 
-      {/* Camions sciés + rendement de la session */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-brand-600">Camions sciés :</span>
-        {/* Pas de « aucun camion lié » tant que la liste n'est pas arrivée. */}
-        {trucksQ.isLoading ? (
-          <SkeletonLine className="w-40" />
-        ) : trucksQ.isError ? (
-          <QueryError error={trucksQ.error} onRetry={() => trucksQ.refetch()}>
-            Impossible de charger les camions
-          </QueryError>
-        ) : linkedTrucks.length === 0 ? (
-          <span className="text-brand-600">aucun camion lié</span>
-        ) : (
-          linkedTrucks.map((t) => (
-            <Link key={t.id} to={`/trucks/${t.id}`} className={buttonCls("secondary", "sm")}>
-              {/* B/L d'abord : la session se rapproche des bordereaux, pas des
-                  immatriculations. */}
-              {truckLabel(t)}
-              {t.deliveryNote && (
-                <span className="font-normal text-brand-500">{t.registration}</span>
-              )}
-            </Link>
-          ))
+        <SummaryRow label="Camions sciés">
+          {/* Pas de « aucun camion lié » tant que la liste n'est pas arrivée. */}
+          {trucksQ.isLoading ? (
+            <SkeletonLine className="w-40" />
+          ) : trucksQ.isError ? (
+            <QueryError error={trucksQ.error} onRetry={() => trucksQ.refetch()}>
+              Impossible de charger les camions
+            </QueryError>
+          ) : linkedTrucks.length === 0 ? (
+            <span className="text-sm text-brand-600">aucun camion lié</span>
+          ) : (
+            linkedTrucks.map((t) => (
+              <Link
+                key={t.id}
+                to={`/trucks/${t.id}`}
+                className="-mx-2 inline-flex min-h-touch items-center gap-2 rounded-lg px-2 text-sm font-medium text-brand-900 underline-offset-2 transition-colors hover:bg-brand-100 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-500 active:bg-brand-200"
+              >
+                {/* B/L d'abord : la session se rapproche des bordereaux, pas des
+                    immatriculations. */}
+                {truckLabel(t)}
+                {t.deliveryNote && (
+                  <span className="font-normal text-brand-500">{t.registration}</span>
+                )}
+              </Link>
+            ))
+          )}
+        </SummaryRow>
+
+        {/* Billons sciés précisés */}
+        {sawnBillons.length > 0 && (
+          <SummaryRow label="Billons sciés">
+            {sawnBillons.map((l) => (
+              <Badge key={l.id} tone="parc" title={`${Number(l.volumeM3).toFixed(4)} m³`}>
+                {l.externalId ?? `#${l.position}`}
+              </Badge>
+            ))}
+          </SummaryRow>
         )}
-      </div>
 
-      {/* Billons sciés précisés */}
-      {sawnBillons.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-sm text-brand-600">Billons sciés :</span>
-          {sawnBillons.map((l) => (
-            <Badge key={l.id} tone="parc" title={`${Number(l.volumeM3).toFixed(4)} m³`}>
-              {l.externalId ?? `#${l.position}`}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Splits longueur & épaisseur (rapport d'activité) */}
-      <div className="mt-2 flex flex-wrap gap-2">
-        <Badge tone="info" className="tabular-nums">
-          Long ≥ 6,5 ft {fmtM3(longM3)} ({fmtPct((longM3 / total) * 100, 0)}) · court{" "}
-          {fmtM3(shortM3)} ({fmtPct((shortM3 / total) * 100, 0)})
-        </Badge>
-        {bands
-          .filter((b) => b.m3 > 0)
-          .map((b) => (
-            <Badge key={b.key} className="tabular-nums">
-              {b.label} {fmtM3(b.m3)} ({fmtPct((b.m3 / total) * 100, 0)})
-            </Badge>
-          ))}
-      </div>
+        {/* Splits longueur & épaisseur (rapport d'activité) */}
+        <SummaryRow label="Longueur">
+          <span className="text-sm tabular-nums text-brand-800">
+            Long ≥ 6,5 ft {fmtM3(longM3)} ({fmtPct((longM3 / total) * 100, 0)})
+            <span className="text-brand-500" aria-hidden>
+              {" · "}
+            </span>
+            court {fmtM3(shortM3)} ({fmtPct((shortM3 / total) * 100, 0)})
+          </span>
+        </SummaryRow>
+        {bands.some((b) => b.m3 > 0) && (
+          <SummaryRow label="Épaisseur">
+            <span className="text-sm tabular-nums text-brand-800">
+              {bands
+                .filter((b) => b.m3 > 0)
+                .map((b, i) => (
+                  <span key={b.key}>
+                    {i > 0 && (
+                      <span className="text-brand-500" aria-hidden>
+                        {" · "}
+                      </span>
+                    )}
+                    {b.label} {fmtM3(b.m3)} ({fmtPct((b.m3 / total) * 100, 0)})
+                  </span>
+                ))}
+            </span>
+          </SummaryRow>
+        )}
+      </Card>
 
       {/* La taille n'est pas une colonne : « 7"+ », « 1" », « 2" » sont eux-mêmes
           des cotes en pouces, et collés à la colonne ép ils se lisaient comme une
@@ -327,6 +347,16 @@ export default function ProductionRunPage() {
 }
 
 /** Lignes d'une session regroupées par taille, dans l'ordre du classeur (F4). */
+/** Rangée libellée de la fiche de répartition (libellé à gauche dès sm). */
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5 py-3 sm:min-h-[3.25rem] sm:flex-row sm:items-center sm:gap-4 sm:py-1">
+      <div className="shrink-0 text-sm text-brand-600 sm:w-32">{label}</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">{children}</div>
+    </div>
+  );
+}
+
 function sizeSections(
   lines: SawnLineDTO[]
 ): { code: string; count: number; m3: number; lines: SawnLineDTO[] }[] {

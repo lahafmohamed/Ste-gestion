@@ -443,8 +443,11 @@ export default function Layout() {
         {/* ml-auto sous lg : sans la nav pour occuper le milieu, les actions
             doivent être poussées à droite elles-mêmes. */}
         <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
+          {/* Bouton secondaire : présent sur chaque page, il ne doit pas
+              voler la vedette à l'action principale de la page (« Nouveau
+              bon », « Camion arrivé »…) — un seul bouton teck plein à l'écran. */}
           {!onContracts && canCreateContract && (
-            <Link to="/contracts?nouveau=1" className={buttonCls("primary", "sm")}>
+            <Link to="/contracts?nouveau=1" className={buttonCls("secondary", "sm")}>
               <IconPlus width={16} height={16} className="-ml-0.5" />
               Contrat
             </Link>

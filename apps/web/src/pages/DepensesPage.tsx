@@ -932,7 +932,7 @@ export default function DepensesPage() {
               </div>
             )}
 
-            <KpiStrip cols={3} className="tabular-nums">
+            <KpiStrip cols={3} stack className="tabular-nums">
               <Kpi
                 bare
                 label="À payer"
@@ -949,8 +949,10 @@ export default function DepensesPage() {
               <Kpi bare label="Total des dépenses" value={fmtFcfa(totalAmount)} />
             </KpiStrip>
 
-            <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
-              <Tabs tabs={TABS} value={tab} onChange={setTab} label="Vue" className="flex-1" />
+            {/* Téléphone : le filtre de contrat passe sous les onglets — sur la
+                même ligne il recouvrait « Bons de paiement ». */}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <Tabs tabs={TABS} value={tab} onChange={setTab} label="Vue" className="min-w-0 sm:flex-1" />
               {contracts.length > 1 && (
                 <SelectField
                   width="auto"
@@ -1025,43 +1027,54 @@ export default function DepensesPage() {
                             </div>
                           )}
                         </div>
+                        {/* Colonnes à largeur fixe : les tableaux des contrats
+                            s'empilent et leurs colonnes tombent sur les mêmes
+                            lignes. Téléphone : deux colonnes seulement — la date
+                            passe sous le libellé, le statut sous le montant
+                            (avant, le montant fuyait hors champ à droite). */}
                         <Card pad="sm">
-                          <TableWrap>
-                            <table className="w-full min-w-[600px] text-base">
-                              <thead className="text-left text-sm text-brand-500">
-                                <tr>
-                                  <Th>Dépense</Th>
-                                  <Th>Date</Th>
-                                  <Th right>Montant</Th>
-                                  <Th className="pr-0 text-right">Statut</Th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {g.map((r) => (
-                                  <tr key={r.rowId} className="border-t border-brand-100">
-                                    <Td>
-                                      <span className="font-medium text-brand-900">{r.label}</span>
-                                      {r.kind === "computed" && (
-                                        <span className="ml-2 text-xs text-brand-500">calculée</span>
-                                      )}
-                                      {r.detail && (
-                                        <div className="text-sm text-brand-500">{r.detail}</div>
-                                      )}
-                                    </Td>
-                                    <Td className="whitespace-nowrap text-sm tabular-nums text-brand-500">
-                                      {r.date ? fmtDate(r.date) : "—"}
-                                    </Td>
-                                    <Td num className="font-medium">
-                                      {fmtFcfa(r.amount)}
-                                    </Td>
-                                    <Td className="py-1.5 pr-0 text-right">
+                          <table className="w-full table-fixed text-base">
+                            <thead className="text-left text-sm text-brand-500">
+                              <tr>
+                                <Th>Dépense</Th>
+                                <Th className="hidden w-28 sm:table-cell">Date</Th>
+                                <Th right className="w-40 pr-0 sm:pr-3">Montant</Th>
+                                <Th className="hidden w-60 pr-0 text-right sm:table-cell">Statut</Th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.map((r) => (
+                                <tr key={r.rowId} className="border-t border-brand-100 align-top sm:align-middle">
+                                  <Td className="py-2 sm:py-1">
+                                    <span className="font-medium text-brand-900">{r.label}</span>
+                                    {r.kind === "computed" && (
+                                      <span className="ml-2 text-xs text-brand-500">calculée</span>
+                                    )}
+                                    {r.detail && (
+                                      <div className="text-sm text-brand-500">{r.detail}</div>
+                                    )}
+                                    {r.date && (
+                                      <div className="text-sm tabular-nums text-brand-500 sm:hidden">
+                                        {fmtDate(r.date)}
+                                      </div>
+                                    )}
+                                  </Td>
+                                  <Td className="hidden whitespace-nowrap text-sm tabular-nums text-brand-500 sm:table-cell">
+                                    {r.date ? fmtDate(r.date) : "—"}
+                                  </Td>
+                                  <Td num className="py-2 pr-0 font-medium sm:py-1 sm:pr-3">
+                                    <div className="whitespace-nowrap">{fmtFcfa(r.amount)}</div>
+                                    <div className="mt-1 sm:hidden">
                                       <Status r={r} />
-                                    </Td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </TableWrap>
+                                    </div>
+                                  </Td>
+                                  <Td className="hidden py-1.5 pr-0 text-right sm:table-cell">
+                                    <Status r={r} />
+                                  </Td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </Card>
                       </section>
                     );

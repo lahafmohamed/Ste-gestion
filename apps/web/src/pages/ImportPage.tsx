@@ -24,9 +24,11 @@ import { IconChevronDown, IconLock } from "../components/icons";
 
 // Lien d'action dans une ligne de résultat (ouvrir le camion, la session…) :
 // cible tactile pleine hauteur, teck comme les autres liens de l'app.
+// Soulignés au repos : en teck foncé seul, ils se confondaient avec le texte.
 const rowLinkCls =
   "inline-flex min-h-touch items-center rounded-lg px-1.5 text-sm font-medium text-accent-700 " +
-  "underline-offset-2 hover:underline hover:text-accent-800 focus-visible:outline " +
+  "underline decoration-accent-300 underline-offset-4 transition-colors hover:text-accent-800 " +
+  "hover:decoration-accent-600 focus-visible:outline " +
   "focus-visible:outline-2 focus-visible:outline-accent-500";
 
 // Import des classeurs Excel du terrain : le réseau manque en brousse, les
@@ -329,14 +331,16 @@ function HistoryRow({ batch, contractId }: { batch: ImportBatchDTO; contractId: 
         <span className="font-medium text-brand-900">{batch.filename}</span>
         <span className="text-sm text-brand-500">{fmtDateTime(batch.createdAt)}</span>
         {batch.user && <span className="text-sm text-brand-500">· {batch.user.name}</span>}
+        {/* Colonnes à largeur fixe dès sm : feuilles, lignes et m³ tombent
+            l'un sous l'autre d'une ligne à l'autre. */}
         <span className="ml-auto flex flex-wrap items-center gap-x-3 text-sm tabular-nums text-brand-700">
-          <span className="tabular-nums">
+          <span className="sm:w-20 sm:text-right">
             {fmtInt(batch.sheetCount)} feuille{batch.sheetCount > 1 ? "s" : ""}
           </span>
-          <span className="tabular-nums">
+          <span className="sm:w-24 sm:text-right">
             {fmtInt(batch.lineCount)} ligne{batch.lineCount > 1 ? "s" : ""}
           </span>
-          <span className="tabular-nums">{fmtNum(batch.totalM3)} m³</span>
+          <span className="sm:w-28 sm:text-right">{fmtDec3(batch.totalM3)} m³</span>
           {batch.createdTrucks > 0 && (
             <Badge tone="amber">
               {fmtInt(batch.createdTrucks)} camion{batch.createdTrucks > 1 ? "s" : ""} créé

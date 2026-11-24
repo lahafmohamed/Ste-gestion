@@ -24,9 +24,12 @@ export default function Tabs<K extends string>({
     // overflow-x-auto force aussi overflow-y en auto (règle CSS) : le -mb-px des
     // onglets déborde d'1px et Chrome afficherait une barre verticale fantôme.
     // Barres masquées, le glissement tactile reste possible.
+    // Téléphone : la rangée déborde jusqu'au bord de l'écran (elle défile au
+    // pouce). Dès sm, le filet s'arrête aux bords de la colonne, comme le
+    // titre et les cartes — il dépassait de 16px de chaque côté.
     <nav
       aria-label={label}
-      className={`-mx-4 overflow-x-auto border-b border-brand-200 px-4 scrollbar-none${
+      className={`-mx-4 overflow-x-auto border-b border-brand-200 px-4 scrollbar-none sm:mx-0 sm:px-0${
         className ? ` ${className}` : ""
       }`}
     >

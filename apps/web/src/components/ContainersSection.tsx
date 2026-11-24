@@ -502,8 +502,12 @@ export default function ContainersSection({ contractId }: { contractId?: string 
       <SectionHeading
         right={
           can("empotage.create") && (
-            <Button size="xs" onClick={() => setShowForm((s) => !s)}>
-              {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Conteneur</>}
+            <Button
+              variant={showForm ? "secondary" : "primary"}
+              aria-expanded={showForm}
+              onClick={() => setShowForm((s) => !s)}
+            >
+              {showForm ? "Fermer" : <><IconPlus width={16} height={16} className="-ml-0.5" />Nouveau conteneur</>}
             </Button>
           )
         }

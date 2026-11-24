@@ -160,7 +160,7 @@ export default function CamionsPage() {
               ) : (
                 <>
                   <IconPlus width={16} height={16} className="-ml-0.5" />
-                  Camion
+                  Nouveau camion
                 </>
               )}
             </Button>
@@ -246,7 +246,7 @@ export default function CamionsPage() {
                 can("camions.create") && (
                   <Button variant="primary" onClick={() => setShowForm(true)}>
                     <IconPlus width={16} height={16} className="-ml-0.5" />
-                    Camion
+                    Nouveau camion
                   </Button>
                 )
               }

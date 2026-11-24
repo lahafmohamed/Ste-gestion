@@ -43,7 +43,7 @@ function FlowStep({
 }) {
   return (
     <li
-      className={`min-w-[8.5rem] flex-1 rounded-lg p-3 ${
+      className={`min-w-0 rounded-lg p-3 ${
         muted
           ? "border border-dashed border-brand-200 bg-brand-50/60"
           : "bg-brand-50 ring-1 ring-inset ring-brand-100"
@@ -353,7 +353,11 @@ export default function ContractDetailPage() {
             <Card className="space-y-3">
               {/* Chaîne de mesure — mêmes étapes et mêmes mots que la réception.
                   Liste ordonnée : l'ordre est le sens du bois. */}
-              <ol className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {/* Grille 2 × 2 sur téléphone (avant : une rangée qui défilait
+                  dans la carte, l'étape 3 coupée au bord) ; 4 de front dès md.
+                  Pastilles d'indicateurs en ton neutre : seul l'ambre (perte
+                  anormale) doit sauter aux yeux. */}
+              <ol className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 <FlowStep
                   step={1}
                   label="Brousse"
@@ -416,17 +420,17 @@ export default function ContractDetailPage() {
                     </Badge>
                   )}
                   {Number(s.girthM3) > 0 && (
-                    <Badge tone="parc">
+                    <Badge>
                       Billons ≥85 cm : {fmtM3(s.girthGte85M3)} · &lt;85 : {fmtM3(s.girthLt85M3)}
                     </Badge>
                   )}
                   {Number(s.debitedM3) > 0 && (
                     <>
-                      <Badge tone="info">
+                      <Badge>
                         Long 6,5ft+ : {fmtM3(s.longM3)} ({fmtPct(Number(s.longPct), 0)}) · court :{" "}
                         {fmtM3(s.shortM3)}
                       </Badge>
-                      <Badge tone="accent">1" : {fmtPct(Number(s.oneInchPct))}</Badge>
+                      <Badge>1" : {fmtPct(Number(s.oneInchPct))}</Badge>
                     </>
                   )}
                 </div>
