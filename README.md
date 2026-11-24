@@ -50,9 +50,13 @@ sont conservés.
 
 ```bash
 pnpm dev          # web + api en parallèle
-pnpm dev:web      # front seul  -> http://localhost:5173
+pnpm dev:web      # front seul  -> http://localhost:5273
 pnpm dev:api      # api seule   -> http://localhost:3001
 ```
+
+Sous Windows, `dev.bat` (double-clic) fait la même chose que `pnpm dev`, prend le
+port suivant si 3001 ou 5273 est occupé, et ouvre le navigateur une fois l'API et
+le front prêts (`dev.bat --no-open` pour ne pas l'ouvrir).
 
 Le front proxy `/api/*` vers l'API (voir `apps/web/vite.config.ts`).
 Health check : `GET http://localhost:3001/health`.

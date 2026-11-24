@@ -2,9 +2,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+// `dev.bat` choisit des ports libres et les passe par l'environnement ; sans
+// variable (`pnpm dev` direct), les ports habituels.
+const API_PORT = Number(process.env.API_PORT ?? 3001);
+const WEB_PORT = Number(process.env.WEB_PORT ?? 5273);
+
 const API_PROXY = {
   "/api": {
-    target: "http://127.0.0.1:3001",
+    target: `http://127.0.0.1:${API_PORT}`,
     changeOrigin: true,
     rewrite: (p: string) => p.replace(/^\/api/, ""),
   },
@@ -79,7 +84,10 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 5273,
+    port: WEB_PORT,
+    // Port imposé par le lanceur : échouer plutôt que glisser sur un autre port
+    // que celui qu'il ouvre dans le navigateur.
+    strictPort: process.env.WEB_PORT !== undefined,
     host: true, // écoute sur le LAN (0.0.0.0) → accès depuis tablette/tél au parc
     proxy: API_PROXY,
   },
